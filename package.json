@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "setup": "tsx scripts/setup.ts",
-    "sync:codex": "tsx scripts/sync-agents-to-codex.ts"
+    "sync:codex": "tsx scripts/sync-agents-to-codex.ts && tsx scripts/sync-rules-to-codex.ts",
+    "sync:codex:agents": "tsx scripts/sync-agents-to-codex.ts",
+    "sync:codex:rules": "tsx scripts/sync-rules-to-codex.ts"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
