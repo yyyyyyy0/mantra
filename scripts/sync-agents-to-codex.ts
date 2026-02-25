@@ -2,26 +2,11 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import * as yaml from 'js-yaml'
-import { z } from 'zod'
 import { buildSkillContent, CodexFrontmatter } from './lib/codex-utils'
 import { writeAtomic } from './lib/fs-utils'
+import { ClaudeAgentFrontmatter } from './lib/agent-schema'
 
-// ────────────────────────────────────────────────────────────
-// スキーマ定義
-// ────────────────────────────────────────────────────────────
-
-const SAFE_NAME_RE = /^[a-zA-Z0-9_-]+$/
-
-const ClaudeAgentFrontmatter = z.object({
-  name: z
-    .string()
-    .regex(SAFE_NAME_RE, 'name には英数字・ハイフン・アンダースコアのみ使用できます'),
-  description: z.string(),
-  tools: z.array(z.string()).optional().default([]),
-  model: z.string().optional(),
-})
-
-type ClaudeAgentFrontmatter = z.infer<typeof ClaudeAgentFrontmatter>
+type ClaudeAgentFrontmatter = typeof ClaudeAgentFrontmatter._output
 
 // ────────────────────────────────────────────────────────────
 // カテゴリマッピング

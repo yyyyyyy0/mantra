@@ -2,24 +2,11 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import * as yaml from 'js-yaml'
-import { z } from 'zod'
 import { buildSkillContent, CodexFrontmatter } from './lib/codex-utils'
 import { writeAtomic } from './lib/fs-utils'
+import { RuleMetadata } from './lib/rule-schema'
 
-// ────────────────────────────────────────────────────────────
-// スキーマ定義
-// ────────────────────────────────────────────────────────────
-
-const SAFE_NAME_RE = /^[a-zA-Z0-9_-]+$/
-
-const RuleMetadata = z.object({
-  name: z
-    .string()
-    .regex(SAFE_NAME_RE, 'name には英数字・ハイフン・アンダースコアのみ使用できます'),
-  description: z.string().min(1, 'description は空にできません'),
-})
-
-type RuleMetadata = z.infer<typeof RuleMetadata>
+type RuleMetadata = typeof RuleMetadata._output
 
 // ────────────────────────────────────────────────────────────
 // カテゴリマッピング
