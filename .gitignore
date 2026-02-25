@@ -1,4 +1,29 @@
+# Dependencies
 node_modules/
+
+# Claude Code
 .claude/
+
+# Logs
 *.log
+
+# OS files
 .DS_Store
+
+# Environment files
+.env
+.env.*
+*.local
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# Editor files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
