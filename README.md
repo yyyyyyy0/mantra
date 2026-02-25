@@ -85,6 +85,7 @@ mantra/
 | `coding-style.md` | イミュータビリティ・ファイル構成・エラー処理 |
 | `git-workflow.md` | コミットメッセージ・PR ワークフロー |
 | `hooks.md` | Claude Code hooks の設定と利用 |
+| `mob-programming.md` | Mob プログラミング：マルチエージェント協調・意思決定プロトコル |
 | `patterns.md` | API レスポンス形式・カスタムフック・リポジトリパターン |
 | `performance.md` | モデル選択・コンテキスト管理・Ultrathink |
 | `security.md` | セキュリティチェックリスト・シークレット管理 |
@@ -102,23 +103,23 @@ mantra/
 
 ---
 
-## Mob Programming (Experimental)
+## Mob Programming（実験的）
 
-This pack includes optional **mob programming orchestration** agents and rules for non-trivial tasks.
+複雑なタスク向けのオプション機能として、**mob プログラミングオーケストレーション**用のエージェントとルールを含んでいます。
 
-Use it when a change involves multiple steps, architectural tradeoffs, or high-risk domains (auth, security, migrations, billing).
+複数ステップを伴う変更、アーキテクチャ上のトレードオフ、高リスクドメイン（認証・セキュリティ・マイグレーション・請求など）での使用に適しています。
 
-### Included mob roles
-- `mob-navigator` — coordinates decision flow and next steps
-- `mob-critic` — challenges assumptions and surfaces risks
-- `mob-scribe` — normalizes multi-agent outputs into decision/risk/action summaries
+### 含まれる mob 役割
+- `mob-navigator` — 意思決定フローと次のステップを調整
+- `mob-critic` — 仮定に挑戦し、リスクを表面化
+- `mob-scribe` — マルチエージェントの出力を意思決定/リスク/アクションの要約に正規化
 
-### Suggested modes
-- **flash-mob**: quick preflight risk scan
-- **plan-mob**: lock plan + acceptance criteria + verification strategy
-- **review-mob**: merge-readiness review with blocker/warning summary
+### 推奨モード
+- **flash-mob**: クイック事前リスクスキャン
+- **plan-mob**: 計画・受入条件・検証戦略の確定
+- **review-mob**: ブロッカー/警告要約付きマージ準備レビュー
 
-See `rules/mob-programming.md` for the operating rules and summary format.
+詳細な運用ルールとサマリー形式は `rules/mob-programming.md` を参照してください。
 
 ---
 
