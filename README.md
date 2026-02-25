@@ -103,23 +103,65 @@ mantra/
 
 ---
 
-## Mob Programming（実験的）
+## Mob Programming（実験的）/ Mob Programming (Experimental)
 
 複雑なタスク向けのオプション機能として、**mob プログラミングオーケストレーション**用のエージェントとルールを含んでいます。
 
-複数ステップを伴う変更、アーキテクチャ上のトレードオフ、高リスクドメイン（認証・セキュリティ・マイグレーション・請求など）での使用に適しています。
+Optional feature for complex tasks: includes **mob programming orchestration** agents and rules.
 
-### 含まれる mob 役割
-- `mob-navigator` — 意思決定フローと次のステップを調整
-- `mob-critic` — 仮定に挑戦し、リスクを表面化
-- `mob-scribe` — マルチエージェントの出力を意思決定/リスク/アクションの要約に正規化
+### なぜモブプログラミングか？/ Why Mob Programming?
 
-### 推奨モード
-- **flash-mob**: クイック事前リスクスキャン
-- **plan-mob**: 計画・受入条件・検証戦略の確定
-- **review-mob**: ブロッカー/警告要約付きマージ準備レビュー
+モブプログラミングは、以下の状況で意思決定の質と実装の安全性を向上させます：
 
-詳細な運用ルールとサマリー形式は `rules/mob-programming.md` を参照してください。
+Mob programming improves decision quality and implementation safety in these situations:
+
+- **3+ 実装ステップ**を伴う変更 / Changes spanning **3+ implementation steps**
+- **複数ファイル・レイヤー**に影響する変更 / Changes touching **multiple files/layers**
+- **アーキテクチャ上のトレードオフ** / Architectural or API tradeoffs
+- **高リスクドメイン**（認証・セキュリティ・課金・移行）/ **High-risk domains** (auth, security, billing, migrations)
+
+### いつ使用すべきでないか / When NOT to Use
+
+- タイプ修正、自明なフォーマット変更 / Typo fixes, trivial formatting
+- 1ファイルの小変更 / Small one-file edits with obvious implementation
+- 振る舞いの変更がないテストスナップショット / Test snapshots without behavior changes
+
+### 含まれる mob 役割 / Included Mob Roles
+
+| 役割 / Role | 説明 / Description |
+|-------------|--------------------|
+| `mob-navigator` | 意思決定フローの調整、専門家の順序決定 / Orchestrates decision flow, sequences specialists |
+| `mob-critic` | 仮定への挑戦、リスク発見、失敗モードの特定 / Challenges assumptions, finds risks, identifies failure modes |
+| `mob-scribe` | マルチエージェント出力の正規化・要約 / Normalizes multi-agent outputs into structured summary |
+
+### 推奨モード / Recommended Modes
+
+| モード / Mode | 使用タイミング / When to Use | 参加者例 / Typical Participants |
+|---------------|----------------------------|-------------------------------|
+| **flash-mob** | 実装前のクイックリスクスキャン / Preflight risk scanning | planner, architect, mob-critic, mob-navigator |
+| **plan-mob** | 計画・受入条件の確定 / Lock plan and acceptance criteria | planner, architect, tdd-guide, mob-critic, mob-scribe |
+| **review-mob** | マージ準備レビュー / Merge readiness review | code-reviewer, security-reviewer, mob-critic, mob-scribe |
+
+### クイックスタート / Quickstart
+
+```bash
+# 5分で始める / Get started in 5 minutes
+cat MOB_QUICKSTART.md
+
+# 実行例を確認 / See examples
+ls examples/mob-*-example.md
+
+# 詳細ルール / Detailed rules
+cat rules/mob-programming.md
+```
+
+### 関連ドキュメント / Related Docs
+
+- `MOB_QUICKSTART.md` — 5分で始めるガイド / Get started in 5 minutes
+- `rules/mob-programming.md` — 完全なプロトコルとアンチパターン / Complete protocol and anti-patterns
+- `examples/` — flash-mob、plan-mob、review-mob の実行例 / Execution examples
+- `docs/mob-role-boundaries.md` — 役割の境界と選択ガイド / Role boundaries and selection guide
+- `templates/mob-*.md` — 二言語テンプレート（plan/review/decision-log）/ Bilingual templates
 
 ---
 
