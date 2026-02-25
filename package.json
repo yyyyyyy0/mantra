@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "setup": "tsx scripts/setup.ts",
     "sync:codex": "tsx scripts/sync-agents-to-codex.ts"
   },
   "devDependencies": {
