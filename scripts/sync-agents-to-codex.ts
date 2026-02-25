@@ -3,6 +3,8 @@ import * as path from 'path'
 import * as os from 'os'
 import * as yaml from 'js-yaml'
 import { z } from 'zod'
+import { buildSkillContent, CodexFrontmatter } from './lib/codex-utils'
+import { writeAtomic } from './lib/fs-utils'
 
 // ────────────────────────────────────────────────────────────
 // スキーマ定義
@@ -20,19 +22,6 @@ const ClaudeAgentFrontmatter = z.object({
 })
 
 type ClaudeAgentFrontmatter = z.infer<typeof ClaudeAgentFrontmatter>
-
-interface CodexFrontmatter {
-  name: string
-  description: string
-  license: string
-  compatibility: string
-  metadata: {
-    author: string
-    version: string
-    category: string
-    tags: string[]
-  }
-}
 
 // ────────────────────────────────────────────────────────────
 // カテゴリマッピング
@@ -103,39 +92,6 @@ function convertFrontmatter(src: ClaudeAgentFrontmatter): CodexFrontmatter {
   }
 }
 
-function buildSkillContent(codexFm: CodexFrontmatter, body: string): string {
-  const frontmatterYaml = yaml.dump(codexFm, {
-    lineWidth: -1,
-    quotingType: '"',
-    forceQuotes: false,
-  }).trimEnd()
-
-  return `---\n${frontmatterYaml}\n---\n\n${body}`
-}
-
-// ────────────────────────────────────────────────────────────
-// アトミック書き込み
-// ────────────────────────────────────────────────────────────
-
-function writeAtomic(destPath: string, content: string, outputBase: string): void {
-  const resolved = path.resolve(destPath)
-  const resolvedBase = path.resolve(outputBase)
-  if (!resolved.startsWith(resolvedBase + path.sep)) {
-    throw new Error(`パストラバーサルを検出しました: ${destPath}`)
-  }
-
-  const dir = path.dirname(resolved)
-  fs.mkdirSync(dir, { recursive: true })
-
-  const tmpPath = `${resolved}.tmp.${process.pid}.${Date.now()}`
-  try {
-    fs.writeFileSync(tmpPath, content, 'utf8')
-    fs.renameSync(tmpPath, resolved)
-  } catch (err) {
-    try { fs.unlinkSync(tmpPath) } catch { /* ignore */ }
-    throw err
-  }
-}
 
 // ────────────────────────────────────────────────────────────
 // メイン
