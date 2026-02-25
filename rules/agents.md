@@ -15,6 +15,9 @@ Located in `~/.claude/agents/`:
 | e2e-runner | E2E testing | Critical user flows |
 | refactor-cleaner | Dead code cleanup | Code maintenance |
 | doc-updater | Documentation | Updating docs |
+| mob-navigator | Decision flow orchestration | Non-trivial tasks with multiple decision points |
+| mob-critic | Risk finder & challenger | Challenging assumptions, preventing groupthink |
+| mob-scribe | Decision/risk summary | Normalizing collaboration outputs |
 
 ## Immediate Agent Usage
 
@@ -65,6 +68,8 @@ Use mob orchestration when:
 - Change touches multiple files/layers
 - Includes architectural or API tradeoffs
 - Failure cost is high (security, auth, billing, migrations)
+
+**IMPORTANT**: Start with mob-navigator to decompose decision points before calling specialists. Do not call all agents at once.
 
 ### Coordination Protocol
 
