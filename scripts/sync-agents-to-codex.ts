@@ -35,6 +35,9 @@ const CATEGORY_MAP: Record<string, string> = {
   'security-reviewer': 'security',
   'build-error-resolver': 'build',
   'e2e-runner': 'testing',
+  'mob-navigator': 'planning',
+  'mob-critic': 'review',
+  'mob-scribe': 'documentation',
   'refactor-cleaner': 'refactoring',
   'doc-updater': 'documentation',
 }

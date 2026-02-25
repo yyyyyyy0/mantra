@@ -65,6 +65,9 @@ mantra/
 | `code-reviewer` | コードレビュー（品質・セキュリティ・保守性） |
 | `doc-updater` | ドキュメント・コードマップの更新 |
 | `e2e-runner` | E2E テスト（Playwright） |
+| `mob-critic` | Mob プログラミング：仮定への挑戦・リスク発見 |
+| `mob-navigator` | Mob プログラミング：意思決定フローの調整 |
+| `mob-scribe` | Mob プログラミング：出力の正規化・要約 |
 | `planner` | 機能実装・リファクタリングの計画 |
 | `refactor-cleaner` | 不要コードの削除・整理 |
 | `security-reviewer` | セキュリティ脆弱性の検出・修正 |
@@ -96,6 +99,26 @@ mantra/
 | `npm run setup` | シムリンクを作成（初回セットアップ） |
 | `npm run setup -- --force` | 既存ファイルを上書きしてシムリンクを再作成 |
 | `npm run sync:codex` | agents を `~/.codex/skills/mantra/` へ同期 |
+
+---
+
+## Mob Programming (Experimental)
+
+This pack includes optional **mob programming orchestration** agents and rules for non-trivial tasks.
+
+Use it when a change involves multiple steps, architectural tradeoffs, or high-risk domains (auth, security, migrations, billing).
+
+### Included mob roles
+- `mob-navigator` — coordinates decision flow and next steps
+- `mob-critic` — challenges assumptions and surfaces risks
+- `mob-scribe` — normalizes multi-agent outputs into decision/risk/action summaries
+
+### Suggested modes
+- **flash-mob**: quick preflight risk scan
+- **plan-mob**: lock plan + acceptance criteria + verification strategy
+- **review-mob**: merge-readiness review with blocker/warning summary
+
+See `rules/mob-programming.md` for the operating rules and summary format.
 
 ---
 

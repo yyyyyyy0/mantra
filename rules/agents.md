@@ -47,3 +47,35 @@ For complex problems, use split role sub-agents:
 - Security expert
 - Consistency reviewer
 - Redundancy checker
+
+## Mob Orchestration
+
+For complex tasks requiring multi-perspective collaboration, use mob programming:
+
+| Agent | Role | When to Use |
+|-------|------|-------------|
+| mob-navigator | Orchestrator & decision flow coordinator | Non-trivial tasks with multiple decision points |
+| mob-critic | Adversarial reviewer & risk finder | Challenging assumptions, preventing groupthink |
+| mob-scribe | Normalizer & documenter | Producing decision/risk/action summaries |
+
+### When to Use Mob Sessions
+
+Use mob orchestration when:
+- Task spans 3+ implementation steps
+- Change touches multiple files/layers
+- Includes architectural or API tradeoffs
+- Failure cost is high (security, auth, billing, migrations)
+
+### Coordination Protocol
+
+Tagged outputs for structured collaboration:
+- `[OBSERVATION]` - established facts
+- `[PROPOSAL]` - suggested change
+- `[CHALLENGE]` - critique or risk
+- `[DECISION]` - accepted/rejected/deferred
+- `[RISK]` - risk with severity
+- `[ACTION]` - next step
+
+**IMPORTANT**: Always include mob-critic for challenging assumptions. Use mob-scribe to normalize outputs before acting.
+
+See `rules/mob-programming.md` for complete protocol.
