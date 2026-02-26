@@ -13,12 +13,15 @@ import {
   writeInfo,
   writeJsonLine,
   writeWarn,
+  writeWarningEvent,
+  type WarningEvent,
 } from './lib/cli-telemetry'
 import {
   hasUserSources,
   listContentFiles,
   resolveContentSources,
   type ContentKind,
+  type ContentSource,
 } from './lib/content-sources'
 
 interface SetupLink {
@@ -141,7 +144,10 @@ function createSymlink(link: SetupLink, force: boolean, json: boolean): SymlinkR
   }
 }
 
-function buildMergedDirectory(kind: ContentKind, json: boolean): { dir: string; files: number } {
+function buildMergedDirectory(
+  kind: ContentKind,
+  json: boolean,
+): { dir: string; files: number; warnings: WarningEvent[] } {
   const files = listContentFiles(kind)
   if (files.length === 0) {
     throw new CliError(`${kind} のソースファイルが見つかりません`, 'E_INPUT_INVALID', false)
@@ -152,18 +158,42 @@ function buildMergedDirectory(kind: ContentKind, json: boolean): { dir: string; 
   fs.rmSync(outputDir, { recursive: true, force: true })
   fs.mkdirSync(outputDir, { recursive: true })
 
-  // Later sources override earlier ones with the same filename.
-  const entries = new Map<string, string>()
+  // Later sources (user) override earlier ones (core) with the same filename.
+  const entries = new Map<string, (typeof files)[number]>()
+  const collected: WarningEvent[] = []
+
   for (const file of files) {
-    entries.set(file.relativeName, file.fullPath)
+    const existing = entries.get(file.relativeName)
+    if (existing !== undefined) {
+      const loser = conflictLoser(existing.source)
+      const event: WarningEvent = {
+        type: 'warning',
+        command: 'setup',
+        code: 'W_SOURCE_CONFLICT_FILENAME',
+        winner: file.source.origin,
+        loser,
+        target: file.relativeName,
+        message: `filename conflict; ${file.source.origin} overrides ${loser} for "${file.relativeName}"`,
+      }
+      writeWarningEvent(json, event)
+      collected.push(event)
+    }
+    entries.set(file.relativeName, file)
   }
 
-  for (const [name, sourcePath] of entries) {
-    fs.symlinkSync(sourcePath, path.join(outputDir, name))
+  for (const [name, contentFile] of entries) {
+    fs.symlinkSync(contentFile.fullPath, path.join(outputDir, name))
   }
 
   writeInfo(json, `merged ${kind}: ${entries.size} files -> ${outputDir}`)
-  return { dir: outputDir, files: entries.size }
+  return { dir: outputDir, files: entries.size, warnings: collected }
+}
+
+function conflictLoser(source: ContentSource): WarningEvent['loser'] {
+  if (source.origin === 'core') {
+    return 'core'
+  }
+  return `user:${source.dir}`
 }
 
 function coreDirectory(kind: ContentKind): string {
@@ -177,12 +207,16 @@ function coreDirectory(kind: ContentKind): string {
 function buildSetupLinks(json: boolean): {
   links: SetupLink[]
   mergedKinds: Array<{ kind: ContentKind; files: number; dir: string }>
+  warnings: WarningEvent[]
 } {
   const mergedKinds: Array<{ kind: ContentKind; files: number; dir: string }> = []
+  const allWarnings: WarningEvent[] = []
+
   const agentsSrc = hasUserSources('agents')
     ? (() => {
         const merged = buildMergedDirectory('agents', json)
-        mergedKinds.push({ kind: 'agents', ...merged })
+        mergedKinds.push({ kind: 'agents', files: merged.files, dir: merged.dir })
+        allWarnings.push(...merged.warnings)
         return merged.dir
       })()
     : coreDirectory('agents')
@@ -190,7 +224,8 @@ function buildSetupLinks(json: boolean): {
   const rulesSrc = hasUserSources('rules')
     ? (() => {
         const merged = buildMergedDirectory('rules', json)
-        mergedKinds.push({ kind: 'rules', ...merged })
+        mergedKinds.push({ kind: 'rules', files: merged.files, dir: merged.dir })
+        allWarnings.push(...merged.warnings)
         return merged.dir
       })()
     : coreDirectory('rules')
@@ -198,7 +233,8 @@ function buildSetupLinks(json: boolean): {
   for (const kind of ['templates', 'examples'] as const) {
     if (hasUserSources(kind)) {
       const merged = buildMergedDirectory(kind, json)
-      mergedKinds.push({ kind, ...merged })
+      mergedKinds.push({ kind, files: merged.files, dir: merged.dir })
+      allWarnings.push(...merged.warnings)
     }
   }
 
@@ -216,6 +252,7 @@ function buildSetupLinks(json: boolean): {
       },
     ],
     mergedKinds,
+    warnings: allWarnings,
   }
 }
 
@@ -225,7 +262,7 @@ function main(): void {
 
   try {
     ensureNodeVersion(20)
-    const { links, mergedKinds } = buildSetupLinks(json)
+    const { links, mergedKinds, warnings } = buildSetupLinks(json)
 
     for (const link of links) {
       ensureReadableDirectory(link.src, `${link.label} source`)
@@ -259,6 +296,7 @@ function main(): void {
             message: f.message,
           })),
         },
+        warnings,
       })
       process.exit(1)
     }
@@ -275,6 +313,7 @@ function main(): void {
         total: links.length,
         merged: mergedKinds,
       },
+      warnings,
     })
   } catch (err) {
     const cliErr = toCliError(err)

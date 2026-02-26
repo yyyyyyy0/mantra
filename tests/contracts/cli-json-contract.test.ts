@@ -57,6 +57,8 @@ describe.sequential('CLI JSON contract', () => {
     expect(typeof last?.command).toBe('string')
     expect(typeof last?.duration_ms).toBe('number')
     expect(typeof last?.success).toBe('boolean')
+    expect(last?.warning_count).toBe(0)
+    expect(last?.warning_types).toEqual([])
   })
 
   it('returns E_SCHEMA_FRONTMATTER for malformed agent file', () => {

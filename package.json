@@ -5,8 +5,10 @@
   "private": true,
   "scripts": {
     "setup": "tsx scripts/setup.ts",
-    "onboarding": "npm run setup && npm run validate && npm run sync:codex",
-    "onboarding:json": "npm run setup -- --json && npm run validate:json && npm run sync:codex:json",
+    "onboarding": "npm run setup && npm run validate",
+    "onboarding:full": "npm run setup && npm run validate && npm run sync:codex",
+    "onboarding:json": "npm run setup -- --json && npm run validate:json",
+    "onboarding:full:json": "npm run setup -- --json && npm run validate:json && npm run sync:codex:json",
     "sync:codex": "tsx scripts/sync-agents-to-codex.ts && tsx scripts/sync-rules-to-codex.ts",
     "sync:codex:json": "npm run sync:codex:agents -- --json && npm run sync:codex:rules -- --json",
     "sync:codex:agents": "tsx scripts/sync-agents-to-codex.ts",

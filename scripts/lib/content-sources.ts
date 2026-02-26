@@ -1,8 +1,92 @@
 import * as fs from 'node:fs'
+import * as os from 'node:os'
 import * as path from 'node:path'
+import { z } from 'zod'
+import { CliError } from './cli-telemetry'
 import { PROJECT_ROOT } from './project-paths'
 
 export type ContentKind = 'agents' | 'rules' | 'templates' | 'examples'
+
+const SourcesFileSchema = z.object({
+  roots: z.array(z.string()).optional().default([]),
+  agentsDirs: z.array(z.string()).optional().default([]),
+  rulesDirs: z.array(z.string()).optional().default([]),
+  templatesDirs: z.array(z.string()).optional().default([]),
+  examplesDirs: z.array(z.string()).optional().default([]),
+})
+
+type SourcesFile = z.infer<typeof SourcesFileSchema>
+
+function getSourcesJsonPath(): string {
+  return path.join(os.homedir(), '.config', 'mantra', 'sources.json')
+}
+
+function expandHome(p: string): string {
+  const expanded = p.startsWith('~/') || p === '~' ? path.join(os.homedir(), p.slice(2)) : p
+  const resolved = path.resolve(expanded)
+  const home = os.homedir()
+
+  if (!resolved.startsWith(`${home}/`) && resolved !== home) {
+    process.stderr.write(
+      `[mantra] warning: sources.json のパスがホームディレクトリ外を指しています: ${resolved}\n`,
+    )
+  }
+
+  return expanded
+}
+
+function loadSourcesFile(): SourcesFile | null {
+  const filePath = getSourcesJsonPath()
+
+  if (!fs.existsSync(filePath)) {
+    return null
+  }
+
+  let raw: string
+  try {
+    raw = fs.readFileSync(filePath, 'utf8')
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    throw new CliError(
+      `sources.json の読み込みに失敗しました: ${filePath} (${message})`,
+      'E_IO',
+      false,
+    )
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    throw new CliError(
+      `sources.json が不正な JSON です: ${filePath} (${message})`,
+      'E_INPUT_INVALID',
+      false,
+    )
+  }
+
+  const result = SourcesFileSchema.safeParse(parsed)
+  if (!result.success) {
+    throw new CliError(
+      `sources.json のスキーマが不正です: ${filePath} (${result.error.message})`,
+      'E_INPUT_INVALID',
+      false,
+    )
+  }
+
+  return result.data
+}
+
+function kindDirKey(kind: ContentKind): keyof SourcesFile {
+  const map: Record<ContentKind, keyof SourcesFile> = {
+    agents: 'agentsDirs',
+    rules: 'rulesDirs',
+    templates: 'templatesDirs',
+    examples: 'examplesDirs',
+  }
+  return map[kind]
+}
 
 export interface ContentSource {
   kind: ContentKind
@@ -53,27 +137,57 @@ export function resolveContentSources(kind: ContentKind): ContentSource[] {
     sources.push({ kind, dir: coreDir, label: `${kind}:core`, origin: 'core' })
   }
 
-  const rootDirs = uniqueExistingDirs(parseList(process.env.MANTRA_USER_CONTENT_ROOTS))
-  for (const root of rootDirs) {
-    const dir = path.join(root, kind)
-    if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+  const sourcesFile = loadSourcesFile()
+
+  if (sourcesFile !== null) {
+    // sources.json が存在する場合: roots + kindDirs を使用（env は無視）
+    const rootDirs = uniqueExistingDirs(sourcesFile.roots.map(expandHome))
+    for (const root of rootDirs) {
+      const dir = path.join(root, kind)
+      if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+        sources.push({
+          kind,
+          dir,
+          label: `${kind}:user-root:${root}`,
+          origin: 'user',
+        })
+      }
+    }
+
+    const directKey = kindDirKey(kind)
+    const directDirs = uniqueExistingDirs((sourcesFile[directKey] as string[]).map(expandHome))
+    for (const dir of directDirs) {
       sources.push({
         kind,
         dir,
-        label: `${kind}:user-root:${root}`,
+        label: `${kind}:user-dir:${dir}`,
         origin: 'user',
       })
     }
-  }
+  } else {
+    // sources.json がない場合: 既存の環境変数ロジック
+    const rootDirs = uniqueExistingDirs(parseList(process.env.MANTRA_USER_CONTENT_ROOTS))
+    for (const root of rootDirs) {
+      const dir = path.join(root, kind)
+      if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+        sources.push({
+          kind,
+          dir,
+          label: `${kind}:user-root:${root}`,
+          origin: 'user',
+        })
+      }
+    }
 
-  const directDirs = uniqueExistingDirs(parseList(process.env[envKeyForKind(kind)]))
-  for (const dir of directDirs) {
-    sources.push({
-      kind,
-      dir,
-      label: `${kind}:user-dir:${dir}`,
-      origin: 'user',
-    })
+    const directDirs = uniqueExistingDirs(parseList(process.env[envKeyForKind(kind)]))
+    for (const dir of directDirs) {
+      sources.push({
+        kind,
+        dir,
+        label: `${kind}:user-dir:${dir}`,
+        origin: 'user',
+      })
+    }
   }
 
   return sources
