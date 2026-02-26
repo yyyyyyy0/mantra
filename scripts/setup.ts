@@ -52,6 +52,53 @@ function pathExists(p: string): boolean {
   }
 }
 
+function formatTimestamp(date: Date): string {
+  const y = String(date.getFullYear())
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const hh = String(date.getHours()).padStart(2, '0')
+  const mm = String(date.getMinutes()).padStart(2, '0')
+  const ss = String(date.getSeconds()).padStart(2, '0')
+  return `${y}${m}${d}${hh}${mm}${ss}`
+}
+
+function buildBackupPath(dest: string): string {
+  const timestamp = formatTimestamp(new Date())
+  const base = `${dest}.bak-${timestamp}`
+
+  if (!pathExists(base)) {
+    return base
+  }
+
+  let index = 2
+  while (pathExists(`${base}-${index}`)) {
+    index++
+  }
+  return `${base}-${index}`
+}
+
+function prepareDestination(dest: string, label: string, force: boolean): void {
+  if (!pathExists(dest)) {
+    return
+  }
+
+  if (!force) {
+    throw new Error(
+      `${label} はすでに存在します。上書きするには --force を使用してください`,
+    )
+  }
+
+  const stat = fs.lstatSync(dest)
+  if (stat.isSymbolicLink()) {
+    fs.unlinkSync(dest)
+    return
+  }
+
+  const backupPath = buildBackupPath(dest)
+  fs.renameSync(dest, backupPath)
+  process.stdout.write(`⚠ backup created: ${backupPath}\n`)
+}
+
 function createSymlink(
   src: string,
   dest: string,
@@ -63,14 +110,7 @@ function createSymlink(
       throw new Error(`ソースディレクトリが存在しません: ${src}`)
     }
 
-    if (pathExists(dest)) {
-      if (!force) {
-        throw new Error(
-          `${label} はすでに存在します。上書きするには --force を使用してください`,
-        )
-      }
-      fs.rmSync(dest, { recursive: true, force: true })
-    }
+    prepareDestination(dest, label, force)
 
     fs.mkdirSync(path.dirname(dest), { recursive: true })
     fs.symlinkSync(src, dest)

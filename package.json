@@ -1,6 +1,7 @@
 {
   "name": "mantra",
   "version": "1.0.0",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "setup": "tsx scripts/setup.ts",
@@ -10,12 +11,16 @@
     "test": "vitest",
     "test:run": "vitest run",
     "validate:agents": "tsx scripts/validate-agents.ts",
-    "validate": "npm run validate:agents",
+    "validate:rules": "tsx scripts/validate-rules.ts",
+    "validate": "npm run validate:agents && npm run validate:rules",
     "prepare": "husky"
   },
   "lint-staged": {
     "agents/*.md": [
       "npm run validate:agents"
+    ],
+    "rules/*.md": [
+      "npm run validate:rules"
     ]
   },
   "devDependencies": {

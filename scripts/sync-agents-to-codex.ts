@@ -5,6 +5,8 @@ import * as yaml from 'js-yaml'
 import { buildSkillContent, CodexFrontmatter } from './lib/codex-utils'
 import { writeAtomic } from './lib/fs-utils'
 import { ClaudeAgentFrontmatter } from './lib/agent-schema'
+import { AGENTS_DIR } from './lib/project-paths'
+import { getProjectMeta } from './lib/project-meta'
 
 type ClaudeAgentFrontmatter = typeof ClaudeAgentFrontmatter._output
 
@@ -65,15 +67,19 @@ function parseAgentFile(content: string): ParsedAgent {
 // 変換
 // ────────────────────────────────────────────────────────────
 
-function convertFrontmatter(src: ClaudeAgentFrontmatter): CodexFrontmatter {
+function convertFrontmatter(
+  src: ClaudeAgentFrontmatter,
+  metadataVersion: string,
+  metadataLicense: string,
+): CodexFrontmatter {
   return {
     name: src.name,
     description: src.description,
-    license: 'Apache-2.0',
+    license: metadataLicense,
     compatibility: 'Works with any codebase',
     metadata: {
       author: 'mantra-project',
-      version: '1.0.0',
+      version: metadataVersion,
       category: inferCategory(src.name),
       tags: ['claude-code', src.name],
     },
@@ -86,8 +92,9 @@ function convertFrontmatter(src: ClaudeAgentFrontmatter): CodexFrontmatter {
 // ────────────────────────────────────────────────────────────
 
 function main(): void {
-  const agentsDir = path.join(process.cwd(), 'agents')
+  const agentsDir = AGENTS_DIR
   const outputBase = path.join(os.homedir(), '.codex', 'skills', 'mantra')
+  const projectMeta = getProjectMeta()
 
   const files = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'))
   if (files.length === 0) {
@@ -103,7 +110,11 @@ function main(): void {
     try {
       const content = fs.readFileSync(srcPath, 'utf8')
       const { frontmatter, body } = parseAgentFile(content)
-      const codexFm = convertFrontmatter(frontmatter)
+      const codexFm = convertFrontmatter(
+        frontmatter,
+        projectMeta.version,
+        projectMeta.license,
+      )
       const skillContent = buildSkillContent(codexFm, body)
 
       const destPath = path.join(outputBase, frontmatter.name, 'SKILL.md')

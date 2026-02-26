@@ -1,71 +1,62 @@
-# HANDOVER.md
-
-Updated: 2026-02-25 JST
+Updated: 2026-02-26
 
 ---
 
 ## 1. このセッションで完了したこと（Done）
 
-- **Mob Programming 用テンプレート**を作成
-  - 新規: `templates/mob-plan.md` — plan-mob 用（実装計画・受入条件・検証戦略）
-  - 新規: `templates/mob-review.md` — review-mob 用（マージ準備レビュー）
-  - 新規: `templates/mob-decision-log.md` — 個別意思決定のログ記録用
-
-- **完了条件レビュー**実施
-  - テンプレ単体で運用可能 ✓
-  - rules を毎回読み直さなくても使える ✓
-  - 正規化フォーマットと整合性あり ✓
-
-- **コミット＆プッシュ完了**: `2a38ae7`
+- **Publicリポジトリ準備**: commit `1b51e10`
+  - `LICENSE` - MIT LICENSEを新規作成 (Copyright: nilhc)
+  - `README.md:13` - GitHub URLを `yyyyyyy0` → `nilhc` に更新
+  - `.gitignore` - `.env*`, `dist/`, `build/`, `.vscode/`, `.idea/` 等を追加
 
 ---
 
 ## 2. いまの状態（State）
 
-- ブランチ: `main`
-- すべての変更がプッシュ済み
-- テンプレートは実務でコピペ使用可能な状態
-- エラー・不具合なし
+- **ブランチ**: `main`
+- **origin/main より 1 コミット進んでいる**（未push）
+- **未コミットの変更あり**:
+  - `package.json`, `scripts/setup.ts`, `scripts/sync-*.ts`, `scripts/validate-agents.ts`
+  - `.github/`, `scripts/lib/*.ts`, `tests/rules.test.ts` (untracked)
+- **動作**: ローカルで検証済み
 
 ---
 
 ## 3. 決定事項（Decisions）
 
-- **記入欄中心の設計**: 冗長な説明を省き、`_` プレースホルダーで記入箇所を明示
-- **日本語優先**: 日本語見出しに英語を併記
-- **正規化フォーマット準拠**: `rules/mob-programming.md` の Normalized Mob Summary Format と整合
+- ユーザー名は `nilhc` を使用
+- MIT LICENSE（READMEに記載済みのため正式ファイル作成）
+- `staging.pmx.trade` は例示として使用中 → 修正不要
 
 ---
 
 ## 4. 次にやること（Next）
 
-（なし — 作業完了）
+1. `git push` でコミットをプッシュ（完了条件: origin/main と同期）
+2. GitHub Settings からリポジトリを Public に変更（完了条件: Settings → Danger Zone → Change visibility 実行）
+3. （任意）未コミットの変更ファイルを確認・コミット
 
 ---
 
 ## 5. 罠・注意点（Pitfalls）
 
-- テンプレートと `rules/mob-programming.md` の整合性を維持する必要がある
-- rules 側のフォーマットを変更した場合は、テンプレートも同期が必要
+- **他の変更が混在している**: `package.json` 等の変更は本タスクとは別物
+- **GitHubユーザー名確認**: `nilhc` が正しいか念のため確認
 
 ---
 
 ## 6. 重要リンク・参照（References）
 
-### 新規ファイル
-- `templates/mob-plan.md` — plan-mob 用テンプレート（64行）
-- `templates/mob-review.md` — review-mob 用テンプレート（54行）
-- `templates/mob-decision-log.md` — 意思決定ログ用テンプレート（59行）
-
-### 関連ファイル
-- `rules/mob-programming.md` — 正規化フォーマットの定義
-
-### コミット
-- `2a38ae7` — feat: Mob Programming 用テンプレートを追加
+- プラン: `/Users/nil/.claude/projects/-Users-nil-src-mantra/6cba0390-fddf-4610-981f-c04b9946d6aa.jsonl`
+- コミット: `1b51e10`
 
 ---
 
 ## Changelog
 
+### 2026-02-26
+- Publicリポジトリ準備完了（LICENSE, README URL, .gitignore）
+
 ### 2026-02-25
 - Mob Programming 用テンプレート3ファイルを追加
+

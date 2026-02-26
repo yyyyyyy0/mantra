@@ -2,15 +2,15 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as yaml from 'js-yaml'
 import { ClaudeAgentFrontmatter } from './lib/agent-schema'
+import { AGENTS_DIR } from './lib/project-paths'
 
 function main(): void {
-  const agentsDir = path.join(process.cwd(), 'agents')
-  const files = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'))
+  const files = fs.readdirSync(AGENTS_DIR).filter(f => f.endsWith('.md'))
 
   let errors = 0
 
   for (const file of files) {
-    const filePath = path.join(agentsDir, file)
+    const filePath = path.join(AGENTS_DIR, file)
     const content = fs.readFileSync(filePath, 'utf8')
 
     try {

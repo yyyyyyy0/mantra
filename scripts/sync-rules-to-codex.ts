@@ -1,12 +1,14 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
-import * as yaml from 'js-yaml'
 import { buildSkillContent, CodexFrontmatter } from './lib/codex-utils'
 import { writeAtomic } from './lib/fs-utils'
-import { RuleMetadata } from './lib/rule-schema'
+import { RULES_DIR } from './lib/project-paths'
+import { getProjectMeta } from './lib/project-meta'
+import { parseRuleFile } from './lib/rule-parser'
+import type { ParsedRule } from './lib/rule-parser'
 
-type RuleMetadata = typeof RuleMetadata._output
+type RuleMetadataType = ParsedRule['metadata']
 
 // ────────────────────────────────────────────────────────────
 // カテゴリマッピング
@@ -27,56 +29,23 @@ function inferCategory(name: string): string {
   return CATEGORY_MAP[name] ?? 'development'
 }
 
-function humanizeName(name: string): string {
-  return name
-    .replace(/-/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase())
-}
-
-// ────────────────────────────────────────────────────────────
-// パーサー
-// ────────────────────────────────────────────────────────────
-
-interface ParsedRule {
-  metadata: RuleMetadata
-  body: string
-}
-
-function extractH1(content: string): string | undefined {
-  let insideCodeBlock = false
-  for (const line of content.split('\n')) {
-    if (line.startsWith('```')) {
-      insideCodeBlock = !insideCodeBlock
-      continue
-    }
-    if (!insideCodeBlock && /^# .+/.test(line)) {
-      return line.replace(/^# /, '').trim()
-    }
-  }
-  return undefined
-}
-
-function parseRuleFile(content: string, filename: string): ParsedRule {
-  const name = filename.replace(/\.md$/, '')
-  const description = extractH1(content) ?? humanizeName(name)
-  const metadata = RuleMetadata.parse({ name, description })
-
-  return { metadata, body: content }
-}
-
 // ────────────────────────────────────────────────────────────
 // 変換
 // ────────────────────────────────────────────────────────────
 
-function convertToCodexFrontmatter(src: RuleMetadata): CodexFrontmatter {
+function convertToCodexFrontmatter(
+  src: RuleMetadataType,
+  metadataVersion: string,
+  metadataLicense: string,
+): CodexFrontmatter {
   return {
     name: src.name,
     description: src.description,
-    license: 'Apache-2.0',
+    license: metadataLicense,
     compatibility: 'Works with any codebase',
     metadata: {
       author: 'mantra-project',
-      version: '1.0.0',
+      version: metadataVersion,
       category: inferCategory(src.name),
       tags: ['claude-code', src.name],
     },
@@ -89,8 +58,9 @@ function convertToCodexFrontmatter(src: RuleMetadata): CodexFrontmatter {
 // ────────────────────────────────────────────────────────────
 
 function main(): void {
-  const rulesDir = path.join(__dirname, '..', 'rules')
+  const rulesDir = RULES_DIR
   const outputBase = path.join(os.homedir(), '.codex', 'skills', 'mantra-rules')
+  const projectMeta = getProjectMeta()
 
   const files = fs.readdirSync(rulesDir).filter(f => f.endsWith('.md'))
   if (files.length === 0) {
@@ -106,7 +76,11 @@ function main(): void {
     try {
       const content = fs.readFileSync(srcPath, 'utf8')
       const { metadata, body } = parseRuleFile(content, file)
-      const codexFm = convertToCodexFrontmatter(metadata)
+      const codexFm = convertToCodexFrontmatter(
+        metadata,
+        projectMeta.version,
+        projectMeta.license,
+      )
       const skillContent = buildSkillContent(codexFm, body)
 
       const destPath = path.join(outputBase, metadata.name, 'SKILL.md')
