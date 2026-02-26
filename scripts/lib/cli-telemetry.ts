@@ -19,7 +19,7 @@ export interface WarningEvent {
   command: string
   code: WarningCode
   winner: 'user' | 'core'
-  loser: 'user' | 'core'
+  loser: 'core' | `user:${string}`
   target: string
   message: string
 }
@@ -42,8 +42,8 @@ interface MetricRecord {
   duration_ms: number
   success: boolean
   error_code?: CliErrorCode
-  warning_count?: number
-  warning_types?: WarningCode[]
+  warning_count: number
+  warning_types: WarningCode[]
 }
 
 interface SummaryPayload {
@@ -173,7 +173,7 @@ export function finishCommand(params: {
 }): void {
   const duration = Date.now() - params.startedAt
   const warnings = params.warnings ?? []
-  const warningCodes = warnings.length > 0 ? [...new Set(warnings.map(w => w.code))] : undefined
+  const warningCodes = [...new Set(warnings.map(w => w.code))]
 
   const summary: SummaryPayload = {
     type: 'summary',
@@ -185,7 +185,7 @@ export function finishCommand(params: {
       error_code: params.error.code,
       retryable: params.error.retryable,
     }),
-    ...(warningCodes && {
+    ...(warningCodes.length > 0 && {
       warning_count: warnings.length,
       warning_types: warningCodes,
     }),
@@ -199,9 +199,7 @@ export function finishCommand(params: {
     duration_ms: duration,
     success: params.success,
     error_code: params.error?.code,
-    ...(warningCodes && {
-      warning_count: warnings.length,
-      warning_types: warningCodes,
-    }),
+    warning_count: warnings.length,
+    warning_types: warningCodes,
   })
 }

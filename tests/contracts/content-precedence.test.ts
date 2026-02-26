@@ -84,6 +84,52 @@ describe('Content precedence contract', () => {
     expect((summary?.warning_types as string[]).includes('W_SOURCE_CONFLICT_FILENAME')).toBe(true)
   })
 
+  it('uses user:<path> as loser when two sources.json user roots conflict on the same filename', () => {
+    const home = createTempHome('mantra-srcjson-user-user-')
+    homes.push(home)
+
+    const userRootA = fs.mkdtempSync(path.join(home, 'mantra-root-a-'))
+    const userRootB = fs.mkdtempSync(path.join(home, 'mantra-root-b-'))
+    const userAgentsDirA = path.join(userRootA, 'agents')
+    const userAgentsDirB = path.join(userRootB, 'agents')
+
+    fs.mkdirSync(userAgentsDirA, { recursive: true })
+    fs.mkdirSync(userAgentsDirB, { recursive: true })
+
+    fs.writeFileSync(
+      path.join(userAgentsDirA, 'same-file-across-roots.md'),
+      '---\nname: same-file-across-roots\ndescription: Root A\ntools: []\n---\nBody\n',
+      'utf8',
+    )
+    fs.writeFileSync(
+      path.join(userAgentsDirB, 'same-file-across-roots.md'),
+      '---\nname: same-file-across-roots\ndescription: Root B\ntools: []\n---\nBody\n',
+      'utf8',
+    )
+
+    const configDir = path.join(home, '.config', 'mantra')
+    fs.mkdirSync(configDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(configDir, 'sources.json'),
+      JSON.stringify({ roots: [userRootA, userRootB] }),
+      'utf8',
+    )
+
+    const result = runScript('setup.ts', ['--json'], home)
+
+    expect(result.raw.status, result.stderr).toBe(0)
+
+    const warningLine = result.jsonLines.find(
+      line =>
+        line.type === 'warning' &&
+        line.code === 'W_SOURCE_CONFLICT_FILENAME' &&
+        line.target === 'same-file-across-roots.md',
+    )
+    expect(warningLine).toBeDefined()
+    expect(warningLine?.winner).toBe('user')
+    expect(warningLine?.loser).toBe(`user:${userAgentsDirA}`)
+  })
+
   it('emits no warnings when there are no filename conflicts', () => {
     const home = createTempHome('mantra-nowarn-')
     homes.push(home)
@@ -111,6 +157,46 @@ describe('Content precedence contract', () => {
 
     const summary = result.jsonLines.find(line => line.type === 'summary')
     expect(summary?.warning_count).toBeUndefined()
+  })
+
+  it('emits W_SOURCE_CONFLICT_FILENAME warning when conflict is introduced via sources.json roots', () => {
+    const home = createTempHome('mantra-srcjson-conflict-')
+    homes.push(home)
+
+    // HOME 配下に root を作って sources.json から読み込ませる
+    const userRoot = fs.mkdtempSync(path.join(home, 'mantra-user-root-'))
+    const userAgentsDir = path.join(userRoot, 'agents')
+    fs.mkdirSync(userAgentsDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(userAgentsDir, 'planner.md'),
+      '---\nname: planner\ndescription: Conflict from sources.json\ntools: []\n---\nBody\n',
+      'utf8',
+    )
+
+    const configDir = path.join(home, '.config', 'mantra')
+    fs.mkdirSync(configDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(configDir, 'sources.json'),
+      JSON.stringify({ roots: [userRoot] }),
+      'utf8',
+    )
+
+    const result = runScript('setup.ts', ['--json'], home)
+
+    expect(result.raw.status, result.stderr).toBe(0)
+
+    const warningLine = result.jsonLines.find(
+      line => line.type === 'warning' && line.code === 'W_SOURCE_CONFLICT_FILENAME',
+    )
+    expect(warningLine).toBeDefined()
+    expect(warningLine?.winner).toBe('user')
+    expect(warningLine?.loser).toBe('core')
+    expect(warningLine?.target).toBe('planner.md')
+
+    const summary = result.jsonLines.find(line => line.type === 'summary')
+    expect(summary?.warning_count).toBeGreaterThanOrEqual(1)
+    expect(Array.isArray(summary?.warning_types)).toBe(true)
+    expect((summary?.warning_types as string[]).includes('W_SOURCE_CONFLICT_FILENAME')).toBe(true)
   })
 
   it('sources.json roots are loaded and reflected in the merged directory', () => {
@@ -199,5 +285,22 @@ describe('Content precedence contract', () => {
     expect(mergedFiles.includes('from-srcjson-agent.md')).toBe(true)
     // env 由来のファイルは含まれない
     expect(mergedFiles.includes('from-env.md')).toBe(false)
+  })
+
+  it('returns E_INPUT_INVALID when sources.json contains malformed JSON', () => {
+    const home = createTempHome('mantra-srcjson-invalid-')
+    homes.push(home)
+
+    const configDir = path.join(home, '.config', 'mantra')
+    fs.mkdirSync(configDir, { recursive: true })
+    fs.writeFileSync(path.join(configDir, 'sources.json'), '{ invalid json', 'utf8')
+
+    const result = runScript('setup.ts', ['--json'], home)
+
+    expect(result.raw.status).toBe(1)
+
+    const summary = result.jsonLines.find(line => line.type === 'summary')
+    expect(summary?.success).toBe(false)
+    expect(summary?.error_code).toBe('E_INPUT_INVALID')
   })
 })

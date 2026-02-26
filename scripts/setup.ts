@@ -21,6 +21,7 @@ import {
   listContentFiles,
   resolveContentSources,
   type ContentKind,
+  type ContentSource,
 } from './lib/content-sources'
 
 interface SetupLink {
@@ -164,14 +165,15 @@ function buildMergedDirectory(
   for (const file of files) {
     const existing = entries.get(file.relativeName)
     if (existing !== undefined) {
+      const loser = conflictLoser(existing.source)
       const event: WarningEvent = {
         type: 'warning',
         command: 'setup',
         code: 'W_SOURCE_CONFLICT_FILENAME',
         winner: file.source.origin,
-        loser: existing.source.origin,
+        loser,
         target: file.relativeName,
-        message: `filename conflict; ${file.source.origin} overrides ${existing.source.origin} for "${file.relativeName}"`,
+        message: `filename conflict; ${file.source.origin} overrides ${loser} for "${file.relativeName}"`,
       }
       writeWarningEvent(json, event)
       collected.push(event)
@@ -185,6 +187,13 @@ function buildMergedDirectory(
 
   writeInfo(json, `merged ${kind}: ${entries.size} files -> ${outputDir}`)
   return { dir: outputDir, files: entries.size, warnings: collected }
+}
+
+function conflictLoser(source: ContentSource): WarningEvent['loser'] {
+  if (source.origin === 'core') {
+    return 'core'
+  }
+  return `user:${source.dir}`
 }
 
 function coreDirectory(kind: ContentKind): string {
