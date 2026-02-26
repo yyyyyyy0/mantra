@@ -12,6 +12,18 @@ export type CliErrorCode =
   | 'E_IO'
   | 'E_INTERNAL'
 
+export type WarningCode = 'W_SOURCE_CONFLICT_FILENAME' | 'W_SOURCE_CONFLICT_NAME'
+
+export interface WarningEvent {
+  type: 'warning'
+  command: string
+  code: WarningCode
+  winner: 'user' | 'core'
+  loser: 'user' | 'core'
+  target: string
+  message: string
+}
+
 export class CliError extends Error {
   code: CliErrorCode
   retryable: boolean
@@ -30,6 +42,8 @@ interface MetricRecord {
   duration_ms: number
   success: boolean
   error_code?: CliErrorCode
+  warning_count?: number
+  warning_types?: WarningCode[]
 }
 
 interface SummaryPayload {
@@ -40,6 +54,8 @@ interface SummaryPayload {
   error_code?: CliErrorCode
   retryable?: boolean
   details?: Record<string, unknown>
+  warning_count?: number
+  warning_types?: WarningCode[]
 }
 
 export function hasJsonFlag(argv = process.argv): boolean {
@@ -55,6 +71,14 @@ export function writeInfo(json: boolean, message: string): void {
 export function writeWarn(json: boolean, message: string): void {
   if (!json) {
     process.stderr.write(`${message}\n`)
+  }
+}
+
+export function writeWarningEvent(json: boolean, event: WarningEvent): void {
+  if (json) {
+    writeJsonLine(json, event as unknown as Record<string, unknown>)
+  } else {
+    process.stderr.write(`⚠ [${event.code}] ${event.message}\n`)
   }
 }
 
@@ -145,22 +169,29 @@ export function finishCommand(params: {
   success: boolean
   error?: CliError
   details?: Record<string, unknown>
+  warnings?: WarningEvent[]
 }): void {
   const duration = Date.now() - params.startedAt
+  const warnings = params.warnings ?? []
+  const warningCodes = warnings.length > 0 ? [...new Set(warnings.map(w => w.code))] : undefined
+
   const summary: SummaryPayload = {
     type: 'summary',
     command: params.command,
     success: params.success,
     duration_ms: duration,
     details: params.details,
+    ...(params.error && {
+      error_code: params.error.code,
+      retryable: params.error.retryable,
+    }),
+    ...(warningCodes && {
+      warning_count: warnings.length,
+      warning_types: warningCodes,
+    }),
   }
 
-  if (params.error) {
-    summary.error_code = params.error.code
-    summary.retryable = params.error.retryable
-  }
-
-  writeJsonLine(params.json, summary)
+  writeJsonLine(params.json, summary as Record<string, unknown>)
 
   recordMetric({
     timestamp: new Date().toISOString(),
@@ -168,5 +199,9 @@ export function finishCommand(params: {
     duration_ms: duration,
     success: params.success,
     error_code: params.error?.code,
+    ...(warningCodes && {
+      warning_count: warnings.length,
+      warning_types: warningCodes,
+    }),
   })
 }
