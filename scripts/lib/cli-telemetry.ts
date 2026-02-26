@@ -191,7 +191,7 @@ export function finishCommand(params: {
     }),
   }
 
-  writeJsonLine(params.json, summary as Record<string, unknown>)
+  writeJsonLine(params.json, summary as unknown as Record<string, unknown>)
 
   recordMetric({
     timestamp: new Date().toISOString(),

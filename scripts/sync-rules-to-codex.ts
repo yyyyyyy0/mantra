@@ -94,6 +94,9 @@ function main(): void {
       | { success: true; name: string; dest: string }
       | { success: false; file: string; message: string; code: CliError['code']; retryable: boolean }
 
+    type SyncSuccess = Extract<Result, { success: true }>
+    type SyncFailure = Extract<Result, { success: false }>
+
     const seenRuleNames = new Set<string>()
 
     const results: Result[] = files.map(file => {
@@ -151,8 +154,8 @@ function main(): void {
       }
     })
 
-    const successes = results.filter(r => r.success)
-    const failures = results.filter(r => !r.success)
+    const successes = results.filter((r): r is SyncSuccess => r.success)
+    const failures = results.filter((r): r is SyncFailure => !r.success)
 
     writeInfo(json, `\n${successes.length}/${files.length} 件を同期しました → ${outputBase}`)
 

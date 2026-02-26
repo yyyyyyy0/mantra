@@ -28,7 +28,7 @@ describe('Agent Definitions', () => {
       const result = ClaudeAgentFrontmatter.safeParse(parsed)
 
       if (!result.success) {
-        const formatted = result.error.errors.map(e => {
+        const formatted = result.error.issues.map(e => {
           return `  - ${e.path.join('.')}: ${e.message}`
         }).join('\n')
         throw new Error(`Schema validation failed for ${name}:\n${formatted}`)

@@ -20,7 +20,7 @@ import {
   writeWarn,
 } from './lib/cli-telemetry'
 
-type ClaudeAgentFrontmatter = typeof ClaudeAgentFrontmatter._output
+type AgentFrontmatter = typeof ClaudeAgentFrontmatter._output
 
 // ────────────────────────────────────────────────────────────
 // カテゴリマッピング
@@ -50,7 +50,7 @@ function inferCategory(name: string): string {
 // ────────────────────────────────────────────────────────────
 
 interface ParsedAgent {
-  frontmatter: ClaudeAgentFrontmatter
+  frontmatter: AgentFrontmatter
   body: string
 }
 
@@ -80,7 +80,7 @@ function parseAgentFile(content: string): ParsedAgent {
 // ────────────────────────────────────────────────────────────
 
 function convertFrontmatter(
-  src: ClaudeAgentFrontmatter,
+  src: AgentFrontmatter,
   metadataVersion: string,
   metadataLicense: string,
 ): CodexFrontmatter {
@@ -127,6 +127,9 @@ function main(): void {
     type Result =
       | { success: true; name: string; dest: string }
       | { success: false; file: string; message: string; code: CliError['code']; retryable: boolean }
+
+    type SyncSuccess = Extract<Result, { success: true }>
+    type SyncFailure = Extract<Result, { success: false }>
 
     const seenAgentNames = new Set<string>()
 
@@ -185,8 +188,8 @@ function main(): void {
       }
     })
 
-    const successes = results.filter(r => r.success)
-    const failures = results.filter(r => !r.success)
+    const successes = results.filter((r): r is SyncSuccess => r.success)
+    const failures = results.filter((r): r is SyncFailure => !r.success)
 
     writeInfo(json, `\n${successes.length}/${files.length} 件を同期しました → ${outputBase}`)
 
