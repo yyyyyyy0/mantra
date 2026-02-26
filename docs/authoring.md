@@ -185,6 +185,20 @@ Before marking work complete:
 
 ## 検証と同期
 
+### ユーザー定義ディレクトリの追加
+
+コア定義とは別に、追加の `agents/rules/templates/examples` を読み込めます。
+
+- `MANTRA_USER_CONTENT_ROOTS=/path/a,/path/b`
+  - それぞれのルート配下の `agents/`, `rules/`, `templates/`, `examples/` を対象化
+- または種別単位で直接指定:
+  - `MANTRA_USER_AGENTS_DIRS`
+  - `MANTRA_USER_RULES_DIRS`
+  - `MANTRA_USER_TEMPLATES_DIRS`
+  - `MANTRA_USER_EXAMPLES_DIRS`
+
+`agents/rules` は name 重複時にエラーになります（運用一貫性のため）。
+
 ### 作成後の検証
 
 ```bash
@@ -196,6 +210,10 @@ npm run validate:rules
 
 # 両方の検証
 npm run validate
+
+# JSON 契約で検証（機械可読）
+npm run validate:agents -- --json
+npm run validate:rules -- --json
 ```
 
 ### Codex への同期
@@ -209,6 +227,18 @@ npm run sync:codex:rules
 
 # 両方同期
 npm run sync:codex
+
+# JSON 契約で同期
+npm run sync:codex:agents -- --json
+npm run sync:codex:rules -- --json
+```
+
+### スモークテスト
+
+onboarding 導線の回帰検知として、以下を実行してください：
+
+```bash
+npm run smoke:onboarding
 ```
 
 ### 動作テスト手順
@@ -246,7 +276,8 @@ ls -la ~/.claude/agents/your-agent-name
 新しい agent/rule を追加する PR では、以下を確認してください：
 
 - [ ] `npm run validate` がパスする
-- [ ] `npm run test:run` がパスする
+- [ ] `npm run test:unit` がパスする
+- [ ] `npm run smoke:onboarding` がパスする
 - [ ] ファイル名が命名規則に従っている
 - [ ] 必要な frontmatter フィールドが含まれている（agent の場合）
 - [ ] 使用タイミングと非目標が明確に記述されている
@@ -259,4 +290,7 @@ ls -la ~/.claude/agents/your-agent-name
 
 - **検証スクリプト:** `scripts/validate-agents.ts`, `scripts/validate-rules.ts`
 - **同期スクリプト:** `scripts/sync-agents-to-codex.ts`, `scripts/sync-rules-to-codex.ts`
-- **スキーマ定義:** `scripts/lib/schema.ts`
+- **CLI 契約:** `docs/cli-contract.md`
+- **メトリクス仕様:** `docs/ops-metrics.md`
+- **トラブルシュート:** `docs/troubleshooting.md`
+- **スキーマ定義:** `scripts/lib/agent-schema.ts`, `scripts/lib/rule-schema.ts`

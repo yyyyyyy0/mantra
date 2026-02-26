@@ -2,16 +2,15 @@
 
 Claude Code の設定（agents・rules）を dotfiles として管理するリポジトリ。
 
-新しいマシンやユーザーが `npm run setup` を実行するだけで、シムリンク経由で Claude Code に設定が反映される。
+新しいマシンやユーザーが `npm run onboarding` を実行するだけで、シムリンク作成・検証・Codex 同期まで完了する。
 
 ---
 
 ## Start here — 最初にやるべきこと / First steps
 
 1. `npm ci` — 依存関係のインストール
-2. `npm run validate` — 設定の検証
-3. `npm run setup` — シムリンク作成
-4. `npm run sync:codex` — Codex へ同期（任意）
+2. `npm run onboarding` — セットアップ + 検証 + 同期
+3. `npm run smoke:onboarding` — 最短導線のスモーク検証（任意）
 
 ↓ 詳細は以下のクイックスタートへ
 
@@ -25,13 +24,10 @@ git clone https://github.com/yyyyyyy0/mantra ~/.mantra
 cd ~/.mantra
 
 # 2. 依存インストール
-npm install
+npm ci
 
-# 3. シムリンク作成（~/.claude/agents, ~/.claude/rules）
-npm run setup
-
-# 4. Codex へ同期（任意、agents + rules）
-npm run sync:codex
+# 3. セットアップ+検証+同期（最短導線）
+npm run onboarding
 ```
 
 既存のシムリンク/ディレクトリを再作成する場合（実ディレクトリはバックアップ退避）:
@@ -64,6 +60,7 @@ ls -la ~/.claude/rules   # → mantra/rules へのシムリンク
 - `npm ci` が失敗する場合: Node.js v20+ がインストールされているか確認
 - `npm run validate` が失敗する場合: agents/ または rules/ ディレクトリの .md ファイルの frontmatter 構文を確認
 - シムリンクが作成されない場合: `npm run setup -- --force` を試す（既存のディレクトリはバックアップされます）
+- `error_code` 単位の詳細対処: [docs/troubleshooting.md](./docs/troubleshooting.md)
 
 ---
 
@@ -129,13 +126,47 @@ mantra/
 | コマンド | 説明 |
 |---|---|
 | `npm run setup` | シムリンクを作成（初回セットアップ） |
+| `npm run onboarding` | セットアップ + 検証 + Codex 同期を一括実行 |
+| `npm run onboarding:json` | onboarding を JSON 出力モードで実行 |
 | `npm run setup -- --force` | 既存の実ディレクトリ/ファイルを `.bak-YYYYMMDDHHmmss` に退避して再作成 |
 | `npm run sync:codex` | agents と rules を Codex へ同期（`~/.codex/skills/mantra/`, `~/.codex/skills/mantra-rules/`） |
+| `npm run sync:codex:json` | sync を JSON 出力モードで実行 |
 | `npm run sync:codex:agents` | agents のみ Codex へ同期 |
 | `npm run sync:codex:rules` | rules のみ Codex へ同期 |
+| `npm run sync:codex:templates` | templates の同期（Roadmap） |
+| `npm run sync:codex:examples` | examples の同期（Roadmap） |
 | `npm run validate` | agents/rules の定義を検証 |
+| `npm run validate:json` | validate を JSON 出力モードで実行 |
 | `npm run validate:agents` | agents 定義のみ検証 |
 | `npm run validate:rules` | rules 定義のみ検証 |
+| `npm run test:unit` | ユニット + 契約テストの実行 |
+| `npm run smoke:onboarding` | onboarding フローのスモークテスト |
+
+---
+
+## User-Defined Content（追加定義の受け入れ）
+
+外部（`mantra/` 配下外）のユーザー定義 `agents/rules/templates/examples` を、core 定義と一緒に扱えます。  
+この機能は **Stable** として運用します。
+
+主設定（推奨）:
+- `~/.config/mantra/sources.json`
+  - `roots`, `agentsDirs`, `rulesDirs`, `templatesDirs`, `examplesDirs`
+
+互換 fallback（既存）:
+- `MANTRA_USER_CONTENT_ROOTS`  
+  - 例: `/Users/nil/my-mantra-extra,/Users/nil/team-mantra`
+  - 各ルート配下の `agents/`, `rules/`, `templates/`, `examples/` を読み込む
+- `MANTRA_USER_AGENTS_DIRS`, `MANTRA_USER_RULES_DIRS`, `MANTRA_USER_TEMPLATES_DIRS`, `MANTRA_USER_EXAMPLES_DIRS`
+  - 種別ごとの直接指定（カンマ区切り）
+
+補足:
+- 同名ファイルは「後から読まれたソース」が優先されます
+- 衝突ポリシーは `warning` を出しつつユーザー定義を優先します（filename/name）
+- ユーザー定義がある場合、`setup` は `~/.mantra/generated/*` にマージして `~/.claude/agents|rules` へリンクします
+
+ロードマップ上の位置づけ:
+- Phase 2/3（運用性・一貫性）で作った基盤を使って、Phase 4（ユーザー価値）を回収する代表施策です。
 
 ---
 
@@ -149,7 +180,8 @@ mantra/
 **検証内容:**
 1. 依存関係のインストール (`npm ci`)
 2. agents/rules 定義の検証 (`npm run validate`)
-3. テストの実行 (`npm run test:run`)
+3. ユニット/契約テストの実行 (`npm run test:unit`)
+4. onboarding スモークテストの実行 (`npm run smoke:onboarding`)
 
 **Node.js バージョン:**
 - CI 環境: Node.js v20
@@ -226,6 +258,9 @@ cat rules/mob-programming.md
 | ドキュメント | 説明 |
 |-------------|------|
 | [Authoring Guide](./docs/authoring.md) | エージェント・ルールの作成ガイド |
+| [CLI Contract](./docs/cli-contract.md) | `--json` 出力・error_code・終了コードの契約 |
+| [Ops Metrics](./docs/ops-metrics.md) | KPI 定義、計測イベント、集計粒度 |
+| [Troubleshooting](./docs/troubleshooting.md) | `error_code` ごとの復旧手順 |
 | [Mob Programming](#mob-programming実験的-mob-programming-experimental) | 複雑タスク向けオーケストレーション |
 
 ---

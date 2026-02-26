@@ -27,5 +27,8 @@ jobs:
       - name: Validate assets
         run: npm run validate
 
-      - name: Run tests
-        run: npm run test:run
+      - name: Run unit and contract tests
+        run: npm run test:unit
+
+      - name: Run onboarding smoke
+        run: npm run smoke:onboarding

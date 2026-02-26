@@ -1,47 +1,54 @@
-import * as fs from 'fs'
-import * as path from 'path'
-import * as os from 'os'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import * as os from 'node:os'
 import { z } from 'zod'
+import {
+  CliError,
+  ensureNodeVersion,
+  ensureReadableDirectory,
+  ensureWritableParent,
+  finishCommand,
+  hasJsonFlag,
+  toCliError,
+  writeInfo,
+  writeJsonLine,
+  writeWarn,
+} from './lib/cli-telemetry'
+import {
+  hasUserSources,
+  listContentFiles,
+  resolveContentSources,
+  type ContentKind,
+} from './lib/content-sources'
 
-// ────────────────────────────────────────────────────────────
-// 設定
-// ────────────────────────────────────────────────────────────
-
-const PROJECT_ROOT = path.resolve(__dirname, '..')
-
-const SYMLINKS: Array<{ src: string; dest: string; label: string }> = [
-  {
-    src: path.join(PROJECT_ROOT, 'agents'),
-    dest: path.join(os.homedir(), '.claude', 'agents'),
-    label: '~/.claude/agents',
-  },
-  {
-    src: path.join(PROJECT_ROOT, 'rules'),
-    dest: path.join(os.homedir(), '.claude', 'rules'),
-    label: '~/.claude/rules',
-  },
-]
-
-// ────────────────────────────────────────────────────────────
-// 引数パース
-// ────────────────────────────────────────────────────────────
+interface SetupLink {
+  src: string
+  dest: string
+  label: string
+}
 
 const ArgsSchema = z.object({
   force: z.boolean(),
+  json: z.boolean(),
 })
 
-function parseArgs(): z.infer<typeof ArgsSchema> {
-  const force = process.argv.includes('--force')
-  return ArgsSchema.parse({ force })
-}
-
-// ────────────────────────────────────────────────────────────
-// シムリンク作成
-// ────────────────────────────────────────────────────────────
-
 type SymlinkResult =
-  | { success: true; dest: string; label: string }
-  | { success: false; dest: string; label: string; message: string }
+  | { success: true; dest: string; label: string; src: string }
+  | {
+      success: false
+      dest: string
+      label: string
+      message: string
+      errorCode: CliError['code']
+      retryable: boolean
+    }
+
+function parseArgs(): z.infer<typeof ArgsSchema> {
+  return ArgsSchema.parse({
+    force: process.argv.includes('--force'),
+    json: hasJsonFlag(process.argv),
+  })
+}
 
 function pathExists(p: string): boolean {
   try {
@@ -77,14 +84,16 @@ function buildBackupPath(dest: string): string {
   return `${base}-${index}`
 }
 
-function prepareDestination(dest: string, label: string, force: boolean): void {
+function prepareDestination(dest: string, label: string, force: boolean, json: boolean): void {
   if (!pathExists(dest)) {
     return
   }
 
   if (!force) {
-    throw new Error(
+    throw new CliError(
       `${label} はすでに存在します。上書きするには --force を使用してください`,
+      'E_INPUT_INVALID',
+      false,
     )
   }
 
@@ -96,60 +105,189 @@ function prepareDestination(dest: string, label: string, force: boolean): void {
 
   const backupPath = buildBackupPath(dest)
   fs.renameSync(dest, backupPath)
-  process.stdout.write(`⚠ backup created: ${backupPath}\n`)
+  writeInfo(json, `⚠ backup created: ${backupPath}`)
 }
 
-function createSymlink(
-  src: string,
-  dest: string,
-  label: string,
-  force: boolean,
-): SymlinkResult {
+function createSymlink(link: SetupLink, force: boolean, json: boolean): SymlinkResult {
   try {
-    if (!fs.existsSync(src)) {
-      throw new Error(`ソースディレクトリが存在しません: ${src}`)
+    if (!fs.existsSync(link.src)) {
+      throw new CliError(`ソースディレクトリが存在しません: ${link.src}`, 'E_INPUT_INVALID', false)
     }
 
-    prepareDestination(dest, label, force)
-
-    fs.mkdirSync(path.dirname(dest), { recursive: true })
-    fs.symlinkSync(src, dest)
-
-    process.stdout.write(`✓ ${label} → ${src}\n`)
-    return { success: true, dest, label }
+    prepareDestination(link.dest, link.label, force, json)
+    fs.mkdirSync(path.dirname(link.dest), { recursive: true })
+    fs.symlinkSync(link.src, link.dest)
+    writeInfo(json, `✓ ${link.label} → ${link.src}`)
+    return { success: true, dest: link.dest, label: link.label, src: link.src }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    process.stderr.write(`✗ ${label}: ${message}\n`)
-    return { success: false, dest, label, message }
+    const cliErr = toCliError(err)
+    writeWarn(json, `✗ ${link.label}: ${cliErr.message}`)
+    writeJsonLine(json, {
+      type: 'error',
+      command: 'setup',
+      target: link.label,
+      message: cliErr.message,
+      error_code: cliErr.code,
+      retryable: cliErr.retryable,
+    })
+    return {
+      success: false,
+      dest: link.dest,
+      label: link.label,
+      message: cliErr.message,
+      errorCode: cliErr.code,
+      retryable: cliErr.retryable,
+    }
   }
 }
 
-// ────────────────────────────────────────────────────────────
-// メイン
-// ────────────────────────────────────────────────────────────
-
-function main(): void {
-  const { force } = parseArgs()
-
-  process.stdout.write('mantra セットアップを開始します...\n\n')
-
-  const results = SYMLINKS.map(({ src, dest, label }) =>
-    createSymlink(src, dest, label, force),
-  )
-
-  const successes = results.filter(r => r.success)
-  const failures = results.filter(r => !r.success)
-
-  process.stdout.write(`\n${successes.length}/${SYMLINKS.length} 件のシムリンクを作成しました\n`)
-
-  if (failures.length > 0) {
-    process.stdout.write('\n次のコマンドで強制上書きできます:\n')
-    process.stdout.write('  npm run setup -- --force\n')
-    process.exit(1)
+function buildMergedDirectory(kind: ContentKind, json: boolean): { dir: string; files: number } {
+  const files = listContentFiles(kind)
+  if (files.length === 0) {
+    throw new CliError(`${kind} のソースファイルが見つかりません`, 'E_INPUT_INVALID', false)
   }
 
-  process.stdout.write('\nセットアップが完了しました。\n')
-  process.stdout.write('次のステップ: npm run sync:codex\n')
+  const outputDir = path.join(os.homedir(), '.mantra', 'generated', kind)
+  ensureWritableParent(path.join(outputDir, '.touch'), `${kind} merged directory`)
+  fs.rmSync(outputDir, { recursive: true, force: true })
+  fs.mkdirSync(outputDir, { recursive: true })
+
+  // Later sources override earlier ones with the same filename.
+  const entries = new Map<string, string>()
+  for (const file of files) {
+    entries.set(file.relativeName, file.fullPath)
+  }
+
+  for (const [name, sourcePath] of entries) {
+    fs.symlinkSync(sourcePath, path.join(outputDir, name))
+  }
+
+  writeInfo(json, `merged ${kind}: ${entries.size} files -> ${outputDir}`)
+  return { dir: outputDir, files: entries.size }
+}
+
+function coreDirectory(kind: ContentKind): string {
+  const sources = resolveContentSources(kind).filter(s => s.origin === 'core')
+  if (sources.length === 0) {
+    throw new CliError(`core ${kind} directory not found`, 'E_INPUT_INVALID', false)
+  }
+  return sources[0].dir
+}
+
+function buildSetupLinks(json: boolean): {
+  links: SetupLink[]
+  mergedKinds: Array<{ kind: ContentKind; files: number; dir: string }>
+} {
+  const mergedKinds: Array<{ kind: ContentKind; files: number; dir: string }> = []
+  const agentsSrc = hasUserSources('agents')
+    ? (() => {
+        const merged = buildMergedDirectory('agents', json)
+        mergedKinds.push({ kind: 'agents', ...merged })
+        return merged.dir
+      })()
+    : coreDirectory('agents')
+
+  const rulesSrc = hasUserSources('rules')
+    ? (() => {
+        const merged = buildMergedDirectory('rules', json)
+        mergedKinds.push({ kind: 'rules', ...merged })
+        return merged.dir
+      })()
+    : coreDirectory('rules')
+
+  for (const kind of ['templates', 'examples'] as const) {
+    if (hasUserSources(kind)) {
+      const merged = buildMergedDirectory(kind, json)
+      mergedKinds.push({ kind, ...merged })
+    }
+  }
+
+  return {
+    links: [
+      {
+        src: agentsSrc,
+        dest: path.join(os.homedir(), '.claude', 'agents'),
+        label: '~/.claude/agents',
+      },
+      {
+        src: rulesSrc,
+        dest: path.join(os.homedir(), '.claude', 'rules'),
+        label: '~/.claude/rules',
+      },
+    ],
+    mergedKinds,
+  }
+}
+
+function main(): void {
+  const { force, json } = parseArgs()
+  const startedAt = Date.now()
+
+  try {
+    ensureNodeVersion(20)
+    const { links, mergedKinds } = buildSetupLinks(json)
+
+    for (const link of links) {
+      ensureReadableDirectory(link.src, `${link.label} source`)
+      ensureWritableParent(link.dest, `${link.label} destination`)
+    }
+
+    writeInfo(json, 'mantra セットアップを開始します...\n')
+
+    const results = links.map(link => createSymlink(link, force, json))
+    const successes = results.filter(r => r.success)
+    const failures = results.filter(r => !r.success)
+
+    writeInfo(json, `\n${successes.length}/${links.length} 件のシムリンクを作成しました`)
+
+    if (failures.length > 0) {
+      writeInfo(json, '\n次のコマンドで強制上書きできます:')
+      writeInfo(json, '  npm run setup -- --force')
+      finishCommand({
+        command: 'setup',
+        json,
+        startedAt,
+        success: false,
+        error: new CliError('セットアップに失敗しました', failures[0].errorCode, failures[0].retryable),
+        details: {
+          created: successes.length,
+          total: links.length,
+          merged: mergedKinds,
+          failures: failures.map(f => ({
+            target: f.label,
+            error_code: f.errorCode,
+            message: f.message,
+          })),
+        },
+      })
+      process.exit(1)
+    }
+
+    writeInfo(json, '\nセットアップが完了しました。')
+    writeInfo(json, '次のステップ: npm run sync:codex')
+    finishCommand({
+      command: 'setup',
+      json,
+      startedAt,
+      success: true,
+      details: {
+        created: successes.length,
+        total: links.length,
+        merged: mergedKinds,
+      },
+    })
+  } catch (err) {
+    const cliErr = toCliError(err)
+    writeWarn(json, cliErr.message)
+    finishCommand({
+      command: 'setup',
+      json,
+      startedAt,
+      success: false,
+      error: cliErr,
+    })
+    process.exit(1)
+  }
 }
 
 main()
