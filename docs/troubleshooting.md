@@ -6,18 +6,18 @@
 ## Warning（非致命）
 
 `type: "warning"` は失敗ではありません。  
-外部ソースと core の衝突がある場合、warning を出してユーザー定義を優先します。
+ソース間で filename 衝突がある場合、`W_SOURCE_CONFLICT_FILENAME` warning を出してユーザー定義を優先します。
 
-主な warning code:
+warning code:
 - `W_SOURCE_CONFLICT_FILENAME`
-- `W_SOURCE_CONFLICT_NAME`
 
 確認:
-- `npm run sync:codex:agents -- --json`
-- `npm run sync:codex:rules -- --json`
+- `npm run setup -- --json`
+- `npm run onboarding:json`
 
 見方:
 - `winner: "user"` と `loser` を確認し、どちらが採用されたかを判断する
+- 注意: agent/rule の name 重複は warning ではなく、`E_INPUT_INVALID` エラーです
 
 ## E_ENV_NODE_VERSION
 
@@ -57,6 +57,17 @@
   - 出力先が `~/.codex/skills/mantra*` 配下であることを確認
   - 手動で不正なシンボリックリンクを作成していないか確認
 
+## E_INPUT_INVALID
+
+- 症状: 入力値/設定不正（例: agent/rule の name 重複、sources.json の JSON/スキーマ不正）
+- 確認:
+  - `npm run validate:agents -- --json`
+  - `npm run validate:rules -- --json`
+- 補足: 重複 name の場合は `type: "error"` 行の `error_code` に `E_INPUT_INVALID` が出力されます
+- 対処:
+  - agent/rule の `name` を一意にする
+  - `~/.config/mantra/sources.json` の JSON とスキーマを修正する
+
 ## E_IO / E_INTERNAL
 
 - 症状: 想定外の I/O 失敗または内部エラー
@@ -78,13 +89,13 @@
 
 簡易確認:
 1. `npm run validate:json`
-2. `npm run sync:codex:agents -- --json`
-3. warningイベントで採用元を確認
+2. `npm run setup -- --json`
+3. warning イベント（`W_SOURCE_CONFLICT_FILENAME`）で採用元を確認
 
 ## 最短診断フロー
 
 1. `npm run onboarding:json`
-2. `npm run sync:codex:agents -- --json`
-3. `npm run sync:codex:rules -- --json`
+2. `npm run setup -- --json`
+3. `npm run validate:json`
 4. warning/error を確認して上記セクションの対処を実施
 5. `npm run smoke:onboarding` で再検証
