@@ -12,7 +12,7 @@ export type CliErrorCode =
   | 'E_IO'
   | 'E_INTERNAL'
 
-export type WarningCode = 'W_SOURCE_CONFLICT_FILENAME' | 'W_SOURCE_CONFLICT_NAME'
+export type WarningCode = 'W_SOURCE_CONFLICT_FILENAME'
 
 export interface WarningEvent {
   type: 'warning'

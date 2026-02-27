@@ -42,7 +42,7 @@
 ```json
 {
   "type": "warning",
-  "command": "sync:codex:agents",
+  "command": "setup",
   "code": "W_SOURCE_CONFLICT_FILENAME",
   "winner": "user",
   "loser": "core",
@@ -53,9 +53,9 @@
 
 - `code`:
   - `W_SOURCE_CONFLICT_FILENAME`
-  - `W_SOURCE_CONFLICT_NAME`
 - `winner`: `user`
 - `loser`: `core` または `user:<path>`
+- 重複した agent/rule name は warning ではなく、`validate:agents|validate:rules` の `type: "error"` イベントで `E_INPUT_INVALID` を返し、終了コード `1` で失敗
 
 ## error_code 一覧
 
