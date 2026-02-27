@@ -46,6 +46,9 @@ type SymlinkResult =
       retryable: boolean
     }
 
+type SymlinkSuccess = Extract<SymlinkResult, { success: true }>
+type SymlinkFailure = Extract<SymlinkResult, { success: false }>
+
 function parseArgs(): z.infer<typeof ArgsSchema> {
   return ArgsSchema.parse({
     force: process.argv.includes('--force'),
@@ -272,8 +275,8 @@ function main(): void {
     writeInfo(json, 'mantra セットアップを開始します...\n')
 
     const results = links.map(link => createSymlink(link, force, json))
-    const successes = results.filter(r => r.success)
-    const failures = results.filter(r => !r.success)
+    const successes = results.filter((r): r is SymlinkSuccess => r.success)
+    const failures = results.filter((r): r is SymlinkFailure => !r.success)
 
     writeInfo(json, `\n${successes.length}/${links.length} 件のシムリンクを作成しました`)
 

@@ -27,6 +27,12 @@ jobs:
       - name: Validate assets
         run: npm run validate
 
+      - name: Run typecheck
+        run: npm run typecheck
+
+      - name: Run lint
+        run: npm run lint
+
       - name: Run unit and contract tests
         run: npm run test:unit
 

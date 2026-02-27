@@ -276,6 +276,8 @@ ls -la ~/.claude/agents/your-agent-name
 新しい agent/rule を追加する PR では、以下を確認してください：
 
 - [ ] `npm run validate` がパスする
+- [ ] `npm run typecheck` がパスする
+- [ ] `npm run lint` がパスする
 - [ ] `npm run test:unit` がパスする
 - [ ] `npm run smoke:onboarding` がパスする
 - [ ] ファイル名が命名規則に従っている

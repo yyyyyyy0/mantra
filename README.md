@@ -2,15 +2,17 @@
 
 Claude Code の設定（agents・rules）を dotfiles として管理するリポジトリ。
 
-新しいマシンやユーザーが `npm run onboarding` を実行するだけで、シムリンク作成・検証・Codex 同期まで完了する。
+新しいマシンやユーザーが `npm run onboarding` を実行するだけで、シムリンク作成と検証まで完了する。  
+Codex 同期まで含める場合は `npm run onboarding:full` を使用する。
 
 ---
 
 ## Start here — 最初にやるべきこと / First steps
 
 1. `npm ci` — 依存関係のインストール
-2. `npm run onboarding` — セットアップ + 検証 + 同期
-3. `npm run smoke:onboarding` — 最短導線のスモーク検証（任意）
+2. `npm run onboarding` — セットアップ + 検証（core）
+3. `npm run onboarding:full` — セットアップ + 検証 + Codex 同期（拡張）
+4. `npm run smoke:onboarding` — 最短導線のスモーク検証（任意）
 
 ↓ 詳細は以下のクイックスタートへ
 
@@ -26,8 +28,11 @@ cd ~/.mantra
 # 2. 依存インストール
 npm ci
 
-# 3. セットアップ+検証+同期（最短導線）
+# 3. セットアップ+検証（最短導線）
 npm run onboarding
+
+# 4. Codex 同期まで実行する場合（任意）
+npm run onboarding:full
 ```
 
 既存のシムリンク/ディレクトリを再作成する場合（実ディレクトリはバックアップ退避）:
@@ -50,6 +55,14 @@ npm ci
 # agents/rules 定義の検証
 npm run validate
 # 期待される出力: ✓ All agents validated / ✓ All rules validated
+
+# TypeScript 型検査
+npm run typecheck
+# 期待される出力: エラーなく完了
+
+# Lint（warning を含めて失敗扱い）
+npm run lint
+# 期待される出力: エラーなく完了
 
 # シムリンクの検証
 ls -la ~/.claude/agents  # → mantra/agents へのシムリンク
@@ -126,8 +139,10 @@ mantra/
 | コマンド | 説明 |
 |---|---|
 | `npm run setup` | シムリンクを作成（初回セットアップ） |
-| `npm run onboarding` | セットアップ + 検証 + Codex 同期を一括実行 |
+| `npm run onboarding` | セットアップ + 検証を一括実行（core） |
+| `npm run onboarding:full` | セットアップ + 検証 + Codex 同期を一括実行（extended） |
 | `npm run onboarding:json` | onboarding を JSON 出力モードで実行 |
+| `npm run onboarding:full:json` | onboarding:full を JSON 出力モードで実行 |
 | `npm run setup -- --force` | 既存の実ディレクトリ/ファイルを `.bak-YYYYMMDDHHmmss` に退避して再作成 |
 | `npm run sync:codex` | agents と rules を Codex へ同期（`~/.codex/skills/mantra/`, `~/.codex/skills/mantra-rules/`） |
 | `npm run sync:codex:json` | sync を JSON 出力モードで実行 |
@@ -139,6 +154,8 @@ mantra/
 | `npm run validate:json` | validate を JSON 出力モードで実行 |
 | `npm run validate:agents` | agents 定義のみ検証 |
 | `npm run validate:rules` | rules 定義のみ検証 |
+| `npm run typecheck` | scripts/tests の TypeScript 型検査 |
+| `npm run lint` | scripts/tests の ESLint チェック（warning も fail） |
 | `npm run test:unit` | ユニット + 契約テストの実行 |
 | `npm run smoke:onboarding` | onboarding フローのスモークテスト |
 
@@ -180,8 +197,10 @@ mantra/
 **検証内容:**
 1. 依存関係のインストール (`npm ci`)
 2. agents/rules 定義の検証 (`npm run validate`)
-3. ユニット/契約テストの実行 (`npm run test:unit`)
-4. onboarding スモークテストの実行 (`npm run smoke:onboarding`)
+3. TypeScript 型検査 (`npm run typecheck`)
+4. ESLint (`npm run lint`)
+5. ユニット/契約テストの実行 (`npm run test:unit`)
+6. onboarding スモークテストの実行 (`npm run smoke:onboarding`)
 
 **Node.js バージョン:**
 - CI 環境: Node.js v20
