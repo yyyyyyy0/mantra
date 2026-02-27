@@ -90,6 +90,17 @@ review-mob:
 
 ## Task Size and Role Selection / タスクサイズと役割選択
 
+### Decision flow (single-agent first)
+
+- **Default**: single-agent path is preferred.
+- **Escalate to planner** only when threshold is met (3+ steps / 2+ files / non-obvious tradeoff).
+- **Escalate to mob** only when planner identifies unresolved ambiguity and cost/benefit is positive.
+
+共通語彙:
+- **Core**: 単一実行で完結する既定のデフォルト導線
+- **Optional**: 専門家追加を使って品質を強化する追加導線
+- **Experimental**: 高い不確実性・高リスク時のみ試す協調導線
+
 ### Small Tasks / 小さなタスク（1-2ファイル、明らかな実装）
 - **Do / する**: 直接実装
 - **Don't / しない**: モブプログラミング
@@ -117,6 +128,13 @@ review-mob:
 ### High-Risk Tasks / 高リスクタスク（セキュリティ、請求、データ整合性）
 - **Do / する**: 常に mob-critic を含める
 - **Additional / 追加**: ドメイン専門家（security-reviewer など）
+
+### 終了基準 / Exit condition（実験的導線）
+
+mob が期待しないコスト上昇を招くと判断した場合は即中止して single-agent 実行へ戻す。
+- `flash-mob` で未解決決定点が 0〜1 件に収まる
+- 2ラウンド目以降も決定点が増える見込み
+- 追加の意思決定時間が単独実行の 2 倍を超える見込み
 
 ---
 

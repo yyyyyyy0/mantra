@@ -14,14 +14,15 @@ Choose the mode that fits your task.
 
 | Mode / モード | Use Case / 使用ケース | 参加者例 |
 |---------------|----------------------|----------|
-| **flash-mob** | 実装前のクイックリスクスキャン | planner, architect, mob-critic, mob-navigator |
-| **plan-mob** | 計画・受入条件の確定 | planner, architect, tdd-guide, mob-critic, mob-scribe |
-| **review-mob** | マージ準備レビュー | code-reviewer, security-reviewer, mob-critic, mob-scribe |
+| **flash-mob** | `single-agent`で進める前提だが、`3+ steps` / `2+ files` / 曖昧性高のときに実施 | planner, architect, mob-critic, mob-navigator |
+| **plan-mob** | flash 後も未解決判断が残る場合、またはリスクが高い設計判断が残る場合 | planner, architect, tdd-guide, mob-critic, mob-scribe |
+| **review-mob** | コード変更後の品質確認、または高リスク変更の最終確認 | code-reviewer, security-reviewer, mob-critic, mob-scribe |
 
 **Decision Guide / 決定ガイド**:
-- 実装前にリスクを知りたい？ → **flash-mob**
-- 実装計画を作成したい？ → **plan-mob**
-- 実装後のレビュー？ → **review-mob**
+- 1ファイルの明確な修正・typo は直接対応（mobなし）  
+- 実装前に不確実性が高く、かつ 3+ steps / 2+ files の場合 → **flash-mob**
+- flash でも判断が残る場合 → **plan-mob**
+- コード変更後の確認が必要な場合 → **review-mob**
 
 ---
 

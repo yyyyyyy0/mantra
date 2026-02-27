@@ -8,12 +8,25 @@ The goal is not to maximize conversation volume. The goal is to improve decision
 
 ## When to Use Mob Orchestration
 
-Use mob orchestration when any of the following are true:
-- The task spans **3+ implementation steps**
-- The change touches multiple files, modules, or layers
-- The task includes architectural or API tradeoffs
-- The failure cost is high (security, auth, billing, migrations, data integrity)
-- Root cause is unclear and requires hypothesis testing
+Use mob orchestration when all of the following is true:
+- The task is not safely solvable in a single path and meets at least one threshold:
+  - 3+ implementation steps
+  - 2+ files or multiple layers
+  - Architectural/API tradeoffs
+  - Failure cost is high (security, auth, billing, migrations, data integrity)
+  - Root cause is unclear and requires hypothesis testing
+- The expected benefit is higher than the overhead of coordination
+
+### Cost / Overhead guardrail
+
+Mob is **not** needed when:
+- The task is clearly single-agent solvable (1 file or obvious fix)
+- The issue is under 3 implementation steps and 2 files **and** low-risk
+- `flash-mob` resolves uncertainty to 0 or 1 unresolved point
+
+Practical stop rule:
+- If after 1 `flash-mob` round uncertainty remains below or equal to 1 high-confidence decision point, proceed without `plan-mob`.
+- If expected coordination cost is estimated to exceed likely single-agent effort by more than 2x, prefer a direct path and keep single-agent execution.
 
 ### Usually Do Not Use It For
 - Typo fixes
@@ -143,6 +156,7 @@ Recommended human gates:
 1. **Plan approval** (after `plan-mob`)
 2. **Implementation start approval** (for risky changes)
 3. **Merge readiness approval** (after `review-mob`)
+4. **De-escalation decision** (cancel planned mob if overhead > benefit after `flash-mob`)
 
 When uncertainty remains, prefer a smaller reversible step.
 
