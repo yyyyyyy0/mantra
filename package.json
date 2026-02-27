@@ -17,7 +17,7 @@
     "lint": "eslint \"scripts/**/*.ts\" \"tests/**/*.ts\" --max-warnings=0",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:unit": "vitest run tests/agents.test.ts tests/rules.test.ts tests/contracts/cli-json-contract.test.ts tests/contracts/package-scripts-contract.test.ts tests/contracts/content-precedence.test.ts tests/contracts/name-conflict-contract.test.ts",
+    "test:unit": "vitest run tests/agents.test.ts tests/rules.test.ts tests/contracts/cli-json-contract.test.ts tests/contracts/package-scripts-contract.test.ts tests/contracts/content-precedence.test.ts tests/contracts/name-conflict-contract.test.ts tests/setup-fs.test.ts tests/setup-merge.test.ts tests/setup-orchestrator.test.ts",
     "smoke:onboarding": "vitest run tests/smoke/onboarding.test.ts",
     "validate:agents": "tsx scripts/validate-agents.ts",
     "validate:rules": "tsx scripts/validate-rules.ts",
