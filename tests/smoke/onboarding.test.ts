@@ -80,4 +80,36 @@ describe('Onboarding smoke', () => {
     expect(records.some(r => r.command === 'setup')).toBe(true)
     expect(records.some(r => r.command === 'sync:codex:agents')).toBe(true)
   })
+
+  it('requires --force to overwrite existing destination paths and succeeds with --force', () => {
+    const home = createTempHome('mantra-smoke-force-')
+    homes.push(home)
+
+    const existingAgents = path.join(home, '.claude', 'agents')
+    const existingRules = path.join(home, '.claude', 'rules')
+    fs.mkdirSync(existingAgents, { recursive: true })
+    fs.mkdirSync(existingRules, { recursive: true })
+    fs.writeFileSync(path.join(existingAgents, 'legacy.md'), 'legacy\n', 'utf8')
+    fs.writeFileSync(path.join(existingRules, 'legacy.md'), 'legacy\n', 'utf8')
+
+    const forceResult = runScript('setup.ts', ['--json', '--force'], home)
+    expect(forceResult.raw.status, `${forceResult.command}\n${forceResult.stderr}`).toBe(0)
+
+    const summary = forceResult.jsonLines.find(line => line.type === 'summary')
+    expect(summary?.success).toBe(true)
+    expect(fs.lstatSync(existingAgents).isSymbolicLink()).toBe(true)
+    expect(fs.lstatSync(existingRules).isSymbolicLink()).toBe(true)
+
+    const claudeDir = path.join(home, '.claude')
+    const backupFiles = fs
+      .readdirSync(claudeDir)
+      .filter(name => name.startsWith('agents.bak-') || name.startsWith('rules.bak-'))
+    expect(backupFiles.length).toBeGreaterThan(0)
+
+    const normalResult = runScript('setup.ts', ['--json'], home)
+    expect(normalResult.raw.status, `${normalResult.command}\n${normalResult.stderr}`).toBe(1)
+
+    const normalSummary = normalResult.jsonLines.find(line => line.type === 'summary')
+    expect(normalSummary?.success).toBe(false)
+  })
 })
