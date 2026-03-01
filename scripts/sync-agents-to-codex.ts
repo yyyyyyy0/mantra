@@ -28,6 +28,7 @@ type AgentFrontmatter = typeof ClaudeAgentFrontmatter._output
 
 const CATEGORY_MAP: Record<string, string> = {
   planner: 'planning',
+  replan: 'planning',
   architect: 'architecture',
   'tdd-guide': 'testing',
   'code-reviewer': 'review',

@@ -46,8 +46,14 @@ Codex sync 追加: setup + validate + sync
 |---|---|
 | 1ファイル / 明確な修正 / 小変更 | single-agent first |
 | 3+実装ステップ、または2+ファイル、または設計トレードオフがある | `planner` 検討 |
+| 実装前レビューで High/Medium の未解決リスクが残る | `replan` で再計画（条件付き） |
 | 実装後にコード品質の確認が必要 | `code-reviewer`（必要時） |
 | 要件が曖昧、失敗コストが高い、複数利害がある | `mob` 系を検討（`mob-navigator`→`mob-critic`→`mob-scribe`） |
+
+**`planner` と `replan` の使い分け**
+- `planner`: 初回の実装計画を作る
+- `replan`: レビュー結果を受けて、実装前に再計画する（`High + Medium > 0` の場合のみ）
+- 同一ラウンドで同時起動しない（`planner` 出力を `replan` に引き継ぐ）
 
 ---
 
@@ -154,6 +160,7 @@ mantra/
 | `mob-navigator` | Mob プログラミング：意思決定フローの調整 |
 | `mob-scribe` | Mob プログラミング：出力の正規化・要約 |
 | `planner` | 機能実装・リファクタリングの計画 |
+| `replan` | レビュー反映の実装前再計画（条件付き） |
 | `refactor-cleaner` | 不要コードの削除・整理 |
 | `security-reviewer` | セキュリティ脆弱性の検出・修正 |
 | `tdd-guide` | テスト駆動開発（テストファースト） |
@@ -206,7 +213,8 @@ mantra/
 ### 導線ガイド / Execution guidance
 
 - 単純修正や明確な 1 ファイル修正は `single-agent` で完了する
-- 複数判断が必要な作業は `planner` で計画
+- 複数判断が必要な作業は `planner` で初回計画を作る
+- 実装前レビューで高/中リスクが未解決なら `replan` で再計画する
 - 変更後のコードレビューは `code-reviewer`、高リスク判断が必要な時のみ `mob`
 
 ---
@@ -297,7 +305,7 @@ Mob programming improves decision quality and implementation safety in these sit
 | モード / Mode | 使用タイミング / When to Use | 参加者例 / Typical Participants |
 |---------------|----------------------------|-------------------------------|
 | **flash-mob** | 実装前のクイックリスクスキャン / Preflight risk scanning | planner, architect, mob-critic, mob-navigator |
-| **plan-mob** | 計画・受入条件の確定 / Lock plan and acceptance criteria | planner, architect, tdd-guide, mob-critic, mob-scribe |
+| **plan-mob** | 計画・受入条件の確定 / Lock plan and acceptance criteria | planner, architect, tdd-guide, mob-critic, mob-scribe (`replan` is a follow-up step, not same-round parallel) |
 | **review-mob** | マージ準備レビュー / Merge readiness review | code-reviewer, security-reviewer, mob-critic, mob-scribe |
 
 ### クイックスタート / Quickstart
