@@ -90,12 +90,12 @@ This agent is plan-only and does not implement code or call external systems.
 - Depth cap: `if replan_depth >= 3 then stop_and_present`
 - Always expose stop reasons in `Blocked Reasons`
 - Recurrence prevention stop:
-  - `new_issue_count <= previous_issue_count` and `new_risk_unresolved > 0`
+  - `new_issue_count >= previous_issue_count` and `new_risk_unresolved > 0`
 - V3 is allowed only when all are true:
   - `replan_depth < 3`
   - `high_remaining + medium_remaining >= replan_criteria.max_high_medium_remaining_for_v3`
   - `replan_criteria.require_recurrence_prevention == true`
-  - `issue_trend > 0`
+  - `issue_trend < 0`
 - If `require_recurrence_prevention == false`, skip V3 and stop at V2 by design.
 
 ## Process
