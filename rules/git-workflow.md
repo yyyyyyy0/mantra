@@ -24,7 +24,8 @@ When creating PRs:
 ## Feature Implementation Workflow
 
 1. **Plan First**
-   - Use **planner** agent to create implementation plan
+   - Use **planner** agent when the task is non-trivial (3+ steps / 2+ files / non-obvious tradeoff)
+   - If pre-implementation review leaves unresolved High/Medium risks, run **replan** before coding
    - Identify dependencies and risks
    - Break down into phases
 
