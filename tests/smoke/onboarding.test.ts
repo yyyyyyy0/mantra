@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   createTempHome,
   removeTempHome,
+  runScript,
   runNpmScript,
   todayMetricsPath,
 } from '../helpers/cli-runner'
