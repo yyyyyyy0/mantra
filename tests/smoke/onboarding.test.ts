@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   createTempHome,
   removeTempHome,
-  runScript,
+  runNpmScript,
   todayMetricsPath,
 } from '../helpers/cli-runner'
 
@@ -21,18 +21,8 @@ describe('Onboarding smoke', () => {
     const home = createTempHome('mantra-smoke-')
     homes.push(home)
 
-    const steps = [
-      ['setup.ts', ['--json']],
-      ['validate-agents.ts', ['--json']],
-      ['validate-rules.ts', ['--json']],
-    ] as const
-
-    for (const [script, args] of steps) {
-      const result = runScript(script, [...args], home)
-      expect(result.raw.status, `${result.command}\n${result.stderr}`).toBe(0)
-      const summary = result.jsonLines.find(line => line.type === 'summary')
-      expect(summary?.success, `${result.command}\n${result.stdout}`).toBe(true)
-    }
+    const result = runNpmScript('onboarding', home)
+    expect(result.raw.status, `${result.command}\n${result.stderr}`).toBe(0)
 
     const agentsLink = path.join(home, '.claude', 'agents')
     const rulesLink = path.join(home, '.claude', 'rules')
@@ -46,28 +36,18 @@ describe('Onboarding smoke', () => {
       .trim()
       .split('\n')
       .map(line => JSON.parse(line) as Record<string, unknown>)
-    expect(records.length).toBeGreaterThanOrEqual(steps.length)
+    expect(records.length).toBeGreaterThanOrEqual(3)
     expect(records.some(r => r.command === 'setup')).toBe(true)
+    expect(records.some(r => r.command === 'validate:agents')).toBe(true)
+    expect(records.some(r => r.command === 'validate:rules')).toBe(true)
   })
 
   it('completes setup -> validate -> sync flow in a fresh HOME (onboarding:full)', () => {
     const home = createTempHome('mantra-smoke-full-')
     homes.push(home)
 
-    const steps = [
-      ['setup.ts', ['--json']],
-      ['validate-agents.ts', ['--json']],
-      ['validate-rules.ts', ['--json']],
-      ['sync-agents-to-codex.ts', ['--json']],
-      ['sync-rules-to-codex.ts', ['--json']],
-    ] as const
-
-    for (const [script, args] of steps) {
-      const result = runScript(script, [...args], home)
-      expect(result.raw.status, `${result.command}\n${result.stderr}`).toBe(0)
-      const summary = result.jsonLines.find(line => line.type === 'summary')
-      expect(summary?.success, `${result.command}\n${result.stdout}`).toBe(true)
-    }
+    const result = runNpmScript('onboarding:full', home)
+    expect(result.raw.status, `${result.command}\n${result.stderr}`).toBe(0)
 
     const metricsPath = todayMetricsPath(home)
     expect(fs.existsSync(metricsPath)).toBe(true)
@@ -76,8 +56,11 @@ describe('Onboarding smoke', () => {
       .trim()
       .split('\n')
       .map(line => JSON.parse(line) as Record<string, unknown>)
-    expect(records.length).toBeGreaterThanOrEqual(steps.length)
+    expect(records.length).toBeGreaterThanOrEqual(5)
     expect(records.some(r => r.command === 'setup')).toBe(true)
+    expect(records.some(r => r.command === 'validate:agents')).toBe(true)
+    expect(records.some(r => r.command === 'validate:rules')).toBe(true)
     expect(records.some(r => r.command === 'sync:codex:agents')).toBe(true)
+    expect(records.some(r => r.command === 'sync:codex:rules')).toBe(true)
   })
 })
