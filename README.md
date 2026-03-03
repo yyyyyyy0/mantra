@@ -61,7 +61,7 @@ Codex sync 追加: setup + validate + sync
 
 1. `npm ci` — 依存関係のインストール
 2. `npm run onboarding` — セットアップ + 検証（core）
-3. `npm run onboarding:full` — セットアップ + 検証 + Codex 同期（拡張）
+3. `npm run onboarding:full` — セットアップ + 検証 + Codex 同期（optional）
 4. `npm run smoke:onboarding` — 最短導線のスモーク検証（任意）
 
 ↓ 詳細は以下のクイックスタートへ
@@ -123,6 +123,7 @@ ls -la ~/.claude/rules   # → mantra/rules へのシムリンク
 - `npm ci` が失敗する場合: Node.js v20+ がインストールされているか確認
 - `npm run validate` が失敗する場合: agents/ または rules/ ディレクトリの .md ファイルの frontmatter 構文と、agent/rule の name 重複を確認
 - シムリンクが作成されない場合: `npm run setup -- --force` を試す（既存のディレクトリはバックアップされます）
+- `npm run setup` 成功後の案内: Core next step は `npm run validate`、Optional next step は `npm run sync:codex`
 - `error_code` 単位の詳細対処: [docs/troubleshooting.md](./docs/troubleshooting.md)
 
 ---
@@ -191,7 +192,7 @@ mantra/
 |---|---|
 | `npm run setup` | シムリンクを作成（初回セットアップ） |
 | `npm run onboarding` | セットアップ + 検証を一括実行（core） |
-| `npm run onboarding:full` | セットアップ + 検証 + Codex 同期を一括実行（extended） |
+| `npm run onboarding:full` | セットアップ + 検証 + Codex 同期を一括実行（optional） |
 | `npm run onboarding:json` | onboarding を JSON 出力モードで実行 |
 | `npm run onboarding:full:json` | onboarding:full を JSON 出力モードで実行 |
 | `npm run setup -- --force` | 既存の実ディレクトリ/ファイルを `.bak-YYYYMMDDHHmmss` に退避して再作成 |
@@ -199,8 +200,6 @@ mantra/
 | `npm run sync:codex:json` | sync を JSON 出力モードで実行 |
 | `npm run sync:codex:agents` | agents のみ Codex へ同期 |
 | `npm run sync:codex:rules` | rules のみ Codex へ同期 |
-| `npm run sync:codex:templates` | templates の同期（Roadmap） |
-| `npm run sync:codex:examples` | examples の同期（Roadmap） |
 | `npm run validate` | agents/rules の定義を検証 |
 | `npm run validate:json` | validate を JSON 出力モードで実行 |
 | `npm run validate:agents` | agents 定義のみ検証 |
@@ -208,6 +207,7 @@ mantra/
 | `npm run typecheck` | scripts/tests の TypeScript 型検査 |
 | `npm run lint` | scripts/tests の ESLint チェック（warning も fail） |
 | `npm run test:unit` | ユニット + 契約テストの実行 |
+| `npm run test:coverage` | ユニット + 契約テストを coverage gate（80%）付きで実行 |
 | `npm run smoke:onboarding` | onboarding フローのスモークテスト |
 
 ### 導線ガイド / Execution guidance
@@ -258,7 +258,7 @@ mantra/
 2. agents/rules 定義の検証 (`npm run validate`)
 3. TypeScript 型検査 (`npm run typecheck`)
 4. ESLint (`npm run lint`)
-5. ユニット/契約テストの実行 (`npm run test:unit`)
+5. ユニット/契約テスト + coverage gate の実行 (`npm run test:coverage`)
 6. onboarding スモークテストの実行 (`npm run smoke:onboarding`)
 
 **Node.js バージョン:**

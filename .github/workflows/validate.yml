@@ -33,8 +33,8 @@ jobs:
       - name: Run lint
         run: npm run lint
 
-      - name: Run unit and contract tests
-        run: npm run test:unit
+      - name: Run unit and contract tests with coverage gate
+        run: npm run test:coverage
 
       - name: Run onboarding smoke
         run: npm run smoke:onboarding

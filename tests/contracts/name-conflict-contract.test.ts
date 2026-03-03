@@ -62,7 +62,7 @@ describe('Name conflict contract', () => {
 
     const summary = result.jsonLines.find(line => line.type === 'summary')
     expect(summary?.success).toBe(false)
-    expect(summary?.error_code).toBe('E_SCHEMA_FRONTMATTER')
+    expect(summary?.error_code).toBe('E_INPUT_INVALID')
   })
 
   it('returns E_INPUT_INVALID for duplicate rule names', () => {
@@ -91,7 +91,7 @@ describe('Name conflict contract', () => {
 
     const summary = result.jsonLines.find(line => line.type === 'summary')
     expect(summary?.success).toBe(false)
-    expect(summary?.error_code).toBe('E_SCHEMA_RULE')
+    expect(summary?.error_code).toBe('E_INPUT_INVALID')
   })
 
   it('does not emit warning contract fields on validation failure paths', () => {

@@ -12,6 +12,7 @@ import {
   writeJsonLine,
   writeWarn,
 } from './lib/cli-telemetry'
+import { selectSummaryErrorCode } from './lib/validation-summary'
 
 function main(): void {
   const json = hasJsonFlag(process.argv)
@@ -29,6 +30,7 @@ function main(): void {
     const seenNames = new Set<string>()
 
     let errors = 0
+    const errorCodes: CliError['code'][] = []
 
     for (const file of files) {
       const content = fs.readFileSync(file.fullPath, 'utf8')
@@ -60,18 +62,20 @@ function main(): void {
           error_code: cliErr.code,
           retryable: cliErr.retryable,
         })
+        errorCodes.push(cliErr.code)
         errors++
       }
     }
 
     if (errors > 0) {
+      const summaryErrorCode = selectSummaryErrorCode(errorCodes, 'E_SCHEMA_RULE')
       writeWarn(json, `\n${errors} 件のエラーが見つかりました`)
       finishCommand({
         command: 'validate:rules',
         json,
         startedAt,
         success: false,
-        error: new CliError(`${errors} 件のエラーが見つかりました`, 'E_SCHEMA_RULE', false),
+        error: new CliError(`${errors} 件のエラーが見つかりました`, summaryErrorCode, false),
         details: { checked: files.length, errors },
       })
       process.exit(1)

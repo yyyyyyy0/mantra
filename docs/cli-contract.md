@@ -30,6 +30,12 @@
 }
 ```
 
+`validate:agents` / `validate:rules` で複数ファイルエラーがある場合、`summary.error_code` は各 `type: "error"` の代表値として次の優先順位で決定します。
+
+- `E_INPUT_INVALID`
+- スキーマ系（`validate:agents` は `E_SCHEMA_FRONTMATTER`、`validate:rules` は `E_SCHEMA_RULE`）
+- その他のエラーコード（検出順の先頭）
+
 ### ファイル単位イベント（任意）
 
 - `type: "validated"`: validate 系でのファイル検証成功

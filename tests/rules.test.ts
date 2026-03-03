@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as fs from 'fs'
 import * as path from 'path'
-import { parseRuleFile } from '../scripts/lib/rule-parser'
+import { extractH1, humanizeName, parseRuleFile } from '../scripts/lib/rule-parser'
 
 describe('Rule Definitions', () => {
   const rulesDir = path.join(process.cwd(), 'rules')
@@ -26,5 +26,31 @@ describe('Rule Definitions', () => {
 
     const unique = new Set(names)
     expect(unique.size).toBe(names.length)
+  })
+
+  it('humanizeName converts kebab-case names into title case', () => {
+    expect(humanizeName('security-reviewer')).toBe('Security Reviewer')
+    expect(humanizeName('tdd-guide')).toBe('Tdd Guide')
+  })
+
+  it('extractH1 ignores fenced code blocks and returns first top-level heading', () => {
+    const content = [
+      '```md',
+      '# Fake heading in code fence',
+      '```',
+      '',
+      '# Real Heading',
+      'Body',
+    ].join('\n')
+
+    expect(extractH1(content)).toBe('Real Heading')
+  })
+
+  it('parseRuleFile falls back to humanized filename when H1 is missing', () => {
+    const content = 'No H1 here.\n\nbody only.'
+    const parsed = parseRuleFile(content, 'sample-rule.md')
+
+    expect(parsed.metadata.name).toBe('sample-rule')
+    expect(parsed.metadata.description).toBe('Sample Rule')
   })
 })

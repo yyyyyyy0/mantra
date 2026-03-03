@@ -26,6 +26,23 @@ export interface SetupLinkPlan {
   warnings: WarningEvent[]
 }
 
+export const SETUP_CORE_NEXT_STEP = 'npm run validate'
+export const SETUP_OPTIONAL_NEXT_STEP = 'npm run sync:codex'
+
+export function getSetupSuccessOutputLines(): string[] {
+  return [
+    'セットアップが完了しました。',
+    `Core next step: ${SETUP_CORE_NEXT_STEP}`,
+    `Optional next step: ${SETUP_OPTIONAL_NEXT_STEP}`,
+  ]
+}
+
+export function writeSetupSuccessOutput(json: boolean): void {
+  for (const line of getSetupSuccessOutputLines()) {
+    writeInfo(json, line)
+  }
+}
+
 function buildSourceDirectory(json: boolean, kind: ContentKind, mergedKinds: MergedKindSummary[], warnings: WarningEvent[]): string {
   if (!hasUserSources(kind)) {
     return coreDirectory(kind)
@@ -116,8 +133,8 @@ export function runSetup(args: SetupArgs): void {
       process.exit(1)
     }
 
-    writeInfo(json, '\nセットアップが完了しました。')
-    writeInfo(json, '次のステップ: npm run sync:codex')
+    writeInfo(json, '')
+    writeSetupSuccessOutput(json)
 
     finishCommand({
       command: 'setup',

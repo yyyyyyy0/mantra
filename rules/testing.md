@@ -1,21 +1,30 @@
 # Testing Requirements
 
-## Minimum Test Coverage: 80%
+## MUST
 
-Test Types (ALL required):
-1. **Unit Tests** - Individual functions, utilities, components
-2. **Integration Tests** - API endpoints, database operations
-3. **E2E Tests** - Critical user flows (Playwright)
+1. **Unit + Contract tests are required**
+   - Unit tests: functions, utilities, components.
+   - Contract tests: CLI/JSON output and script contract stability.
+2. **Coverage is required at 80% or higher**
+   - Statements: 80%
+   - Branches: 80%
+   - Functions: 80%
+   - Lines: 80%
+   - Scope: unit/contract target modules configured in `vitest.config.ts`
+3. **CI must enforce the coverage gate**
+   - CI must run a coverage-enabled unit/contract test command.
+   - The pipeline must fail when thresholds are not met.
 
-## Test-Driven Development
+## SHOULD
 
-MANDATORY workflow:
-1. Write test first (RED)
-2. Run test - it should FAIL
-3. Write minimal implementation (GREEN)
-4. Run test - it should PASS
-5. Refactor (IMPROVE)
-6. Verify coverage (80%+)
+1. **Integration tests**
+   - Cover API/file-system boundaries and cross-module behavior.
+2. **E2E tests**
+   - Cover critical user flows (Playwright).
+3. **TDD workflow**
+   - RED: write a failing test first.
+   - GREEN: implement the minimum passing change.
+   - REFACTOR: improve code while keeping tests green.
 
 ## Troubleshooting Test Failures
 
