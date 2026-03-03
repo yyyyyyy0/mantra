@@ -10,7 +10,6 @@ export default defineConfig({
         'scripts/lib/agent-schema.ts',
         'scripts/lib/rule-parser.ts',
         'scripts/lib/rule-schema.ts',
-        'scripts/lib/setup-orchestrator.ts',
         'scripts/lib/validation-summary.ts',
       ],
       thresholds: {
