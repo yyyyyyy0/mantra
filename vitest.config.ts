@@ -6,6 +6,13 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
+      include: [
+        'scripts/lib/agent-schema.ts',
+        'scripts/lib/rule-parser.ts',
+        'scripts/lib/rule-schema.ts',
+        'scripts/lib/setup-orchestrator.ts',
+        'scripts/lib/validation-summary.ts',
+      ],
       thresholds: {
         statements: 80,
         branches: 80,

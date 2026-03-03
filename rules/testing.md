@@ -10,6 +10,7 @@
    - Branches: 80%
    - Functions: 80%
    - Lines: 80%
+   - Scope: unit/contract target modules configured in `vitest.config.ts`
 3. **CI must enforce the coverage gate**
    - CI must run a coverage-enabled unit/contract test command.
    - The pipeline must fail when thresholds are not met.

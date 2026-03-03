@@ -23,6 +23,7 @@ import {
   type ContentKind,
   type ContentSource,
 } from './lib/content-sources'
+import { writeSetupSuccessOutput } from './lib/setup-orchestrator'
 
 interface SetupLink {
   src: string
@@ -304,8 +305,8 @@ function main(): void {
       process.exit(1)
     }
 
-    writeInfo(json, '\nセットアップが完了しました。')
-    writeInfo(json, '次のステップ: npm run sync:codex')
+    writeInfo(json, '')
+    writeSetupSuccessOutput(json)
     finishCommand({
       command: 'setup',
       json,

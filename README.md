@@ -156,6 +156,7 @@ mantra/
 | `npm run typecheck` | scripts/tests の TypeScript 型検査 |
 | `npm run lint` | scripts/tests の ESLint チェック（warning も fail） |
 | `npm run test:unit` | ユニット + 契約テストの実行 |
+| `npm run test:coverage` | ユニット + 契約テストを coverage gate（80%）付きで実行 |
 | `npm run smoke:onboarding` | onboarding フローのスモークテスト |
 
 ---
@@ -198,7 +199,7 @@ mantra/
 2. agents/rules 定義の検証 (`npm run validate`)
 3. TypeScript 型検査 (`npm run typecheck`)
 4. ESLint (`npm run lint`)
-5. ユニット/契約テストの実行 (`npm run test:unit`)
+5. ユニット/契約テスト + coverage gate の実行 (`npm run test:coverage`)
 6. onboarding スモークテストの実行 (`npm run smoke:onboarding`)
 
 **Node.js バージョン:**

@@ -4,7 +4,6 @@ import { ClaudeAgentFrontmatter } from './lib/agent-schema'
 import { listContentFiles, resolveContentSources } from './lib/content-sources'
 import {
   CliError,
-  type CliErrorCode,
   ensureNodeVersion,
   ensureReadableDirectory,
   finishCommand,
@@ -14,16 +13,7 @@ import {
   writeJsonLine,
   writeWarn,
 } from './lib/cli-telemetry'
-
-function summarizeErrorCode(errorCodes: CliErrorCode[]): CliErrorCode {
-  if (errorCodes.includes('E_INPUT_INVALID')) {
-    return 'E_INPUT_INVALID'
-  }
-  if (errorCodes.includes('E_SCHEMA_FRONTMATTER')) {
-    return 'E_SCHEMA_FRONTMATTER'
-  }
-  return errorCodes[0] ?? 'E_SCHEMA_FRONTMATTER'
-}
+import { selectSummaryErrorCode } from './lib/validation-summary'
 
 function main(): void {
   const json = hasJsonFlag(process.argv)
@@ -41,7 +31,7 @@ function main(): void {
     const seenNames = new Set<string>()
 
     let errors = 0
-    const errorCodes: CliErrorCode[] = []
+    const errorCodes: CliError['code'][] = []
 
     for (const file of files) {
       const content = fs.readFileSync(file.fullPath, 'utf8')
@@ -90,7 +80,7 @@ function main(): void {
     }
 
     if (errors > 0) {
-      const summaryErrorCode = summarizeErrorCode(errorCodes)
+      const summaryErrorCode = selectSummaryErrorCode(errorCodes, 'E_SCHEMA_FRONTMATTER')
       writeWarn(json, `\n${errors} 件のエラーが見つかりました`)
       finishCommand({
         command: 'validate:agents',

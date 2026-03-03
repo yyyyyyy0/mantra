@@ -24,9 +24,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Vitest coverage provider
-        run: npm install --no-save --no-package-lock @vitest/coverage-v8
-
       - name: Validate assets
         run: npm run validate
 
