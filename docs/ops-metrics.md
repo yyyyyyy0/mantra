@@ -18,8 +18,9 @@
   - 定義: 実行時に user source が1つ以上解決された割合
   - 式: `user source 利用実行数 / 実行数`
 - **衝突 warning 率**
-  - 定義: filename/name 衝突 warning の発生割合
+  - 定義: filename 衝突 warning（`W_SOURCE_CONFLICT_FILENAME`）の発生割合
   - 式: `warning 発生実行数 / 実行数`
+  - 補足: agent/rule の name 重複は warning ではなく、`E_INPUT_INVALID` の失敗として「コマンド失敗率」に計上
 - **原因特定時間（MTTI）**
   - 定義: 最初の失敗発生から `error_code` と対処手順が特定されるまでの時間
 - **初回完了時間（P50）**

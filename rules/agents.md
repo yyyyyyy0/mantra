@@ -7,6 +7,7 @@ Located in `~/.claude/agents/`:
 | Agent | Purpose | When to Use |
 |-------|---------|-------------|
 | planner | Implementation planning | Complex features, refactoring |
+| replan | Review-driven re-planning | After review when High/Medium issues remain unresolved |
 | architect | System design | Architectural decisions |
 | tdd-guide | Test-driven development | New features, bug fixes |
 | code-reviewer | Code review | After writing code |
@@ -19,13 +20,41 @@ Located in `~/.claude/agents/`:
 | mob-critic | Risk finder & challenger | Challenging assumptions, preventing groupthink |
 | mob-scribe | Decision/risk summary | Normalizing collaboration outputs |
 
-## Immediate Agent Usage
+## Immediate Agent Usage (Conditional)
 
-No user prompt needed:
-1. Complex feature requests - Use **planner** agent
-2. Code just written/modified - Use **code-reviewer** agent
-3. Bug fix or new feature - Use **tdd-guide** agent
-4. Architectural decision - Use **architect** agent
+No user prompt is needed to follow the default ladder, but there is no default agent storm.
+
+Use this sequence:
+
+- **P0 (Default single-agent path)**  
+  - Typo / formatting / docs-only small fixes  
+  - One-file obvious edits  
+  - No architectural decision needed
+
+- **P1 (planner condition)**  
+  - 3+ implementation steps  
+  - 2+ files  
+  - Ambiguous requirements or non-trivial behavior choices  
+  - If any condition applies, invoke **planner**
+
+- **P2 (replan condition)**  
+  - Run only after `planner` or design review outputs exist
+  - Review shows unresolved High/Medium risks (`High + Medium > 0`)
+  - Use **replan** to rebuild execution plan before implementation
+  - Do not use for trivial one-file or obvious edits
+  - Do not run `planner` and `replan` in the same round
+
+- **P3 (mob condition)**  
+  - High-risk scope (security, auth, billing, migrations, data integrity)  
+  - Repeated unresolved decision points after `planner` / `replan`  
+  - Escalate to `mob-*` only when multi-perspective value is clear
+
+- **P4 (code-reviewer condition)**  
+  - Non-trivial code changes  
+  - Invoke **code-reviewer** after writing code, not before obvious docs-only edits
+
+Suggested escalation:
+- `single-agent` → `planner` (if P1) → `replan` (if P2) → `mob-navigator`/`mob-critic`/`mob-scribe` (if P3) → `code-reviewer` (if P4)
 
 ## Parallel Task Execution
 
