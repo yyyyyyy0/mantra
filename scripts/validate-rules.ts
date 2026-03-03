@@ -3,6 +3,7 @@ import { parseRuleFile } from './lib/rule-parser'
 import { listContentFiles, resolveContentSources } from './lib/content-sources'
 import {
   CliError,
+  type CliErrorCode,
   ensureNodeVersion,
   ensureReadableDirectory,
   finishCommand,
@@ -12,6 +13,16 @@ import {
   writeJsonLine,
   writeWarn,
 } from './lib/cli-telemetry'
+
+function summarizeErrorCode(errorCodes: CliErrorCode[]): CliErrorCode {
+  if (errorCodes.includes('E_INPUT_INVALID')) {
+    return 'E_INPUT_INVALID'
+  }
+  if (errorCodes.includes('E_SCHEMA_RULE')) {
+    return 'E_SCHEMA_RULE'
+  }
+  return errorCodes[0] ?? 'E_SCHEMA_RULE'
+}
 
 function main(): void {
   const json = hasJsonFlag(process.argv)
@@ -29,6 +40,7 @@ function main(): void {
     const seenNames = new Set<string>()
 
     let errors = 0
+    const errorCodes: CliErrorCode[] = []
 
     for (const file of files) {
       const content = fs.readFileSync(file.fullPath, 'utf8')
@@ -60,18 +72,20 @@ function main(): void {
           error_code: cliErr.code,
           retryable: cliErr.retryable,
         })
+        errorCodes.push(cliErr.code)
         errors++
       }
     }
 
     if (errors > 0) {
+      const summaryErrorCode = summarizeErrorCode(errorCodes)
       writeWarn(json, `\n${errors} 件のエラーが見つかりました`)
       finishCommand({
         command: 'validate:rules',
         json,
         startedAt,
         success: false,
-        error: new CliError(`${errors} 件のエラーが見つかりました`, 'E_SCHEMA_RULE', false),
+        error: new CliError(`${errors} 件のエラーが見つかりました`, summaryErrorCode, false),
         details: { checked: files.length, errors },
       })
       process.exit(1)
