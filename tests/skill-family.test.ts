@@ -58,6 +58,27 @@ describe('skill family composition', () => {
     expect(composed.content).toBe('base body\ngeneric body')
   })
 
+  it('supports overlay names without .md extension', () => {
+    const root = createTempDir('mantra-family-')
+    tempDirs.push(root)
+
+    const familyDir = writeFamily({
+      root,
+      name: 'name-only-overlay',
+      familyYml: 'targets:\n  codex: codex\n',
+      baseContent: 'base body',
+      overlays: {
+        'codex.md': 'codex body',
+      },
+    })
+
+    const family = loadSkillFamily(familyDir)
+    const composed = composeSkillFamily(family, 'codex')
+
+    expect(composed.overlayTarget).toBe('codex')
+    expect(composed.content).toBe('base body\ncodex body')
+  })
+
   it('uses base only when no overlays are configured', () => {
     const root = createTempDir('mantra-family-')
     tempDirs.push(root)

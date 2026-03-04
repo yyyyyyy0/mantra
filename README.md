@@ -121,7 +121,7 @@ ls -la ~/.claude/rules   # → mantra/rules へのシムリンク
 
 **一般的なトラブルシューティング:**
 - `npm ci` が失敗する場合: Node.js v20+ がインストールされているか確認
-- `npm run validate` が失敗する場合: agents/ または rules/ ディレクトリの .md ファイルの frontmatter/metadata 構文と、legacy/family 出力名の重複を確認
+- `npm run validate` が失敗する場合: agents/ または rules/ ディレクトリの .md / `*.family` 構成、出力名の重複を確認
 - シムリンクが作成されない場合: `npm run setup -- --force` を試す（既存のディレクトリはバックアップされます）
 - `npm run setup` 成功後の案内: Core next step は `npm run validate`、Optional next step は `npm run sync:codex`
 - `error_code` 単位の詳細対処: [docs/troubleshooting.md](./docs/troubleshooting.md)
@@ -196,10 +196,14 @@ mantra/
 | `npm run onboarding:json` | onboarding を JSON 出力モードで実行 |
 | `npm run onboarding:full:json` | onboarding:full を JSON 出力モードで実行 |
 | `npm run setup -- --force` | 既存の実ディレクトリ/ファイルを `.bak-YYYYMMDDHHmmss` に退避して再作成 |
-| `npm run sync:codex` | agents と rules を Codex へ同期（`~/.codex/skills/mantra/`, `~/.codex/skills/mantra-rules/`） |
+| `npm run sync:codex` | agents/rules/templates/examples を Codex へ同期 |
 | `npm run sync:codex:json` | sync を JSON 出力モードで実行 |
 | `npm run sync:codex:agents` | agents のみ Codex へ同期 |
 | `npm run sync:codex:rules` | rules のみ Codex へ同期 |
+| `npm run sync:codex:templates` | templates のみ Codex へ同期 |
+| `npm run sync:codex:examples` | examples のみ Codex へ同期 |
+| `npm run sync:codex:preview` | 書き込みなしで effective content を表示 |
+| `npm run sync:codex:preview:json` | preview を JSON 出力モードで実行 |
 | `npm run validate` | agents/rules の定義を検証 |
 | `npm run validate:json` | validate を JSON 出力モードで実行 |
 | `npm run validate:agents` | agents 定義のみ検証 |
@@ -238,9 +242,10 @@ mantra/
 補足:
 - 同名ファイルは「後から読まれたソース」が優先されます
 - 衝突ポリシーは filename 衝突のみで、`W_SOURCE_CONFLICT_FILENAME` warning を出してユーザー定義を優先します
-- agent/rule の name 重複は warning ではなく、`validate:agents|validate:rules` で `E_INPUT_INVALID` として失敗します
-- family 出力（agent: `family` / `families`, rule: `<!-- mantra-family(ies): ... -->`）も `E_INPUT_INVALID` で検証されます
-- `validate --json` の `type: "validated"` には `outputs.legacy` / `outputs.family` が含まれ、出力プレビューとして利用できます
+- family は `*.family/{family.yml,base.md,overlays/*}` 形式で定義します
+- `family.yml.targets` は overlay 名（例: `codex`）を指定し、`overlays/<name>.md` を解決します
+- 同一 source で legacy と family が同名出力になる場合は family を優先し、warning を出します
+- agent/rule の name 重複（legacy + family）は warning ではなく、`validate:agents|validate:rules` で `E_INPUT_INVALID` として失敗します
 - ユーザー定義がある場合、`setup` は `~/.mantra/generated/*` にマージして `~/.claude/agents|rules` へリンクします
 
 ロードマップ上の位置づけ:

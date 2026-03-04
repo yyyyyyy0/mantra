@@ -122,7 +122,7 @@ describe('setup merge responsibilities', () => {
     writeFamily({
       dir: userAgentsDir,
       name: 'family-merge-claude',
-      familyYml: 'targets:\n  generic: generic.md\n',
+      familyYml: 'description: merge family\ntargets:\n  generic: generic.md\n',
       baseContent: 'base body',
       overlays: {
         'generic.md': 'generic overlay',
@@ -158,7 +158,7 @@ describe('setup merge responsibilities', () => {
     writeFamily({
       dir: userAgentsDir,
       name: 'family-overrides-legacy',
-      familyYml: 'targets:\n  claude: claude.md\n',
+      familyYml: 'description: override family\ntargets:\n  claude: claude.md\n',
       baseContent: 'base',
       overlays: {
         'claude.md': 'claude',

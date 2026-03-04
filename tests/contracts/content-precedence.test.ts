@@ -84,7 +84,7 @@ describe('Content precedence contract', () => {
     expect((summary?.warning_types as string[]).includes('W_SOURCE_CONFLICT_FILENAME')).toBe(true)
   })
 
-  it('keeps filename precedence contract when user content includes family metadata', () => {
+  it('keeps filename precedence contract when user content includes a family directory', () => {
     const home = createTempHome('mantra-family-prec-')
     homes.push(home)
 
@@ -93,20 +93,10 @@ describe('Content precedence contract', () => {
 
     const userAgentsDir = path.join(userRoot, 'agents')
     fs.mkdirSync(userAgentsDir, { recursive: true })
-    fs.writeFileSync(
-      path.join(userAgentsDir, 'planner.md'),
-      [
-        '---',
-        'name: planner',
-        'description: Family-aware conflict test',
-        'families: [planning, strategy]',
-        'tools: []',
-        '---',
-        'Body',
-        '',
-      ].join('\n'),
-      'utf8',
-    )
+    const familyDir = path.join(userAgentsDir, 'planner.family')
+    fs.mkdirSync(path.join(familyDir, 'overlays'), { recursive: true })
+    fs.writeFileSync(path.join(familyDir, 'family.yml'), 'description: Family planner\ntargets: {}\n', 'utf8')
+    fs.writeFileSync(path.join(familyDir, 'base.md'), 'Family planner body\n', 'utf8')
 
     const result = runScript('setup.ts', ['--json'], home, {
       MANTRA_USER_CONTENT_ROOTS: userRoot,

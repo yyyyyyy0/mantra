@@ -51,7 +51,7 @@ describe('content entries', () => {
     writeFamily({
       dir: agentsDir,
       name: 'family-fallback-only',
-      familyYml: 'targets:\n  generic: generic.md\n',
+      familyYml: 'description: fallback family\ntargets:\n  generic: generic.md\n',
       baseContent: 'base block',
       overlays: {
         'generic.md': 'generic block',
@@ -90,7 +90,7 @@ describe('content entries', () => {
     writeFamily({
       dir: agentsDir,
       name: 'family-conflict-entry',
-      familyYml: 'targets:\n  claude: claude.md\n',
+      familyYml: 'description: conflict family\ntargets:\n  claude: claude.md\n',
       baseContent: 'base content',
       overlays: {
         'claude.md': 'claude only',
@@ -126,7 +126,7 @@ describe('content entries', () => {
     writeFamily({
       dir: agentsDirA,
       name: 'deterministic-family',
-      familyYml: 'targets:\n  generic: generic.md\n',
+      familyYml: 'description: deterministic A\ntargets:\n  generic: generic.md\n',
       baseContent: 'A base',
       overlays: {
         'generic.md': 'A overlay',
@@ -136,7 +136,7 @@ describe('content entries', () => {
     writeFamily({
       dir: agentsDirB,
       name: 'deterministic-family',
-      familyYml: 'targets:\n  generic: generic.md\n',
+      familyYml: 'description: deterministic B\ntargets:\n  generic: generic.md\n',
       baseContent: 'B base',
       overlays: {
         'generic.md': 'B overlay',

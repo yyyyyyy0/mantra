@@ -4,9 +4,9 @@ import { CliError } from './cli-telemetry'
 import { type ContentKind, type ContentSource, resolveContentSources } from './content-sources'
 import {
   composeSkillFamily,
-  familyDirectoryToRelativeName,
   isSkillFamilyDirectoryName,
   loadSkillFamily,
+  type LoadedSkillFamily,
 } from './skill-family'
 import { type SkillFamilyTarget } from './skill-family-schema'
 
@@ -26,6 +26,7 @@ export interface FamilyContentEntry {
   relativeName: string
   fullPath: string
   familyDir: string
+  family: LoadedSkillFamily
   composedContent: string
   composedTarget?: ContentTarget
 }
@@ -76,18 +77,19 @@ function toLegacyEntry(source: ContentSource, fullPath: string, relativeName: st
 function toFamilyEntry(
   source: ContentSource,
   familyDir: string,
-  relativeName: string,
+  kind: ContentKind,
   target: ContentTarget,
 ): FamilyContentEntry {
-  const loaded = loadSkillFamily(familyDir)
+  const loaded = loadSkillFamily(familyDir, { kind })
   const composed = composeSkillFamily(loaded, target)
 
   return {
     source,
     entryKind: 'family',
-    relativeName,
+    relativeName: `${loaded.outputName}.md`,
     fullPath: familyDir,
     familyDir,
+    family: loaded,
     composedContent: composed.content,
     composedTarget: composed.overlayTarget,
   }
@@ -189,8 +191,7 @@ function listEntriesForSource(
     }
 
     if (stat.isDirectory() && isSkillFamilyDirectoryName(name)) {
-      const relativeName = familyDirectoryToRelativeName(name)
-      scanned.push(toFamilyEntry(source, fullPath, relativeName, target))
+      scanned.push(toFamilyEntry(source, fullPath, kind, target))
     }
   }
 

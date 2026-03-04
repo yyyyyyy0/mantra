@@ -43,26 +43,54 @@
 - `type: "error"`: ファイル単位エラー
 - `type: "warning"`: 衝突などの非致命イベント
 
-### validate preview 契約（legacy / family 出力）
+### validate イベント契約（legacy / family）
 
-`validate:agents` / `validate:rules` の `type: "validated"` には、出力プレビューとして `outputs` を含みます。
+`validate:agents` / `validate:rules` の `type: "validated"` には、検証対象の出力情報として `source_kind` / `output_name` を含みます。
 
 ```json
 {
   "type": "validated",
   "command": "validate:agents",
-  "file": "/path/to/agents/planner.md",
+  "file": "/path/to/agents/planner.family",
   "success": true,
-  "outputs": {
-    "legacy": ["planner"],
-    "family": ["planning", "orchestration"]
-  }
+  "source_kind": "family",
+  "output_name": "planner"
 }
 ```
 
-- `outputs.legacy`: 既存（legacy）出力名
-- `outputs.family`: family 出力名（未指定なら空配列）
-- 一意性は `legacy + family` の合成集合で判定されます（どちらかの衝突でも `E_INPUT_INVALID`）
+- `source_kind`: `legacy` または `family`
+- `output_name`: 実際に出力される名前
+- 一意性は `legacy + family` の合成集合で判定されます（衝突時は `E_INPUT_INVALID`）
+
+### sync preview 契約
+
+`sync:codex:* --json --preview` は、書き込みをせずに effective content を返します。
+
+```json
+{
+  "type": "preview_base",
+  "command": "sync:codex:agents",
+  "name": "planner",
+  "kind": "agents",
+  "source_kind": "family",
+  "content": "..."
+}
+```
+
+```json
+{
+  "type": "preview_generated",
+  "command": "sync:codex:agents",
+  "name": "planner",
+  "kind": "agents",
+  "source_kind": "family",
+  "tool": "codex",
+  "content": "..."
+}
+```
+
+- `tool`: `claude` / `codex` / `generic`
+- `summary.details.previewed`: preview 件数
 
 ### warning イベント契約
 
@@ -83,7 +111,7 @@
 - `winner`: `user`
 - `loser`: `core` または `user:<path>`
 - 重複した agent/rule name は warning ではなく、`validate:agents|validate:rules` の `type: "error"` イベントで `E_INPUT_INVALID` を返し、終了コード `1` で失敗
-- family 出力の形式不正・重複・legacy/family 間衝突も同様に `E_INPUT_INVALID` で失敗
+- family ディレクトリ（`*.family`）の形式不正・重複・legacy/family 間衝突も同様に `E_INPUT_INVALID` で失敗
 
 ## error_code 一覧
 

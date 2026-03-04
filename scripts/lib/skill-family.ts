@@ -2,10 +2,13 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as yaml from 'js-yaml'
 import { CliError } from './cli-telemetry'
+import type { ContentKind } from './content-sources'
 import {
   SkillFamilyFileSchema,
+  type SkillFamilyFile,
   type SkillFamilyTarget,
 } from './skill-family-schema'
+import { SAFE_NAME_RE } from './agent-schema'
 
 const FAMILY_CONFIG = 'family.yml'
 const FAMILY_BASE = 'base.md'
@@ -20,7 +23,12 @@ export interface SkillFamilyOverlay {
 
 export interface LoadedSkillFamily {
   name: string
+  outputName: string
+  description?: string
+  tools: string[]
+  model?: string
   dir: string
+  configPath: string
   basePath: string
   baseContent: string
   overlays: Partial<Record<SkillFamilyTarget, SkillFamilyOverlay>>
@@ -75,26 +83,30 @@ function normalizeOverlayPath(familyDir: string, overlayRef: string): string {
     )
   }
 
-  const normalized = overlayRef.replace(/^\.\//, '')
-  const relative = normalized.startsWith(`${OVERLAYS_DIR}/`)
-    ? normalized
-    : path.posix.join(OVERLAYS_DIR, normalized)
+  const normalized = overlayRef.replace(/\\/g, '/').replace(/^\.\//, '').trim()
+  if (normalized.length === 0) {
+    throw new CliError('family の overlay 名が空です', 'E_INPUT_INVALID', false)
+  }
 
-  if (!relative.endsWith('.md')) {
+  const withoutPrefix = normalized.startsWith(`${OVERLAYS_DIR}/`)
+    ? normalized.slice(`${OVERLAYS_DIR}/`.length)
+    : normalized
+  if (withoutPrefix.includes('/')) {
     throw new CliError(
-      `family の overlay は .md ファイルである必要があります: ${overlayRef}`,
+      `family の overlay 名に '/' は使えません（overlays 配下の単一ファイル名のみ）: ${overlayRef}`,
       'E_INPUT_INVALID',
       false,
     )
   }
 
-  const overlayPath = path.resolve(familyDir, relative)
+  const fileName = withoutPrefix.endsWith('.md') ? withoutPrefix : `${withoutPrefix}.md`
+  const overlayPath = path.resolve(familyDir, OVERLAYS_DIR, fileName)
   ensureInsideDirectory(familyDir, overlayPath)
   ensureFile(overlayPath, 'overlay')
   return overlayPath
 }
 
-function parseFamilyConfig(filePath: string): Record<string, string | undefined> {
+function parseFamilyConfig(filePath: string): SkillFamilyFile {
   const raw = readTextFile(filePath)
 
   let parsed: unknown
@@ -119,7 +131,7 @@ function parseFamilyConfig(filePath: string): Record<string, string | undefined>
     )
   }
 
-  return result.data.targets
+  return result.data
 }
 
 export function isSkillFamilyDirectoryName(name: string): boolean {
@@ -134,13 +146,23 @@ export function familyDirectoryToRelativeName(name: string): string {
   return `${name.slice(0, -FAMILY_SUFFIX.length)}.md`
 }
 
-export function loadSkillFamily(familyDir: string): LoadedSkillFamily {
-  const resolvedDir = path.resolve(familyDir)
-  const familyName = path.basename(resolvedDir)
+function ensureSafeOutputName(name: string, filePath: string): string {
+  if (!SAFE_NAME_RE.test(name)) {
+    throw new CliError(`family name が不正です: ${name} (${filePath})`, 'E_INPUT_INVALID', false)
+  }
+  return name
+}
 
-  if (!isSkillFamilyDirectoryName(familyName)) {
+export function loadSkillFamily(
+  familyDir: string,
+  options: { kind?: ContentKind } = {},
+): LoadedSkillFamily {
+  const resolvedDir = path.resolve(familyDir)
+  const familyDirName = path.basename(resolvedDir)
+
+  if (!isSkillFamilyDirectoryName(familyDirName)) {
     throw new CliError(
-      `family ディレクトリ名は *.family 形式である必要があります: ${familyName}`,
+      `family ディレクトリ名は *.family 形式である必要があります: ${familyDirName}`,
       'E_INPUT_INVALID',
       false,
     )
@@ -156,11 +178,23 @@ export function loadSkillFamily(familyDir: string): LoadedSkillFamily {
   const basePath = path.join(resolvedDir, FAMILY_BASE)
   ensureFile(basePath, 'base.md')
 
-  const targets = parseFamilyConfig(configPath)
+  const config = parseFamilyConfig(configPath)
+  const outputName = ensureSafeOutputName(
+    config.name ?? familyDirName.slice(0, -FAMILY_SUFFIX.length),
+    configPath,
+  )
+
+  if (options.kind === 'agents' && (config.description ?? '').trim().length === 0) {
+    throw new CliError(
+      `agents family では description が必須です: ${configPath}`,
+      'E_INPUT_INVALID',
+      false,
+    )
+  }
 
   const overlays: Partial<Record<SkillFamilyTarget, SkillFamilyOverlay>> = {}
   for (const target of ['claude', 'codex', 'generic'] as const) {
-    const ref = targets[target]
+    const ref = config.targets[target]
     if (!ref) {
       continue
     }
@@ -174,8 +208,13 @@ export function loadSkillFamily(familyDir: string): LoadedSkillFamily {
   }
 
   return {
-    name: familyName.slice(0, -FAMILY_SUFFIX.length),
+    name: outputName,
+    outputName,
+    description: config.description,
+    tools: config.tools ?? [],
+    model: config.model,
     dir: resolvedDir,
+    configPath,
     basePath,
     baseContent: readTextFile(basePath),
     overlays,

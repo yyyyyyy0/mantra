@@ -14,7 +14,6 @@
 ---
 name: agent-name
 description: 簡潔な説明（1-2文）
-families: ["planning"] # 省略可能: family 出力名（legacy と重複不可）
 tools: ["Read", "Write", "Edit"] # 省略時は []
 model: opus # 省略可能: opus | sonnet | haiku
 ---
@@ -26,7 +25,6 @@ model: opus # 省略可能: opus | sonnet | haiku
 |-----------|------|------|
 | `name` | ✅ | エージェント名。ファイル名と一致させる（例: `planner.md` → `name: planner`）。英数字とハイフン/アンダースコアのみ |
 | `description` | ✅ | エージェントの目的と使用タイミングを簡潔に説明 |
-| `families` / `family` | ❌ | family 出力名（文字列または文字列配列）。`name`（legacy）や他ファイルの family 出力名と重複不可 |
 | `tools` | ❌ | エージェントが使用可能なツール配列。デフォルトは空配列 |
 | `model` | ❌ | 使用する Claude モデル。省略時はシステムデフォルト |
 
@@ -111,22 +109,38 @@ model: haiku  # 高頻度呼び出し向けに軽量モデルを選択
 5. **品質基準 / Quality Bar**
    - 完了の判断基準
 
-### Family 出力の定義（Agent）
+### Skill Family の定義（Agent/Rule/Template/Example）
 
-family 出力は、legacy 出力（`name`）に加えて `validate --json` の `outputs.family` に現れる追加エントリです。
+`.family` ディレクトリで、shared base + tool overlay を定義できます。
 
-```yaml
----
-name: planner
-description: 計画エージェント
-families: ["planning", "orchestration"]
-tools: ["Read", "Grep"]
----
+```text
+agents/planner.family/
+├── family.yml
+├── base.md
+└── overlays/
+    ├── claude.md
+    ├── codex.md
+    └── generic.md
 ```
 
-- `family`（単数）または `families`（複数）を使用可能
-- 文字列は `,` 区切りでも指定可能（例: `family: planning,orchestration`）
-- すべての出力名（legacy + family）はグローバル一意である必要があります
+`family.yml`:
+
+```yaml
+name: planner # 省略時はディレクトリ名（*.family の prefix）
+description: 計画エージェント # agents family では必須
+tools: ["Read", "Grep"] # agents のみ利用
+model: opus             # agents のみ利用
+targets:
+  claude: claude
+  codex: codex
+  generic: generic
+```
+
+- fallback: `target -> generic -> base`
+- `targets` は overlay 名（拡張子なし）を推奨。`overlays/<name>.md` を解決します（`<name>.md` の直接指定も可）
+- 合成は静的連結（`base + overlay`）のみ
+- 同一 source 内で legacy と family が同名出力になる場合は family を優先し、`W_SOURCE_CONFLICT_FILENAME` warning を出します
+- `agents/rules` の出力名（legacy + family）は全体で一意である必要があります（重複時は `E_INPUT_INVALID`）
 
 ### 良い説明トリガーの例
 
@@ -156,19 +170,6 @@ tools: ["Read", "Grep"]
 
 1. ファイル名がルール名になる（例: `coding-style.md` → `coding-style`）
 2. 最初の H1 見出しが説明になる（例: `# Coding Style`）
-
-### Family 出力の定義（Rule）
-
-rule は frontmatter を使わないため、必要な場合のみ HTML コメントで family 出力を定義します。
-
-```markdown
-<!-- mantra-families: governance,standards -->
-# Coding Style
-```
-
-- `<!-- mantra-family: ... -->` でも指定可能
-- 文字列は `,` 区切りで複数指定可能
-- すべての出力名（legacy + family）は agent/rule 全体で重複不可
 
 ### 命名規則
 
@@ -232,7 +233,7 @@ Before marking work complete:
 `agents/rules` は以下の重複時にエラーになります（運用一貫性のため）。
 
 - `name`（legacy）同士の重複
-- family 出力同士の重複
+- family 出力同士の重複（`.family/family.yml` の `name` またはディレクトリ名）
 - legacy 出力と family 出力の衝突
 
 ### 作成後の検証
@@ -252,7 +253,7 @@ npm run validate:agents -- --json
 npm run validate:rules -- --json
 ```
 
-`--json` の `type: "validated"` イベントには `outputs.legacy` / `outputs.family` が含まれ、実際に生成される出力名をプレビューできます。
+`--json` の `type: "validated"` イベントには `source_kind` / `output_name` が含まれます。
 
 ### Codex への同期
 
@@ -263,12 +264,21 @@ npm run sync:codex:agents
 # Rule を Codex スキルとして同期
 npm run sync:codex:rules
 
+# Template を Codex スキルとして同期
+npm run sync:codex:templates
+
+# Example を Codex スキルとして同期
+npm run sync:codex:examples
+
 # 両方同期
 npm run sync:codex
 
 # JSON 契約で同期
 npm run sync:codex:agents -- --json
 npm run sync:codex:rules -- --json
+
+# Effective output を確認（書き込みなし）
+npm run sync:codex:preview:json
 ```
 
 ### スモークテスト
@@ -306,6 +316,7 @@ ls -la ~/.claude/agents/your-agent-name
 - [ ] 指定されたツールのみが使用される
 - [ ] `model` 指定がある場合は正しいモデルで動作する
 - [ ] エージェントの説明に従った出力が得られる
+- [ ] family を使う場合、`family.yml` / `base.md` / `overlays/*` が正しい構造になっている
 
 ---
 
@@ -329,8 +340,8 @@ ls -la ~/.claude/agents/your-agent-name
 ## 関連ファイル
 
 - **検証スクリプト:** `scripts/validate-agents.ts`, `scripts/validate-rules.ts`
-- **同期スクリプト:** `scripts/sync-agents-to-codex.ts`, `scripts/sync-rules-to-codex.ts`
+- **同期スクリプト:** `scripts/sync-agents-to-codex.ts`, `scripts/sync-rules-to-codex.ts`, `scripts/sync-templates-to-codex.ts`, `scripts/sync-examples-to-codex.ts`
 - **CLI 契約:** `docs/cli-contract.md`
 - **メトリクス仕様:** `docs/ops-metrics.md`
 - **トラブルシュート:** `docs/troubleshooting.md`
-- **スキーマ定義:** `scripts/lib/agent-schema.ts`, `scripts/lib/rule-schema.ts`
+- **スキーマ定義:** `scripts/lib/agent-schema.ts`, `scripts/lib/rule-schema.ts`, `scripts/lib/skill-family-schema.ts`

@@ -1,12 +1,8 @@
-import * as fs from 'fs'
-import * as path from 'path'
-import * as os from 'os'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 import * as yaml from 'js-yaml'
-import { buildSkillContent, CodexFrontmatter } from './lib/codex-utils'
-import { writeAtomic } from './lib/fs-utils'
 import { ClaudeAgentFrontmatter } from './lib/agent-schema'
-import { getProjectMeta } from './lib/project-meta'
-import { listContentFiles, resolveContentSources } from './lib/content-sources'
 import {
   CliError,
   ensureNodeVersion,
@@ -19,21 +15,27 @@ import {
   writeJsonLine,
   writeWarn,
 } from './lib/cli-telemetry'
+import { listContentEntries, type ContentEntry } from './lib/content-entries'
+import { resolveContentSources } from './lib/content-sources'
+import { buildSkillContent, type CodexFrontmatter } from './lib/codex-utils'
+import { writeAtomic } from './lib/fs-utils'
+import { getProjectMeta } from './lib/project-meta'
+import { composeSkillFamily } from './lib/skill-family'
 
 type AgentFrontmatter = typeof ClaudeAgentFrontmatter._output
 type GenerationTarget = 'claude' | 'codex' | 'generic'
 
 const GENERATION_TARGETS: GenerationTarget[] = ['claude', 'codex', 'generic']
 
-interface FamilySyncContent {
-  family: string
-  base: string
-  generated: Partial<Record<GenerationTarget, string>>
+interface AgentSyncInput {
+  name: string
+  description: string
+  tools: string[]
+  model?: string
+  baseContent: string
+  generated: Record<GenerationTarget, string>
+  sourceKind: 'legacy' | 'family'
 }
-
-// ────────────────────────────────────────────────────────────
-// カテゴリマッピング
-// ────────────────────────────────────────────────────────────
 
 const CATEGORY_MAP: Record<string, string> = {
   planner: 'planning',
@@ -55,10 +57,6 @@ function inferCategory(name: string): string {
   return CATEGORY_MAP[name] ?? 'development'
 }
 
-// ────────────────────────────────────────────────────────────
-// パーサー
-// ────────────────────────────────────────────────────────────
-
 interface ParsedAgent {
   frontmatter: AgentFrontmatter
   body: string
@@ -69,12 +67,12 @@ function parseAgentFile(content: string): ParsedAgent {
   const lines = content.split('\n')
 
   if (lines[0] !== DELIMITER) {
-    throw new Error('フロントマターが見つかりません（先頭に --- がありません）')
+    throw new CliError('フロントマターが見つかりません（先頭に --- がありません）', 'E_SCHEMA_FRONTMATTER', false)
   }
 
   const endIndex = lines.indexOf(DELIMITER, 1)
   if (endIndex === -1) {
-    throw new Error('フロントマターの終端 --- が見つかりません')
+    throw new CliError('フロントマターの終端 --- が見つかりません', 'E_SCHEMA_FRONTMATTER', false)
   }
 
   const rawYaml = lines.slice(1, endIndex).join('\n')
@@ -85,129 +83,8 @@ function parseAgentFile(content: string): ParsedAgent {
   return { frontmatter, body }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function extractFrontmatterObject(content: string): Record<string, unknown> | null {
-  const DELIMITER = '---'
-  const lines = content.split('\n')
-  if (lines[0] !== DELIMITER) {
-    return null
-  }
-  const endIndex = lines.indexOf(DELIMITER, 1)
-  if (endIndex === -1) {
-    return null
-  }
-
-  const rawYaml = lines.slice(1, endIndex).join('\n')
-  const parsed = yaml.load(rawYaml, { schema: yaml.DEFAULT_SCHEMA })
-  return isRecord(parsed) ? parsed : null
-}
-
-function toTargetContentMap(value: unknown): Partial<Record<GenerationTarget, string>> {
-  if (!isRecord(value)) {
-    return {}
-  }
-  const out: Partial<Record<GenerationTarget, string>> = {}
-  for (const target of GENERATION_TARGETS) {
-    const targetValue = value[target]
-    if (typeof targetValue === 'string') {
-      out[target] = targetValue
-    }
-  }
-  return out
-}
-
-function parseFamilySyncContent(content: string): FamilySyncContent {
-  const parsed = extractFrontmatterObject(content)
-  if (parsed === null) {
-    return { family: 'legacy', base: content, generated: {} }
-  }
-
-  const result: FamilySyncContent = {
-    family: 'legacy',
-    base: content,
-    generated: {
-      ...toTargetContentMap(parsed.generated),
-      ...toTargetContentMap(parsed.targets),
-    },
-  }
-
-  const applyPayload = (payload: unknown, fallbackFamily?: string): void => {
-    if (typeof payload === 'string') {
-      if (fallbackFamily !== undefined) {
-        result.family = fallbackFamily
-        if (GENERATION_TARGETS.includes(fallbackFamily as GenerationTarget)) {
-          result.generated[fallbackFamily as GenerationTarget] = payload
-        } else {
-          result.base = payload
-        }
-      } else if (payload.trim().length > 0) {
-        result.family = payload
-      }
-      return
-    }
-    if (!isRecord(payload)) {
-      return
-    }
-
-    if (typeof payload.name === 'string' && payload.name.trim().length > 0) {
-      result.family = payload.name
-    } else if (fallbackFamily !== undefined) {
-      result.family = fallbackFamily
-    }
-
-    if (typeof payload.base === 'string') {
-      result.base = payload.base
-    } else if (typeof payload.content === 'string') {
-      result.base = payload.content
-    }
-
-    Object.assign(result.generated, toTargetContentMap(payload))
-    Object.assign(result.generated, toTargetContentMap(payload.generated))
-    Object.assign(result.generated, toTargetContentMap(payload.targets))
-  }
-
-  applyPayload(parsed.mantra_family)
-  applyPayload(parsed.family)
-
-  const familiesPayload = parsed.mantra_families ?? parsed.families
-  if (isRecord(familiesPayload)) {
-    const directTargets = toTargetContentMap(familiesPayload)
-    if (Object.keys(directTargets).length > 0) {
-      Object.assign(result.generated, directTargets)
-      result.family = 'family'
-    } else {
-      const preferredKey = ['codex', 'generic', 'claude'].find(k => k in familiesPayload)
-      const [firstKey] = Object.keys(familiesPayload)
-      const chosenKey = preferredKey ?? firstKey
-      if (chosenKey !== undefined) {
-        applyPayload(familiesPayload[chosenKey], chosenKey)
-      }
-    }
-  }
-
-  return result
-}
-
-function buildGeneratedContent(
-  familyContent: FamilySyncContent,
-  codexContent: string,
-): Record<GenerationTarget, string> {
-  return {
-    claude: familyContent.generated.claude ?? familyContent.base,
-    codex: familyContent.generated.codex ?? codexContent,
-    generic: familyContent.generated.generic ?? familyContent.base,
-  }
-}
-
-// ────────────────────────────────────────────────────────────
-// 変換
-// ────────────────────────────────────────────────────────────
-
 function convertFrontmatter(
-  src: AgentFrontmatter,
+  src: Pick<AgentFrontmatter, 'name' | 'description'>,
   metadataVersion: string,
   metadataLicense: string,
 ): CodexFrontmatter {
@@ -225,18 +102,58 @@ function convertFrontmatter(
   }
 }
 
+function entryToSyncInput(entry: ContentEntry): AgentSyncInput {
+  if (entry.entryKind === 'legacy') {
+    const raw = fs.readFileSync(entry.fullPath, 'utf8')
+    const parsed = parseAgentFile(raw)
+    return {
+      name: parsed.frontmatter.name,
+      description: parsed.frontmatter.description,
+      tools: parsed.frontmatter.tools,
+      model: parsed.frontmatter.model,
+      baseContent: parsed.body,
+      generated: {
+        claude: parsed.body,
+        codex: parsed.body,
+        generic: parsed.body,
+      },
+      sourceKind: 'legacy',
+    }
+  }
 
-// ────────────────────────────────────────────────────────────
-// メイン
-// ────────────────────────────────────────────────────────────
+  const family = entry.family
+  if ((family.description ?? '').trim().length === 0) {
+    throw new CliError(
+      `agents family では description が必須です: ${family.configPath}`,
+      'E_INPUT_INVALID',
+      false,
+    )
+  }
+
+  return {
+    name: family.outputName,
+    description: family.description as string,
+    tools: family.tools,
+    model: family.model,
+    baseContent: family.baseContent,
+    generated: {
+      claude: composeSkillFamily(family, 'claude').content,
+      codex: composeSkillFamily(family, 'codex').content,
+      generic: composeSkillFamily(family, 'generic').content,
+    },
+    sourceKind: 'family',
+  }
+}
 
 function main(): void {
   const json = hasJsonFlag(process.argv)
   const preview = process.argv.includes('--preview')
   const startedAt = Date.now()
   const outputBase = path.join(os.homedir(), '.codex', 'skills', 'mantra')
+
   try {
     ensureNodeVersion(20)
+
     const sourceDirs = resolveContentSources('agents')
     if (sourceDirs.length === 0) {
       throw new CliError('agents のソースディレクトリが見つかりません', 'E_INPUT_INVALID', false)
@@ -244,13 +161,15 @@ function main(): void {
     for (const source of sourceDirs) {
       ensureReadableDirectory(source.dir, source.label)
     }
+
     if (!preview) {
       ensureWritableParent(path.join(outputBase, '.touch'), 'sync destination')
     }
-    const projectMeta = getProjectMeta()
 
-    const files = listContentFiles('agents')
-    if (files.length === 0) {
+    const projectMeta = getProjectMeta()
+    const listed = listContentEntries('agents', { target: 'codex' })
+    const entries = listed.entries
+    if (entries.length === 0) {
       throw new CliError('agents のソースファイルが見つかりません', 'E_INPUT_INVALID', false)
     }
 
@@ -261,82 +180,80 @@ function main(): void {
     type SyncSuccess = Extract<Result, { success: true }>
     type SyncFailure = Extract<Result, { success: false }>
 
-    const seenAgentNames = new Set<string>()
+    const seenNames = new Set<string>()
 
-    const results: Result[] = files.map(file => {
+    const results: Result[] = entries.map(entry => {
       try {
-        const content = fs.readFileSync(file.fullPath, 'utf8')
-        const { frontmatter, body } = parseAgentFile(content)
-        if (seenAgentNames.has(frontmatter.name)) {
+        const input = entryToSyncInput(entry)
+
+        if (seenNames.has(input.name)) {
           throw new CliError(
-            `重複した agent name が見つかりました: ${frontmatter.name}`,
+            `重複した agent name が見つかりました: ${input.name}`,
             'E_INPUT_INVALID',
             false,
           )
         }
-        seenAgentNames.add(frontmatter.name)
-        const codexFm = convertFrontmatter(
-          frontmatter,
-          projectMeta.version,
-          projectMeta.license,
-        )
-        const skillContent = buildSkillContent(codexFm, body)
-        const familyContent = parseFamilySyncContent(content)
-        const generatedContent = buildGeneratedContent(familyContent, skillContent)
+        seenNames.add(input.name)
 
         if (preview) {
-          writeInfo(json, `~ preview ${frontmatter.name}`)
+          writeInfo(json, `~ preview ${input.name}`)
           writeJsonLine(json, {
             type: 'preview_base',
             command: 'sync:codex:agents',
-            name: frontmatter.name,
-            file: file.fullPath,
-            family: familyContent.family,
-            content: familyContent.base,
+            name: input.name,
+            kind: 'agents',
+            source_kind: input.sourceKind,
+            content: input.baseContent,
           })
-          for (const target of GENERATION_TARGETS) {
+          for (const tool of GENERATION_TARGETS) {
             writeJsonLine(json, {
               type: 'preview_generated',
               command: 'sync:codex:agents',
-              name: frontmatter.name,
-              file: file.fullPath,
-              family: familyContent.family,
-              target,
-              content: generatedContent[target],
+              name: input.name,
+              kind: 'agents',
+              source_kind: input.sourceKind,
+              tool,
+              content: input.generated[tool],
             })
           }
-          return { success: true, name: frontmatter.name, previewed: true }
+          return { success: true, name: input.name, previewed: true }
         }
 
-        const destPath = path.join(outputBase, frontmatter.name, 'SKILL.md')
-        writeAtomic(destPath, generatedContent.codex, outputBase)
+        const codexFm = convertFrontmatter(
+          { name: input.name, description: input.description },
+          projectMeta.version,
+          projectMeta.license,
+        )
+        const skillContent = buildSkillContent(codexFm, input.generated.codex)
+        const destPath = path.join(outputBase, input.name, 'SKILL.md')
+        writeAtomic(destPath, skillContent, outputBase)
 
-        writeInfo(json, `✓ ${frontmatter.name} → ${destPath}`)
+        writeInfo(json, `✓ ${input.name} → ${destPath}`)
         writeJsonLine(json, {
           type: 'synced',
           command: 'sync:codex:agents',
-          name: frontmatter.name,
+          name: input.name,
           dest: destPath,
         })
-        return { success: true, name: frontmatter.name, dest: destPath, previewed: false }
+
+        return { success: true, name: input.name, dest: destPath, previewed: false }
       } catch (err) {
         const cliErr = toCliError(err, 'E_SCHEMA_FRONTMATTER')
-        const code =
-          cliErr.message.includes('パストラバーサル')
-            ? 'E_SYNC_OUTPUT_PATH'
-            : cliErr.code
-        writeWarn(json, `✗ ${file}: ${cliErr.message}`)
+        const code = cliErr.message.includes('パストラバーサル') ? 'E_SYNC_OUTPUT_PATH' : cliErr.code
+        const targetFile = entry.entryKind === 'legacy' ? entry.fullPath : entry.familyDir
+
+        writeWarn(json, `✗ ${targetFile}: ${cliErr.message}`)
         writeJsonLine(json, {
           type: 'error',
           command: 'sync:codex:agents',
-          file: file.fullPath,
+          file: targetFile,
           message: cliErr.message,
           error_code: code,
           retryable: cliErr.retryable,
         })
         return {
           success: false,
-          file: file.fullPath,
+          file: targetFile,
           message: cliErr.message,
           code,
           retryable: cliErr.retryable,
@@ -349,9 +266,9 @@ function main(): void {
     const previewedCount = successes.filter(r => r.previewed).length
 
     if (preview) {
-      writeInfo(json, `\n${previewedCount}/${files.length} 件をプレビューしました`)
+      writeInfo(json, `\n${previewedCount}/${entries.length} 件をプレビューしました`)
     } else {
-      writeInfo(json, `\n${successes.length}/${files.length} 件を同期しました → ${outputBase}`)
+      writeInfo(json, `\n${successes.length}/${entries.length} 件を同期しました → ${outputBase}`)
     }
 
     if (failures.length > 0) {
@@ -367,7 +284,7 @@ function main(): void {
         ),
         details: {
           ...(preview ? { previewed: previewedCount } : { synced: successes.length }),
-          total: files.length,
+          total: entries.length,
           failures: failures.map(f => ({
             file: f.file,
             error_code: f.code,
@@ -384,8 +301,8 @@ function main(): void {
       startedAt,
       success: true,
       details: preview
-        ? { previewed: previewedCount, total: files.length }
-        : { synced: successes.length, total: files.length },
+        ? { previewed: previewedCount, total: entries.length }
+        : { synced: successes.length, total: entries.length },
     })
   } catch (err) {
     const cliErr = toCliError(err, 'E_INTERNAL')

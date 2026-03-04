@@ -76,12 +76,17 @@ describe.sequential('CLI JSON contract', () => {
     expect(previewBaseLines.length).toBeGreaterThan(0)
     expect(previewGeneratedLines.length).toBe(previewBaseLines.length * 3)
 
-    const generatedTargets = new Set(
+    const generatedTools = new Set(
       previewGeneratedLines
-        .map(line => line.target)
-        .filter((target): target is string => typeof target === 'string'),
+        .map(line => line.tool)
+        .filter((tool): tool is string => typeof tool === 'string'),
     )
-    expect(generatedTargets).toEqual(new Set(['claude', 'codex', 'generic']))
+    expect(generatedTools).toEqual(new Set(['claude', 'codex', 'generic']))
+    expect(
+      previewGeneratedLines.every(
+        line => line.kind === 'agents' && (line.source_kind === 'legacy' || line.source_kind === 'family'),
+      ),
+    ).toBe(true)
 
     const summary = result.jsonLines.find(line => line.type === 'summary')
     expectSummaryShape(summary)

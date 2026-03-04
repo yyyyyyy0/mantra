@@ -8,24 +8,34 @@ function createTempDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix))
 }
 
-function writeAgent(filePath: string, name: string, familyOutputs: string[] = []): void {
-  const familyBlock =
-    familyOutputs.length > 0
-      ? `families: [${familyOutputs.map(value => JSON.stringify(value)).join(', ')}]\n`
-      : ''
+function writeAgent(filePath: string, name: string): void {
   fs.writeFileSync(
     filePath,
-    `---\nname: ${name}\ndescription: Name conflict contract\n${familyBlock}tools: []\n---\nBody\n`,
+    `---\nname: ${name}\ndescription: Name conflict contract\ntools: []\n---\nBody\n`,
     'utf8',
   )
 }
 
-function writeRule(filePath: string, heading: string, familyOutputs: string[] = []): void {
-  const familyDirective =
-    familyOutputs.length > 0
-      ? `<!-- mantra-families: ${familyOutputs.join(', ')} -->\n\n`
-      : ''
-  fs.writeFileSync(filePath, `${familyDirective}# ${heading}\n\nBody\n`, 'utf8')
+function writeRule(filePath: string, heading: string): void {
+  fs.writeFileSync(filePath, `# ${heading}\n\nBody\n`, 'utf8')
+}
+
+function writeAgentFamily(args: {
+  agentsDir: string
+  familyDirName: string
+  nameInConfig?: string
+  description?: string
+}): void {
+  const dir = path.join(args.agentsDir, `${args.familyDirName}.family`)
+  fs.mkdirSync(path.join(dir, 'overlays'), { recursive: true })
+
+  const lines: string[] = []
+  if (args.nameInConfig !== undefined) {
+    lines.push(`name: ${args.nameInConfig}`)
+  }
+  lines.push(`description: ${args.description ?? 'Family Description'}`)
+  fs.writeFileSync(path.join(dir, 'family.yml'), `${lines.join('\n')}\ntargets: {}\n`, 'utf8')
+  fs.writeFileSync(path.join(dir, 'base.md'), 'Family Base\n', 'utf8')
 }
 
 function runValidateAgentsWithDuplicateNames(home: string, tempDirs: string[]): CliRunResult {
@@ -73,32 +83,6 @@ describe('Name conflict contract', () => {
     expect(summary?.error_code).toBe('E_INPUT_INVALID')
   })
 
-  it('emits outputs preview for agent legacy/family entries', () => {
-    const home = createTempHome('mantra-family-agent-preview-')
-    homes.push(home)
-
-    const userAgentsDir = createTempDir('mantra-family-agent-preview-dir-')
-    tempDirs.push(userAgentsDir)
-
-    writeAgent(path.join(userAgentsDir, 'family-preview.md'), 'family-preview-agent', ['planning'])
-
-    const result = runScript('validate-agents.ts', ['--json'], home, {
-      MANTRA_USER_AGENTS_DIRS: userAgentsDir,
-    })
-    expect(result.raw.status, result.stderr).toBe(0)
-
-    const validated = result.jsonLines.find(
-      line =>
-        line.type === 'validated' &&
-        String(line.file).endsWith(path.join('family-preview.md')),
-    )
-    expect(validated).toBeDefined()
-    expect(validated?.outputs).toEqual({
-      legacy: ['family-preview-agent'],
-      family: ['planning'],
-    })
-  })
-
   it('returns E_INPUT_INVALID for duplicate rule names', () => {
     const home = createTempHome('mantra-dup-rule-contract-')
     homes.push(home)
@@ -128,140 +112,52 @@ describe('Name conflict contract', () => {
     expect(summary?.error_code).toBe('E_INPUT_INVALID')
   })
 
-  it('emits outputs preview for rule legacy/family entries', () => {
-    const home = createTempHome('mantra-family-rule-preview-')
+  it('prefers family over legacy within the same source and still validates successfully', () => {
+    const home = createTempHome('mantra-family-agent-conflict-')
     homes.push(home)
 
-    const userRulesDir = createTempDir('mantra-family-rule-preview-dir-')
-    tempDirs.push(userRulesDir)
+    const userAgentsDir = createTempDir('mantra-family-agent-dir-')
+    tempDirs.push(userAgentsDir)
 
-    writeRule(path.join(userRulesDir, 'family-preview-rule.md'), 'Family Preview Rule', ['governance'])
+    writeAgent(path.join(userAgentsDir, 'legacy-output.md'), 'legacy-output')
+    writeAgentFamily({
+      agentsDir: userAgentsDir,
+      familyDirName: 'legacy-output',
+      description: 'Family conflict',
+    })
 
-    const result = runScript('validate-rules.ts', ['--json'], home, {
-      MANTRA_USER_RULES_DIRS: userRulesDir,
+    const result = runScript('validate-agents.ts', ['--json'], home, {
+      MANTRA_USER_AGENTS_DIRS: userAgentsDir,
     })
     expect(result.raw.status, result.stderr).toBe(0)
 
     const validated = result.jsonLines.find(
-      line =>
-        line.type === 'validated' &&
-        String(line.file).endsWith(path.join('family-preview-rule.md')),
+      line => line.type === 'validated' && line.source_kind === 'family' && line.output_name === 'legacy-output',
     )
     expect(validated).toBeDefined()
-    expect(validated?.outputs).toEqual({
-      legacy: ['family-preview-rule'],
-      family: ['governance'],
-    })
   })
 
-  it('returns E_INPUT_INVALID when agent family output conflicts with legacy output', () => {
-    const home = createTempHome('mantra-family-agent-output-conflict-')
+  it('returns E_INPUT_INVALID for invalid family output name', () => {
+    const home = createTempHome('mantra-family-invalid-name-')
     homes.push(home)
 
-    const userAgentsDir = createTempDir('mantra-family-agent-')
+    const userAgentsDir = createTempDir('mantra-family-invalid-dir-')
     tempDirs.push(userAgentsDir)
 
-    writeAgent(path.join(userAgentsDir, 'legacy-output.md'), 'legacy-agent-output')
-    writeAgent(path.join(userAgentsDir, 'family-output.md'), 'family-agent-output', [
-      'legacy-agent-output',
-    ])
+    writeAgentFamily({
+      agentsDir: userAgentsDir,
+      familyDirName: 'invalid name',
+      description: 'Invalid family name',
+    })
 
     const result = runScript('validate-agents.ts', ['--json'], home, {
       MANTRA_USER_AGENTS_DIRS: userAgentsDir,
     })
     expect(result.raw.status, result.stderr).toBe(1)
 
-    const duplicateError = result.jsonLines.find(
-      line =>
-        line.type === 'error' &&
-        line.error_code === 'E_INPUT_INVALID' &&
-        String(line.message).includes('重複した agent output'),
-    )
-    expect(duplicateError).toBeDefined()
-
     const summary = result.jsonLines.find(line => line.type === 'summary')
     expect(summary?.success).toBe(false)
     expect(summary?.error_code).toBe('E_INPUT_INVALID')
-  })
-
-  it('returns E_INPUT_INVALID for invalid agent family output names', () => {
-    const home = createTempHome('mantra-family-agent-invalid-output-')
-    homes.push(home)
-
-    const userAgentsDir = createTempDir('mantra-family-agent-invalid-dir-')
-    tempDirs.push(userAgentsDir)
-
-    writeAgent(path.join(userAgentsDir, 'invalid-family-output.md'), 'invalid-family-output-agent', [
-      'invalid family output',
-    ])
-
-    const result = runScript('validate-agents.ts', ['--json'], home, {
-      MANTRA_USER_AGENTS_DIRS: userAgentsDir,
-    })
-    expect(result.raw.status, result.stderr).toBe(1)
-
-    const invalidError = result.jsonLines.find(
-      line =>
-        line.type === 'error' &&
-        line.error_code === 'E_INPUT_INVALID' &&
-        String(line.message).includes('family output 名が不正'),
-    )
-    expect(invalidError).toBeDefined()
-  })
-
-  it('returns E_INPUT_INVALID when rule family output conflicts with legacy output', () => {
-    const home = createTempHome('mantra-family-rule-output-conflict-')
-    homes.push(home)
-
-    const userRulesDir = createTempDir('mantra-family-rule-')
-    tempDirs.push(userRulesDir)
-
-    writeRule(path.join(userRulesDir, 'legacy-rule-output.md'), 'Legacy Rule Output')
-    writeRule(path.join(userRulesDir, 'family-rule-output.md'), 'Family Rule Output', [
-      'legacy-rule-output',
-    ])
-
-    const result = runScript('validate-rules.ts', ['--json'], home, {
-      MANTRA_USER_RULES_DIRS: userRulesDir,
-    })
-    expect(result.raw.status, result.stderr).toBe(1)
-
-    const duplicateError = result.jsonLines.find(
-      line =>
-        line.type === 'error' &&
-        line.error_code === 'E_INPUT_INVALID' &&
-        String(line.message).includes('重複した rule output'),
-    )
-    expect(duplicateError).toBeDefined()
-
-    const summary = result.jsonLines.find(line => line.type === 'summary')
-    expect(summary?.success).toBe(false)
-    expect(summary?.error_code).toBe('E_INPUT_INVALID')
-  })
-
-  it('returns E_INPUT_INVALID for invalid rule family output names', () => {
-    const home = createTempHome('mantra-family-rule-invalid-output-')
-    homes.push(home)
-
-    const userRulesDir = createTempDir('mantra-family-rule-invalid-dir-')
-    tempDirs.push(userRulesDir)
-
-    writeRule(path.join(userRulesDir, 'invalid-rule-family-output.md'), 'Invalid Rule Family', [
-      'invalid rule family',
-    ])
-
-    const result = runScript('validate-rules.ts', ['--json'], home, {
-      MANTRA_USER_RULES_DIRS: userRulesDir,
-    })
-    expect(result.raw.status, result.stderr).toBe(1)
-
-    const invalidError = result.jsonLines.find(
-      line =>
-        line.type === 'error' &&
-        line.error_code === 'E_INPUT_INVALID' &&
-        String(line.message).includes('family output 名が不正'),
-    )
-    expect(invalidError).toBeDefined()
   })
 
   it('does not emit warning contract fields on validation failure paths', () => {
