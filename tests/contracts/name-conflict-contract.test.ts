@@ -137,6 +137,36 @@ describe('Name conflict contract', () => {
     expect(validated).toBeDefined()
   })
 
+  it('returns E_INPUT_INVALID when two families in one source resolve to the same output name', () => {
+    const home = createTempHome('mantra-family-duplicate-output-')
+    homes.push(home)
+
+    const userAgentsDir = createTempDir('mantra-family-duplicate-output-dir-')
+    tempDirs.push(userAgentsDir)
+
+    writeAgentFamily({
+      agentsDir: userAgentsDir,
+      familyDirName: 'family-a',
+      nameInConfig: 'duplicate-family-output',
+      description: 'Family A',
+    })
+    writeAgentFamily({
+      agentsDir: userAgentsDir,
+      familyDirName: 'family-b',
+      nameInConfig: 'duplicate-family-output',
+      description: 'Family B',
+    })
+
+    const result = runScript('validate-agents.ts', ['--json'], home, {
+      MANTRA_USER_AGENTS_DIRS: userAgentsDir,
+    })
+    expect(result.raw.status, result.stderr).toBe(1)
+
+    const summary = result.jsonLines.find(line => line.type === 'summary')
+    expect(summary?.success).toBe(false)
+    expect(summary?.error_code).toBe('E_INPUT_INVALID')
+  })
+
   it('returns E_INPUT_INVALID for invalid family output name', () => {
     const home = createTempHome('mantra-family-invalid-name-')
     homes.push(home)

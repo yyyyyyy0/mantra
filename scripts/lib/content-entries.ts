@@ -98,7 +98,7 @@ function toFamilyEntry(
 function isFamilyPreferred(
   current: ContentEntry,
   incoming: ContentEntry,
-): incoming is FamilyContentEntry {
+): boolean {
   return current.entryKind === 'legacy' && incoming.entryKind === 'family'
 }
 
@@ -148,16 +148,24 @@ function mergeEntriesByPolicy(sourceEntries: ContentEntry[]): {
       continue
     }
 
-    if (existing.entryKind === 'family' && entry.entryKind === 'legacy') {
-      warningHooks.push(
-        createFamilyConflictHook(
-          entry.source,
-          entry.relativeName,
-          existing.fullPath,
-          entry.fullPath,
-        ),
+    if (existing.entryKind === 'family') {
+      if (entry.entryKind === 'legacy') {
+        warningHooks.push(
+          createFamilyConflictHook(
+            entry.source,
+            entry.relativeName,
+            existing.fullPath,
+            entry.fullPath,
+          ),
+        )
+        continue
+      }
+
+      throw new CliError(
+        `同一 source 内で family 出力名が重複しています: ${entry.relativeName} (${existing.familyDir} と ${entry.familyDir})`,
+        'E_INPUT_INVALID',
+        false,
       )
-      continue
     }
 
     // Preserve prior behavior: later entries win when the entry type is the same.
