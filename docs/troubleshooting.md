@@ -18,6 +18,7 @@ warning code:
 見方:
 - `winner: "user"` と `loser` を確認し、どちらが採用されたかを判断する
 - 注意: agent/rule の name 重複は warning ではなく、`E_INPUT_INVALID` エラーです
+- 注意: family 出力の衝突も warning ではなく、`E_INPUT_INVALID` エラーです
 
 ## E_ENV_NODE_VERSION
 
@@ -59,13 +60,16 @@ warning code:
 
 ## E_INPUT_INVALID
 
-- 症状: 入力値/設定不正（例: agent/rule の name 重複、sources.json の JSON/スキーマ不正）
+- 症状: 入力値/設定不正（例: agent/rule の name 重複、family 出力の形式不正/重複、sources.json の JSON/スキーマ不正）
 - 確認:
   - `npm run validate:agents -- --json`
   - `npm run validate:rules -- --json`
-- 補足: 重複 name の場合は `type: "error"` 行の `error_code` に `E_INPUT_INVALID` が出力されます
+- 補足:
+  - 重複 name の場合は `type: "error"` 行の `error_code` に `E_INPUT_INVALID` が出力されます
+  - `type: "validated"` 行の `outputs.legacy` / `outputs.family` を見ると、衝突している出力名を特定できます
 - 対処:
   - agent/rule の `name` を一意にする
+  - family 出力名（`families` / `mantra-families`）を一意かつ安全文字にする
   - `~/.config/mantra/sources.json` の JSON とスキーマを修正する
 
 ## E_IO / E_INTERNAL

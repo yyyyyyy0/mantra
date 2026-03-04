@@ -14,6 +14,7 @@
 ---
 name: agent-name
 description: 簡潔な説明（1-2文）
+families: ["planning"] # 省略可能: family 出力名（legacy と重複不可）
 tools: ["Read", "Write", "Edit"] # 省略時は []
 model: opus # 省略可能: opus | sonnet | haiku
 ---
@@ -25,6 +26,7 @@ model: opus # 省略可能: opus | sonnet | haiku
 |-----------|------|------|
 | `name` | ✅ | エージェント名。ファイル名と一致させる（例: `planner.md` → `name: planner`）。英数字とハイフン/アンダースコアのみ |
 | `description` | ✅ | エージェントの目的と使用タイミングを簡潔に説明 |
+| `families` / `family` | ❌ | family 出力名（文字列または文字列配列）。`name`（legacy）や他ファイルの family 出力名と重複不可 |
 | `tools` | ❌ | エージェントが使用可能なツール配列。デフォルトは空配列 |
 | `model` | ❌ | 使用する Claude モデル。省略時はシステムデフォルト |
 
@@ -109,6 +111,23 @@ model: haiku  # 高頻度呼び出し向けに軽量モデルを選択
 5. **品質基準 / Quality Bar**
    - 完了の判断基準
 
+### Family 出力の定義（Agent）
+
+family 出力は、legacy 出力（`name`）に加えて `validate --json` の `outputs.family` に現れる追加エントリです。
+
+```yaml
+---
+name: planner
+description: 計画エージェント
+families: ["planning", "orchestration"]
+tools: ["Read", "Grep"]
+---
+```
+
+- `family`（単数）または `families`（複数）を使用可能
+- 文字列は `,` 区切りでも指定可能（例: `family: planning,orchestration`）
+- すべての出力名（legacy + family）はグローバル一意である必要があります
+
 ### 良い説明トリガーの例
 
 ```
@@ -137,6 +156,19 @@ model: haiku  # 高頻度呼び出し向けに軽量モデルを選択
 
 1. ファイル名がルール名になる（例: `coding-style.md` → `coding-style`）
 2. 最初の H1 見出しが説明になる（例: `# Coding Style`）
+
+### Family 出力の定義（Rule）
+
+rule は frontmatter を使わないため、必要な場合のみ HTML コメントで family 出力を定義します。
+
+```markdown
+<!-- mantra-families: governance,standards -->
+# Coding Style
+```
+
+- `<!-- mantra-family: ... -->` でも指定可能
+- 文字列は `,` 区切りで複数指定可能
+- すべての出力名（legacy + family）は agent/rule 全体で重複不可
 
 ### 命名規則
 
@@ -197,7 +229,11 @@ Before marking work complete:
   - `MANTRA_USER_TEMPLATES_DIRS`
   - `MANTRA_USER_EXAMPLES_DIRS`
 
-`agents/rules` は name 重複時にエラーになります（運用一貫性のため）。
+`agents/rules` は以下の重複時にエラーになります（運用一貫性のため）。
+
+- `name`（legacy）同士の重複
+- family 出力同士の重複
+- legacy 出力と family 出力の衝突
 
 ### 作成後の検証
 
@@ -215,6 +251,8 @@ npm run validate
 npm run validate:agents -- --json
 npm run validate:rules -- --json
 ```
+
+`--json` の `type: "validated"` イベントには `outputs.legacy` / `outputs.family` が含まれ、実際に生成される出力名をプレビューできます。
 
 ### Codex への同期
 

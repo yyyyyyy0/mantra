@@ -121,7 +121,7 @@ ls -la ~/.claude/rules   # → mantra/rules へのシムリンク
 
 **一般的なトラブルシューティング:**
 - `npm ci` が失敗する場合: Node.js v20+ がインストールされているか確認
-- `npm run validate` が失敗する場合: agents/ または rules/ ディレクトリの .md ファイルの frontmatter 構文と、agent/rule の name 重複を確認
+- `npm run validate` が失敗する場合: agents/ または rules/ ディレクトリの .md ファイルの frontmatter/metadata 構文と、legacy/family 出力名の重複を確認
 - シムリンクが作成されない場合: `npm run setup -- --force` を試す（既存のディレクトリはバックアップされます）
 - `npm run setup` 成功後の案内: Core next step は `npm run validate`、Optional next step は `npm run sync:codex`
 - `error_code` 単位の詳細対処: [docs/troubleshooting.md](./docs/troubleshooting.md)
@@ -239,6 +239,8 @@ mantra/
 - 同名ファイルは「後から読まれたソース」が優先されます
 - 衝突ポリシーは filename 衝突のみで、`W_SOURCE_CONFLICT_FILENAME` warning を出してユーザー定義を優先します
 - agent/rule の name 重複は warning ではなく、`validate:agents|validate:rules` で `E_INPUT_INVALID` として失敗します
+- family 出力（agent: `family` / `families`, rule: `<!-- mantra-family(ies): ... -->`）も `E_INPUT_INVALID` で検証されます
+- `validate --json` の `type: "validated"` には `outputs.legacy` / `outputs.family` が含まれ、出力プレビューとして利用できます
 - ユーザー定義がある場合、`setup` は `~/.mantra/generated/*` にマージして `~/.claude/agents|rules` へリンクします
 
 ロードマップ上の位置づけ:

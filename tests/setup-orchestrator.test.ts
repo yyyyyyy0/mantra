@@ -64,7 +64,7 @@ describe('setup orchestration', () => {
     fs.mkdirSync(userAgentsDir, { recursive: true })
     fs.writeFileSync(
       path.join(userAgentsDir, 'planner-user.md'),
-      '---\nname: planner-user\ndescription: User planner\ntools: []\n---\nBody\n',
+      '---\nname: planner-user\ndescription: User planner\nfamilies: [planning]\ntools: []\n---\nBody\n',
       'utf8',
     )
 

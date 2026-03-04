@@ -43,6 +43,27 @@
 - `type: "error"`: ファイル単位エラー
 - `type: "warning"`: 衝突などの非致命イベント
 
+### validate preview 契約（legacy / family 出力）
+
+`validate:agents` / `validate:rules` の `type: "validated"` には、出力プレビューとして `outputs` を含みます。
+
+```json
+{
+  "type": "validated",
+  "command": "validate:agents",
+  "file": "/path/to/agents/planner.md",
+  "success": true,
+  "outputs": {
+    "legacy": ["planner"],
+    "family": ["planning", "orchestration"]
+  }
+}
+```
+
+- `outputs.legacy`: 既存（legacy）出力名
+- `outputs.family`: family 出力名（未指定なら空配列）
+- 一意性は `legacy + family` の合成集合で判定されます（どちらかの衝突でも `E_INPUT_INVALID`）
+
 ### warning イベント契約
 
 ```json
@@ -62,6 +83,7 @@
 - `winner`: `user`
 - `loser`: `core` または `user:<path>`
 - 重複した agent/rule name は warning ではなく、`validate:agents|validate:rules` の `type: "error"` イベントで `E_INPUT_INVALID` を返し、終了コード `1` で失敗
+- family 出力の形式不正・重複・legacy/family 間衝突も同様に `E_INPUT_INVALID` で失敗
 
 ## error_code 一覧
 
