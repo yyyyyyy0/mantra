@@ -62,11 +62,10 @@ describe('setup orchestration', () => {
     tempDirs.push(home, userRoot)
 
     fs.mkdirSync(userAgentsDir, { recursive: true })
-    fs.writeFileSync(
-      path.join(userAgentsDir, 'planner-user.md'),
-      '---\nname: planner-user\ndescription: User planner\ntools: []\n---\nBody\n',
-      'utf8',
-    )
+    const familyDir = path.join(userAgentsDir, 'planner-user.family')
+    fs.mkdirSync(path.join(familyDir, 'overlays'), { recursive: true })
+    fs.writeFileSync(path.join(familyDir, 'family.yml'), 'description: User planner\ntargets: {}\n', 'utf8')
+    fs.writeFileSync(path.join(familyDir, 'base.md'), 'Body\n', 'utf8')
 
     const restoreHome = withHome(home)
     process.env.MANTRA_USER_CONTENT_ROOTS = userRoot

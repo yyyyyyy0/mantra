@@ -20,6 +20,24 @@ function writeRule(filePath: string, heading: string): void {
   fs.writeFileSync(filePath, `# ${heading}\n\nBody\n`, 'utf8')
 }
 
+function writeAgentFamily(args: {
+  agentsDir: string
+  familyDirName: string
+  nameInConfig?: string
+  description?: string
+}): void {
+  const dir = path.join(args.agentsDir, `${args.familyDirName}.family`)
+  fs.mkdirSync(path.join(dir, 'overlays'), { recursive: true })
+
+  const lines: string[] = []
+  if (args.nameInConfig !== undefined) {
+    lines.push(`name: ${args.nameInConfig}`)
+  }
+  lines.push(`description: ${args.description ?? 'Family Description'}`)
+  fs.writeFileSync(path.join(dir, 'family.yml'), `${lines.join('\n')}\ntargets: {}\n`, 'utf8')
+  fs.writeFileSync(path.join(dir, 'base.md'), 'Family Base\n', 'utf8')
+}
+
 function runValidateAgentsWithDuplicateNames(home: string, tempDirs: string[]): CliRunResult {
   const userAgentsDir = createTempDir('mantra-dup-agent-')
   tempDirs.push(userAgentsDir)
@@ -88,6 +106,84 @@ describe('Name conflict contract', () => {
         String(line.message).includes('重複した rule name'),
     )
     expect(duplicateError).toBeDefined()
+
+    const summary = result.jsonLines.find(line => line.type === 'summary')
+    expect(summary?.success).toBe(false)
+    expect(summary?.error_code).toBe('E_INPUT_INVALID')
+  })
+
+  it('prefers family over legacy within the same source and still validates successfully', () => {
+    const home = createTempHome('mantra-family-agent-conflict-')
+    homes.push(home)
+
+    const userAgentsDir = createTempDir('mantra-family-agent-dir-')
+    tempDirs.push(userAgentsDir)
+
+    writeAgent(path.join(userAgentsDir, 'legacy-output.md'), 'legacy-output')
+    writeAgentFamily({
+      agentsDir: userAgentsDir,
+      familyDirName: 'legacy-output',
+      description: 'Family conflict',
+    })
+
+    const result = runScript('validate-agents.ts', ['--json'], home, {
+      MANTRA_USER_AGENTS_DIRS: userAgentsDir,
+    })
+    expect(result.raw.status, result.stderr).toBe(0)
+
+    const validated = result.jsonLines.find(
+      line => line.type === 'validated' && line.source_kind === 'family' && line.output_name === 'legacy-output',
+    )
+    expect(validated).toBeDefined()
+  })
+
+  it('returns E_INPUT_INVALID when two families in one source resolve to the same output name', () => {
+    const home = createTempHome('mantra-family-duplicate-output-')
+    homes.push(home)
+
+    const userAgentsDir = createTempDir('mantra-family-duplicate-output-dir-')
+    tempDirs.push(userAgentsDir)
+
+    writeAgentFamily({
+      agentsDir: userAgentsDir,
+      familyDirName: 'family-a',
+      nameInConfig: 'duplicate-family-output',
+      description: 'Family A',
+    })
+    writeAgentFamily({
+      agentsDir: userAgentsDir,
+      familyDirName: 'family-b',
+      nameInConfig: 'duplicate-family-output',
+      description: 'Family B',
+    })
+
+    const result = runScript('validate-agents.ts', ['--json'], home, {
+      MANTRA_USER_AGENTS_DIRS: userAgentsDir,
+    })
+    expect(result.raw.status, result.stderr).toBe(1)
+
+    const summary = result.jsonLines.find(line => line.type === 'summary')
+    expect(summary?.success).toBe(false)
+    expect(summary?.error_code).toBe('E_INPUT_INVALID')
+  })
+
+  it('returns E_INPUT_INVALID for invalid family output name', () => {
+    const home = createTempHome('mantra-family-invalid-name-')
+    homes.push(home)
+
+    const userAgentsDir = createTempDir('mantra-family-invalid-dir-')
+    tempDirs.push(userAgentsDir)
+
+    writeAgentFamily({
+      agentsDir: userAgentsDir,
+      familyDirName: 'invalid name',
+      description: 'Invalid family name',
+    })
+
+    const result = runScript('validate-agents.ts', ['--json'], home, {
+      MANTRA_USER_AGENTS_DIRS: userAgentsDir,
+    })
+    expect(result.raw.status, result.stderr).toBe(1)
 
     const summary = result.jsonLines.find(line => line.type === 'summary')
     expect(summary?.success).toBe(false)

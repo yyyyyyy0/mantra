@@ -84,6 +84,35 @@ describe('Content precedence contract', () => {
     expect((summary?.warning_types as string[]).includes('W_SOURCE_CONFLICT_FILENAME')).toBe(true)
   })
 
+  it('keeps filename precedence contract when user content includes a family directory', () => {
+    const home = createTempHome('mantra-family-prec-')
+    homes.push(home)
+
+    const userRoot = createTempDir('mantra-family-root-')
+    tempDirs.push(userRoot)
+
+    const userAgentsDir = path.join(userRoot, 'agents')
+    fs.mkdirSync(userAgentsDir, { recursive: true })
+    const familyDir = path.join(userAgentsDir, 'planner.family')
+    fs.mkdirSync(path.join(familyDir, 'overlays'), { recursive: true })
+    fs.writeFileSync(path.join(familyDir, 'family.yml'), 'description: Family planner\ntargets: {}\n', 'utf8')
+    fs.writeFileSync(path.join(familyDir, 'base.md'), 'Family planner body\n', 'utf8')
+
+    const result = runScript('setup.ts', ['--json'], home, {
+      MANTRA_USER_CONTENT_ROOTS: userRoot,
+    })
+
+    expect(result.raw.status, result.stderr).toBe(0)
+
+    const warningLine = result.jsonLines.find(
+      line => line.type === 'warning' && line.code === 'W_SOURCE_CONFLICT_FILENAME',
+    )
+    expect(warningLine).toBeDefined()
+    expect(warningLine?.winner).toBe('user')
+    expect(warningLine?.loser).toBe('core')
+    expect(warningLine?.target).toBe('planner.md')
+  })
+
   it('uses user:<path> as loser when two sources.json user roots conflict on the same filename', () => {
     const home = createTempHome('mantra-srcjson-user-user-')
     homes.push(home)

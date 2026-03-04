@@ -36,6 +36,8 @@ describe.sequential('CLI JSON contract', () => {
       'validate-rules.ts',
       'sync-agents-to-codex.ts',
       'sync-rules-to-codex.ts',
+      'sync-templates-to-codex.ts',
+      'sync-examples-to-codex.ts',
     ] as const
 
     for (const script of scripts) {
@@ -59,6 +61,39 @@ describe.sequential('CLI JSON contract', () => {
     expect(typeof last?.success).toBe('boolean')
     expect(last?.warning_count).toBe(0)
     expect(last?.warning_types).toEqual([])
+  })
+
+  it('emits preview events and summary preview counts for sync preview mode', () => {
+    const home = createTempHome('mantra-contract-preview-')
+    homes.push(home)
+
+    const result = runScript('sync-agents-to-codex.ts', ['--json', '--preview'], home)
+    expect(result.raw.status, `${result.command}\n${result.stderr}`).toBe(0)
+
+    const previewBaseLines = result.jsonLines.filter(line => line.type === 'preview_base')
+    const previewGeneratedLines = result.jsonLines.filter(line => line.type === 'preview_generated')
+
+    expect(previewBaseLines.length).toBeGreaterThan(0)
+    expect(previewGeneratedLines.length).toBe(previewBaseLines.length * 3)
+
+    const generatedTools = new Set(
+      previewGeneratedLines
+        .map(line => line.tool)
+        .filter((tool): tool is string => typeof tool === 'string'),
+    )
+    expect(generatedTools).toEqual(new Set(['claude', 'codex', 'generic']))
+    expect(
+      previewGeneratedLines.every(
+        line => line.kind === 'agents' && (line.source_kind === 'legacy' || line.source_kind === 'family'),
+      ),
+    ).toBe(true)
+
+    const summary = result.jsonLines.find(line => line.type === 'summary')
+    expectSummaryShape(summary)
+    expect(summary?.success).toBe(true)
+    const details = summary?.details as Record<string, unknown> | undefined
+    expect(details?.previewed).toBe(previewBaseLines.length)
+    expect(details?.total).toBe(previewBaseLines.length)
   })
 
   it('returns E_SCHEMA_FRONTMATTER for malformed agent file', () => {

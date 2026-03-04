@@ -1,12 +1,6 @@
-import * as fs from 'fs'
-import * as path from 'path'
-import * as os from 'os'
-import { buildSkillContent, CodexFrontmatter } from './lib/codex-utils'
-import { writeAtomic } from './lib/fs-utils'
-import { getProjectMeta } from './lib/project-meta'
-import { parseRuleFile } from './lib/rule-parser'
-import type { ParsedRule } from './lib/rule-parser'
-import { listContentFiles, resolveContentSources } from './lib/content-sources'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 import {
   CliError,
   ensureNodeVersion,
@@ -19,12 +13,26 @@ import {
   writeJsonLine,
   writeWarn,
 } from './lib/cli-telemetry'
+import { listContentEntries, type ContentEntry } from './lib/content-entries'
+import { resolveContentSources } from './lib/content-sources'
+import { buildSkillContent, type CodexFrontmatter } from './lib/codex-utils'
+import { writeAtomic } from './lib/fs-utils'
+import { getProjectMeta } from './lib/project-meta'
+import { composeSkillFamily } from './lib/skill-family'
+import { extractH1, humanizeName, parseRuleFile, type ParsedRule } from './lib/rule-parser'
 
 type RuleMetadataType = ParsedRule['metadata']
+type GenerationTarget = 'claude' | 'codex' | 'generic'
 
-// ────────────────────────────────────────────────────────────
-// カテゴリマッピング
-// ────────────────────────────────────────────────────────────
+const GENERATION_TARGETS: GenerationTarget[] = ['claude', 'codex', 'generic']
+
+interface RuleSyncInput {
+  name: string
+  description: string
+  baseContent: string
+  generated: Record<GenerationTarget, string>
+  sourceKind: 'legacy' | 'family'
+}
 
 const CATEGORY_MAP: Record<string, string> = {
   'coding-style': 'style',
@@ -40,10 +48,6 @@ const CATEGORY_MAP: Record<string, string> = {
 function inferCategory(name: string): string {
   return CATEGORY_MAP[name] ?? 'development'
 }
-
-// ────────────────────────────────────────────────────────────
-// 変換
-// ────────────────────────────────────────────────────────────
 
 function convertToCodexFrontmatter(
   src: RuleMetadataType,
@@ -64,17 +68,49 @@ function convertToCodexFrontmatter(
   }
 }
 
+function entryToSyncInput(entry: ContentEntry): RuleSyncInput {
+  if (entry.entryKind === 'legacy') {
+    const raw = fs.readFileSync(entry.fullPath, 'utf8')
+    const { metadata, body } = parseRuleFile(raw, entry.relativeName)
+    return {
+      name: metadata.name,
+      description: metadata.description,
+      baseContent: body,
+      generated: {
+        claude: body,
+        codex: body,
+        generic: body,
+      },
+      sourceKind: 'legacy',
+    }
+  }
 
-// ────────────────────────────────────────────────────────────
-// メイン
-// ────────────────────────────────────────────────────────────
+  const family = entry.family
+  const name = family.outputName
+  const description = family.description ?? extractH1(family.baseContent) ?? humanizeName(name)
+
+  return {
+    name,
+    description,
+    baseContent: family.baseContent,
+    generated: {
+      claude: composeSkillFamily(family, 'claude').content,
+      codex: composeSkillFamily(family, 'codex').content,
+      generic: composeSkillFamily(family, 'generic').content,
+    },
+    sourceKind: 'family',
+  }
+}
 
 function main(): void {
   const json = hasJsonFlag(process.argv)
+  const preview = process.argv.includes('--preview')
   const startedAt = Date.now()
   const outputBase = path.join(os.homedir(), '.codex', 'skills', 'mantra-rules')
+
   try {
     ensureNodeVersion(20)
+
     const sourceDirs = resolveContentSources('rules')
     if (sourceDirs.length === 0) {
       throw new CliError('rules のソースディレクトリが見つかりません', 'E_INPUT_INVALID', false)
@@ -82,71 +118,99 @@ function main(): void {
     for (const source of sourceDirs) {
       ensureReadableDirectory(source.dir, source.label)
     }
-    ensureWritableParent(path.join(outputBase, '.touch'), 'sync destination')
-    const projectMeta = getProjectMeta()
 
-    const files = listContentFiles('rules')
-    if (files.length === 0) {
+    if (!preview) {
+      ensureWritableParent(path.join(outputBase, '.touch'), 'sync destination')
+    }
+
+    const projectMeta = getProjectMeta()
+    const listed = listContentEntries('rules', { target: 'codex' })
+    const entries = listed.entries
+    if (entries.length === 0) {
       throw new CliError('rules のソースファイルが見つかりません', 'E_INPUT_INVALID', false)
     }
 
     type Result =
-      | { success: true; name: string; dest: string }
+      | { success: true; name: string; dest?: string; previewed: boolean }
       | { success: false; file: string; message: string; code: CliError['code']; retryable: boolean }
 
     type SyncSuccess = Extract<Result, { success: true }>
     type SyncFailure = Extract<Result, { success: false }>
 
-    const seenRuleNames = new Set<string>()
+    const seenNames = new Set<string>()
 
-    const results: Result[] = files.map(file => {
+    const results: Result[] = entries.map(entry => {
       try {
-        const content = fs.readFileSync(file.fullPath, 'utf8')
-        const { metadata, body } = parseRuleFile(content, file.relativeName)
-        if (seenRuleNames.has(metadata.name)) {
+        const input = entryToSyncInput(entry)
+
+        if (seenNames.has(input.name)) {
           throw new CliError(
-            `重複した rule name が見つかりました: ${metadata.name}`,
+            `重複した rule name が見つかりました: ${input.name}`,
             'E_INPUT_INVALID',
             false,
           )
         }
-        seenRuleNames.add(metadata.name)
+        seenNames.add(input.name)
+
+        if (preview) {
+          writeInfo(json, `~ preview ${input.name}`)
+          writeJsonLine(json, {
+            type: 'preview_base',
+            command: 'sync:codex:rules',
+            name: input.name,
+            kind: 'rules',
+            source_kind: input.sourceKind,
+            content: input.baseContent,
+          })
+          for (const tool of GENERATION_TARGETS) {
+            writeJsonLine(json, {
+              type: 'preview_generated',
+              command: 'sync:codex:rules',
+              name: input.name,
+              kind: 'rules',
+              source_kind: input.sourceKind,
+              tool,
+              content: input.generated[tool],
+            })
+          }
+          return { success: true, name: input.name, previewed: true }
+        }
+
         const codexFm = convertToCodexFrontmatter(
-          metadata,
+          { name: input.name, description: input.description },
           projectMeta.version,
           projectMeta.license,
         )
-        const skillContent = buildSkillContent(codexFm, body)
-
-        const destPath = path.join(outputBase, metadata.name, 'SKILL.md')
+        const skillContent = buildSkillContent(codexFm, input.generated.codex)
+        const destPath = path.join(outputBase, input.name, 'SKILL.md')
         writeAtomic(destPath, skillContent, outputBase)
 
-        writeInfo(json, `✓ ${metadata.name} → ${destPath}`)
+        writeInfo(json, `✓ ${input.name} → ${destPath}`)
         writeJsonLine(json, {
           type: 'synced',
           command: 'sync:codex:rules',
-          name: metadata.name,
+          name: input.name,
           dest: destPath,
         })
-        return { success: true, name: metadata.name, dest: destPath }
+
+        return { success: true, name: input.name, dest: destPath, previewed: false }
       } catch (err) {
         const cliErr = toCliError(err, 'E_SCHEMA_RULE')
-        const code =
-          cliErr.message.includes('パストラバーサル')
-            ? 'E_SYNC_OUTPUT_PATH'
-            : cliErr.code
-        writeWarn(json, `✗ ${file}: ${cliErr.message}`)
+        const code = cliErr.message.includes('パストラバーサル') ? 'E_SYNC_OUTPUT_PATH' : cliErr.code
+        const targetFile = entry.entryKind === 'legacy' ? entry.fullPath : entry.familyDir
+
+        writeWarn(json, `✗ ${targetFile}: ${cliErr.message}`)
         writeJsonLine(json, {
           type: 'error',
           command: 'sync:codex:rules',
-          file: file.fullPath,
+          file: targetFile,
           message: cliErr.message,
           error_code: code,
           retryable: cliErr.retryable,
         })
         return {
           success: false,
-          file: file.fullPath,
+          file: targetFile,
           message: cliErr.message,
           code,
           retryable: cliErr.retryable,
@@ -156,8 +220,13 @@ function main(): void {
 
     const successes = results.filter((r): r is SyncSuccess => r.success)
     const failures = results.filter((r): r is SyncFailure => !r.success)
+    const previewedCount = successes.filter(r => r.previewed).length
 
-    writeInfo(json, `\n${successes.length}/${files.length} 件を同期しました → ${outputBase}`)
+    if (preview) {
+      writeInfo(json, `\n${previewedCount}/${entries.length} 件をプレビューしました`)
+    } else {
+      writeInfo(json, `\n${successes.length}/${entries.length} 件を同期しました → ${outputBase}`)
+    }
 
     if (failures.length > 0) {
       finishCommand({
@@ -171,8 +240,8 @@ function main(): void {
           failures[0].retryable,
         ),
         details: {
-          synced: successes.length,
-          total: files.length,
+          ...(preview ? { previewed: previewedCount } : { synced: successes.length }),
+          total: entries.length,
           failures: failures.map(f => ({
             file: f.file,
             error_code: f.code,
@@ -188,7 +257,9 @@ function main(): void {
       json,
       startedAt,
       success: true,
-      details: { synced: successes.length, total: files.length },
+      details: preview
+        ? { previewed: previewedCount, total: entries.length }
+        : { synced: successes.length, total: entries.length },
     })
   } catch (err) {
     const cliErr = toCliError(err, 'E_INTERNAL')
@@ -204,9 +275,4 @@ function main(): void {
   }
 }
 
-try {
-  main()
-} catch (err) {
-  process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`)
-  process.exit(1)
-}
+main()

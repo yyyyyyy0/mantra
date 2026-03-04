@@ -109,6 +109,39 @@ model: haiku  # 高頻度呼び出し向けに軽量モデルを選択
 5. **品質基準 / Quality Bar**
    - 完了の判断基準
 
+### Skill Family の定義（Agent/Rule/Template/Example）
+
+`.family` ディレクトリで、shared base + tool overlay を定義できます。
+
+```text
+agents/planner.family/
+├── family.yml
+├── base.md
+└── overlays/
+    ├── claude.md
+    ├── codex.md
+    └── generic.md
+```
+
+`family.yml`:
+
+```yaml
+name: planner # 省略時はディレクトリ名（*.family の prefix）
+description: 計画エージェント # agents family では必須
+tools: ["Read", "Grep"] # agents のみ利用
+model: opus             # agents のみ利用
+targets:
+  claude: claude
+  codex: codex
+  generic: generic
+```
+
+- fallback: `target -> generic -> base`
+- `targets` は overlay 名（拡張子なし）を推奨。`overlays/<name>.md` を解決します（`<name>.md` の直接指定も可）
+- 合成は静的連結（`base + overlay`）のみ
+- 同一 source 内で legacy と family が同名出力になる場合は family を優先し、`W_SOURCE_CONFLICT_FILENAME` warning を出します
+- `agents/rules` の出力名（legacy + family）は全体で一意である必要があります（重複時は `E_INPUT_INVALID`）
+
 ### 良い説明トリガーの例
 
 ```
@@ -197,7 +230,11 @@ Before marking work complete:
   - `MANTRA_USER_TEMPLATES_DIRS`
   - `MANTRA_USER_EXAMPLES_DIRS`
 
-`agents/rules` は name 重複時にエラーになります（運用一貫性のため）。
+`agents/rules` は以下の重複時にエラーになります（運用一貫性のため）。
+
+- `name`（legacy）同士の重複
+- family 出力同士の重複（`.family/family.yml` の `name` またはディレクトリ名）
+- legacy 出力と family 出力の衝突
 
 ### 作成後の検証
 
@@ -216,6 +253,8 @@ npm run validate:agents -- --json
 npm run validate:rules -- --json
 ```
 
+`--json` の `type: "validated"` イベントには `source_kind` / `output_name` が含まれます。
+
 ### Codex への同期
 
 ```bash
@@ -225,12 +264,21 @@ npm run sync:codex:agents
 # Rule を Codex スキルとして同期
 npm run sync:codex:rules
 
+# Template を Codex スキルとして同期
+npm run sync:codex:templates
+
+# Example を Codex スキルとして同期
+npm run sync:codex:examples
+
 # 両方同期
 npm run sync:codex
 
 # JSON 契約で同期
 npm run sync:codex:agents -- --json
 npm run sync:codex:rules -- --json
+
+# Effective output を確認（書き込みなし）
+npm run sync:codex:preview:json
 ```
 
 ### スモークテスト
@@ -268,6 +316,7 @@ ls -la ~/.claude/agents/your-agent-name
 - [ ] 指定されたツールのみが使用される
 - [ ] `model` 指定がある場合は正しいモデルで動作する
 - [ ] エージェントの説明に従った出力が得られる
+- [ ] family を使う場合、`family.yml` / `base.md` / `overlays/*` が正しい構造になっている
 
 ---
 
@@ -291,8 +340,8 @@ ls -la ~/.claude/agents/your-agent-name
 ## 関連ファイル
 
 - **検証スクリプト:** `scripts/validate-agents.ts`, `scripts/validate-rules.ts`
-- **同期スクリプト:** `scripts/sync-agents-to-codex.ts`, `scripts/sync-rules-to-codex.ts`
+- **同期スクリプト:** `scripts/sync-agents-to-codex.ts`, `scripts/sync-rules-to-codex.ts`, `scripts/sync-templates-to-codex.ts`, `scripts/sync-examples-to-codex.ts`
 - **CLI 契約:** `docs/cli-contract.md`
 - **メトリクス仕様:** `docs/ops-metrics.md`
 - **トラブルシュート:** `docs/troubleshooting.md`
-- **スキーマ定義:** `scripts/lib/agent-schema.ts`, `scripts/lib/rule-schema.ts`
+- **スキーマ定義:** `scripts/lib/agent-schema.ts`, `scripts/lib/rule-schema.ts`, `scripts/lib/skill-family-schema.ts`

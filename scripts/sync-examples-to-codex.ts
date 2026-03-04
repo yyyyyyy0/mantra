@@ -1,8 +1,6 @@
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import * as yaml from 'js-yaml'
-import { ClaudeAgentFrontmatter } from './lib/agent-schema'
 import {
   CliError,
   ensureNodeVersion,
@@ -17,124 +15,39 @@ import {
 } from './lib/cli-telemetry'
 import { listContentEntries, type ContentEntry } from './lib/content-entries'
 import { resolveContentSources } from './lib/content-sources'
-import { buildSkillContent, type CodexFrontmatter } from './lib/codex-utils'
 import { writeAtomic } from './lib/fs-utils'
-import { getProjectMeta } from './lib/project-meta'
 import { composeSkillFamily } from './lib/skill-family'
 
-type AgentFrontmatter = typeof ClaudeAgentFrontmatter._output
 type GenerationTarget = 'claude' | 'codex' | 'generic'
 
 const GENERATION_TARGETS: GenerationTarget[] = ['claude', 'codex', 'generic']
 
-interface AgentSyncInput {
+interface ExampleSyncInput {
   name: string
-  description: string
-  tools: string[]
-  model?: string
   baseContent: string
   generated: Record<GenerationTarget, string>
   sourceKind: 'legacy' | 'family'
 }
 
-const CATEGORY_MAP: Record<string, string> = {
-  planner: 'planning',
-  replan: 'planning',
-  architect: 'architecture',
-  'tdd-guide': 'testing',
-  'code-reviewer': 'review',
-  'security-reviewer': 'security',
-  'build-error-resolver': 'build',
-  'e2e-runner': 'testing',
-  'mob-navigator': 'planning',
-  'mob-critic': 'review',
-  'mob-scribe': 'documentation',
-  'refactor-cleaner': 'refactoring',
-  'doc-updater': 'documentation',
-}
-
-function inferCategory(name: string): string {
-  return CATEGORY_MAP[name] ?? 'development'
-}
-
-interface ParsedAgent {
-  frontmatter: AgentFrontmatter
-  body: string
-}
-
-function parseAgentFile(content: string): ParsedAgent {
-  const DELIMITER = '---'
-  const lines = content.split('\n')
-
-  if (lines[0] !== DELIMITER) {
-    throw new CliError('フロントマターが見つかりません（先頭に --- がありません）', 'E_SCHEMA_FRONTMATTER', false)
-  }
-
-  const endIndex = lines.indexOf(DELIMITER, 1)
-  if (endIndex === -1) {
-    throw new CliError('フロントマターの終端 --- が見つかりません', 'E_SCHEMA_FRONTMATTER', false)
-  }
-
-  const rawYaml = lines.slice(1, endIndex).join('\n')
-  const parsed = yaml.load(rawYaml, { schema: yaml.DEFAULT_SCHEMA })
-  const frontmatter = ClaudeAgentFrontmatter.parse(parsed)
-  const body = lines.slice(endIndex + 1).join('\n').trimStart()
-
-  return { frontmatter, body }
-}
-
-function convertFrontmatter(
-  src: Pick<AgentFrontmatter, 'name' | 'description'>,
-  metadataVersion: string,
-  metadataLicense: string,
-): CodexFrontmatter {
-  return {
-    name: src.name,
-    description: src.description,
-    license: metadataLicense,
-    compatibility: 'Works with any codebase',
-    metadata: {
-      author: 'mantra-project',
-      version: metadataVersion,
-      category: inferCategory(src.name),
-      tags: ['claude-code', src.name],
-    },
-  }
-}
-
-function entryToSyncInput(entry: ContentEntry): AgentSyncInput {
+function entryToSyncInput(entry: ContentEntry): ExampleSyncInput {
   if (entry.entryKind === 'legacy') {
     const raw = fs.readFileSync(entry.fullPath, 'utf8')
-    const parsed = parseAgentFile(raw)
+    const name = entry.relativeName.replace(/\.md$/, '')
     return {
-      name: parsed.frontmatter.name,
-      description: parsed.frontmatter.description,
-      tools: parsed.frontmatter.tools,
-      model: parsed.frontmatter.model,
-      baseContent: parsed.body,
+      name,
+      baseContent: raw,
       generated: {
-        claude: parsed.body,
-        codex: parsed.body,
-        generic: parsed.body,
+        claude: raw,
+        codex: raw,
+        generic: raw,
       },
       sourceKind: 'legacy',
     }
   }
 
   const family = entry.family
-  if ((family.description ?? '').trim().length === 0) {
-    throw new CliError(
-      `agents family では description が必須です: ${family.configPath}`,
-      'E_INPUT_INVALID',
-      false,
-    )
-  }
-
   return {
     name: family.outputName,
-    description: family.description as string,
-    tools: family.tools,
-    model: family.model,
     baseContent: family.baseContent,
     generated: {
       claude: composeSkillFamily(family, 'claude').content,
@@ -149,14 +62,15 @@ function main(): void {
   const json = hasJsonFlag(process.argv)
   const preview = process.argv.includes('--preview')
   const startedAt = Date.now()
-  const outputBase = path.join(os.homedir(), '.codex', 'skills', 'mantra')
+  const outputBase = path.join(os.homedir(), '.codex', 'skills', 'mantra-examples')
+  const command = 'sync:codex:examples'
 
   try {
     ensureNodeVersion(20)
 
-    const sourceDirs = resolveContentSources('agents')
+    const sourceDirs = resolveContentSources('examples')
     if (sourceDirs.length === 0) {
-      throw new CliError('agents のソースディレクトリが見つかりません', 'E_INPUT_INVALID', false)
+      throw new CliError('examples のソースディレクトリが見つかりません', 'E_INPUT_INVALID', false)
     }
     for (const source of sourceDirs) {
       ensureReadableDirectory(source.dir, source.label)
@@ -166,11 +80,10 @@ function main(): void {
       ensureWritableParent(path.join(outputBase, '.touch'), 'sync destination')
     }
 
-    const projectMeta = getProjectMeta()
-    const listed = listContentEntries('agents', { target: 'codex' })
+    const listed = listContentEntries('examples', { target: 'codex' })
     const entries = listed.entries
     if (entries.length === 0) {
-      throw new CliError('agents のソースファイルが見つかりません', 'E_INPUT_INVALID', false)
+      throw new CliError('examples のソースファイルが見つかりません', 'E_INPUT_INVALID', false)
     }
 
     type Result =
@@ -188,7 +101,7 @@ function main(): void {
 
         if (seenNames.has(input.name)) {
           throw new CliError(
-            `重複した agent name が見つかりました: ${input.name}`,
+            `重複した example name が見つかりました: ${input.name}`,
             'E_INPUT_INVALID',
             false,
           )
@@ -199,18 +112,18 @@ function main(): void {
           writeInfo(json, `~ preview ${input.name}`)
           writeJsonLine(json, {
             type: 'preview_base',
-            command: 'sync:codex:agents',
+            command,
             name: input.name,
-            kind: 'agents',
+            kind: 'examples',
             source_kind: input.sourceKind,
             content: input.baseContent,
           })
           for (const tool of GENERATION_TARGETS) {
             writeJsonLine(json, {
               type: 'preview_generated',
-              command: 'sync:codex:agents',
+              command,
               name: input.name,
-              kind: 'agents',
+              kind: 'examples',
               source_kind: input.sourceKind,
               tool,
               content: input.generated[tool],
@@ -219,38 +132,33 @@ function main(): void {
           return { success: true, name: input.name, previewed: true }
         }
 
-        const codexFm = convertFrontmatter(
-          { name: input.name, description: input.description },
-          projectMeta.version,
-          projectMeta.license,
-        )
-        const skillContent = buildSkillContent(codexFm, input.generated.codex)
         const destPath = path.join(outputBase, input.name, 'SKILL.md')
-        writeAtomic(destPath, skillContent, outputBase)
+        writeAtomic(destPath, input.generated.codex, outputBase)
 
-        writeInfo(json, `✓ ${input.name} → ${destPath}`)
+        writeInfo(json, `✓ example ${input.name} → ${destPath}`)
         writeJsonLine(json, {
           type: 'synced',
-          command: 'sync:codex:agents',
+          command,
           name: input.name,
           dest: destPath,
         })
 
         return { success: true, name: input.name, dest: destPath, previewed: false }
       } catch (err) {
-        const cliErr = toCliError(err, 'E_SCHEMA_FRONTMATTER')
+        const cliErr = toCliError(err, 'E_INPUT_INVALID')
         const code = cliErr.message.includes('パストラバーサル') ? 'E_SYNC_OUTPUT_PATH' : cliErr.code
         const targetFile = entry.entryKind === 'legacy' ? entry.fullPath : entry.familyDir
 
         writeWarn(json, `✗ ${targetFile}: ${cliErr.message}`)
         writeJsonLine(json, {
           type: 'error',
-          command: 'sync:codex:agents',
+          command,
           file: targetFile,
           message: cliErr.message,
           error_code: code,
           retryable: cliErr.retryable,
         })
+
         return {
           success: false,
           file: targetFile,
@@ -273,7 +181,7 @@ function main(): void {
 
     if (failures.length > 0) {
       finishCommand({
-        command: 'sync:codex:agents',
+        command,
         json,
         startedAt,
         success: false,
@@ -296,7 +204,7 @@ function main(): void {
     }
 
     finishCommand({
-      command: 'sync:codex:agents',
+      command,
       json,
       startedAt,
       success: true,
@@ -304,11 +212,11 @@ function main(): void {
         ? { previewed: previewedCount, total: entries.length }
         : { synced: successes.length, total: entries.length },
     })
-  } catch (err) {
-    const cliErr = toCliError(err, 'E_INTERNAL')
+  } catch (error) {
+    const cliErr = toCliError(error, 'E_INTERNAL')
     writeWarn(json, cliErr.message)
     finishCommand({
-      command: 'sync:codex:agents',
+      command,
       json,
       startedAt,
       success: false,

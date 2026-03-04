@@ -8,7 +8,12 @@ import {
   writeWarningEvent,
   type WarningEvent,
 } from './cli-telemetry'
-import { ContentKind, ContentSource, listContentFiles, resolveContentSources } from './content-sources'
+import {
+  listContentEntries,
+  type ContentEntry,
+  type ContentEntryWarningHook,
+} from './content-entries'
+import { ContentKind, ContentSource, resolveContentSources } from './content-sources'
 
 export interface BuildMergedDirectoryResult {
   dir: string
@@ -44,8 +49,8 @@ export function buildMergedDirectory(
   kind: ContentKind,
   json: boolean,
 ): BuildMergedDirectoryResult {
-  const files = listContentFiles(kind)
-  if (files.length === 0) {
+  const contentEntries = listContentEntries(kind, { target: 'claude' })
+  if (contentEntries.entries.length === 0) {
     throw new CliError(`${kind} のソースファイルが見つかりません`, 'E_INPUT_INVALID', false)
   }
 
@@ -55,10 +60,16 @@ export function buildMergedDirectory(
   fs.mkdirSync(outputDir, { recursive: true })
 
   // Later sources (user) override earlier ones (core) with the same filename.
-  const entries = new Map<string, (typeof files)[number]>()
+  const entries = new Map<string, ContentEntry>()
   const warnings: WarningEvent[] = []
 
-  for (const file of files) {
+  for (const hook of contentEntries.warningHooks) {
+    const hookWarning = warningEventFromHook(hook)
+    writeWarningEvent(json, hookWarning)
+    warnings.push(hookWarning)
+  }
+
+  for (const file of contentEntries.entries) {
     const existing = entries.get(file.relativeName)
     if (existing !== undefined) {
       const loser = conflictLoser(existing.source)
@@ -80,9 +91,29 @@ export function buildMergedDirectory(
   }
 
   for (const [name, contentFile] of entries) {
-    fs.symlinkSync(contentFile.fullPath, path.join(outputDir, name))
+    const destination = path.join(outputDir, name)
+    if (contentFile.entryKind === 'legacy') {
+      fs.symlinkSync(contentFile.fullPath, destination)
+      continue
+    }
+
+    fs.writeFileSync(destination, contentFile.composedContent, 'utf8')
   }
 
   writeInfo(json, `merged ${kind}: ${entries.size} files -> ${outputDir}`)
   return { dir: outputDir, files: entries.size, warnings }
+}
+
+export function warningEventFromHook(hook: ContentEntryWarningHook): WarningEvent {
+  const loser = conflictLoser(hook.source)
+  const winner = hook.source.origin === 'user' ? 'user' : 'core'
+  return {
+    type: 'warning',
+    command: 'setup',
+    code: hook.code,
+    winner,
+    loser,
+    target: hook.target,
+    message: `${hook.message}; ${hook.winnerKind}(${hook.winnerPath}) overrides ${hook.loserKind}(${hook.loserPath})`,
+  }
 }

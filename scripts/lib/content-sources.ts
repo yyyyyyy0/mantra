@@ -202,7 +202,10 @@ export interface ContentFile {
 export function listContentFiles(kind: ContentKind): ContentFile[] {
   const results: ContentFile[] = []
   for (const source of resolveContentSources(kind)) {
-    const names = fs.readdirSync(source.dir)
+    const names = fs
+      .readdirSync(source.dir)
+      .slice()
+      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
     for (const name of names) {
       const fullPath = path.join(source.dir, name)
       const stat = fs.statSync(fullPath)
