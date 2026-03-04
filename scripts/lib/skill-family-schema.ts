@@ -13,6 +13,15 @@ export const SkillFamilyTargetsSchema = z
   })
   .strict()
 
+export const SkillFamilyDriftGuardSchema = z
+  .object({
+    enabled: z.boolean().optional().default(false),
+    max_overlay_ratio: z.number().positive().max(1).optional(),
+  })
+  .strict()
+
+export type SkillFamilyDriftGuard = z.infer<typeof SkillFamilyDriftGuardSchema>
+
 export const SkillFamilyFileSchema = z
   .object({
     name: z.string().regex(SAFE_NAME_RE).optional(),
@@ -20,6 +29,7 @@ export const SkillFamilyFileSchema = z
     tools: z.array(z.string()).optional(),
     model: z.string().optional(),
     targets: SkillFamilyTargetsSchema.optional().default({}),
+    drift_guard: SkillFamilyDriftGuardSchema.optional(),
   })
   .strict()
 

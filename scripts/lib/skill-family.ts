@@ -5,6 +5,7 @@ import { CliError } from './cli-telemetry'
 import type { ContentKind } from './content-sources'
 import {
   SkillFamilyFileSchema,
+  type SkillFamilyDriftGuard,
   type SkillFamilyFile,
   type SkillFamilyTarget,
 } from './skill-family-schema'
@@ -32,12 +33,18 @@ export interface LoadedSkillFamily {
   basePath: string
   baseContent: string
   overlays: Partial<Record<SkillFamilyTarget, SkillFamilyOverlay>>
+  driftGuard: {
+    enabled: boolean
+    maxOverlayRatio: number
+  }
 }
 
 export interface ComposedSkillFamily {
   content: string
   overlayTarget?: SkillFamilyTarget
 }
+
+const DEFAULT_MAX_OVERLAY_RATIO = 0.2
 
 function readTextFile(filePath: string): string {
   try {
@@ -134,6 +141,16 @@ function parseFamilyConfig(filePath: string): SkillFamilyFile {
   return result.data
 }
 
+function normalizeDriftGuard(config: SkillFamilyDriftGuard | undefined): {
+  enabled: boolean
+  maxOverlayRatio: number
+} {
+  return {
+    enabled: config?.enabled ?? false,
+    maxOverlayRatio: config?.max_overlay_ratio ?? DEFAULT_MAX_OVERLAY_RATIO,
+  }
+}
+
 export function isSkillFamilyDirectoryName(name: string): boolean {
   return name.endsWith(FAMILY_SUFFIX)
 }
@@ -218,6 +235,7 @@ export function loadSkillFamily(
     basePath,
     baseContent: readTextFile(basePath),
     overlays,
+    driftGuard: normalizeDriftGuard(config.drift_guard),
   }
 }
 

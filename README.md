@@ -121,7 +121,7 @@ ls -la ~/.claude/rules   # → mantra/rules へのシムリンク
 
 **一般的なトラブルシューティング:**
 - `npm ci` が失敗する場合: Node.js v20+ がインストールされているか確認
-- `npm run validate` が失敗する場合: agents/ または rules/ ディレクトリの .md / `*.family` 構成、出力名の重複を確認
+- `npm run validate` が失敗する場合: agents/rules の .md / `*.family` 構成、出力名重複、`drift_guard` 設定を確認
 - シムリンクが作成されない場合: `npm run setup -- --force` を試す（既存のディレクトリはバックアップされます）
 - `npm run setup` 成功後の案内: Core next step は `npm run validate`、Optional next step は `npm run sync:codex`
 - `error_code` 単位の詳細対処: [docs/troubleshooting.md](./docs/troubleshooting.md)
@@ -204,10 +204,11 @@ mantra/
 | `npm run sync:codex:examples` | examples のみ Codex へ同期 |
 | `npm run sync:codex:preview` | 書き込みなしで effective content を表示 |
 | `npm run sync:codex:preview:json` | preview を JSON 出力モードで実行 |
-| `npm run validate` | agents/rules の定義を検証 |
+| `npm run validate` | agents/rules + family drift guard を検証 |
 | `npm run validate:json` | validate を JSON 出力モードで実行 |
 | `npm run validate:agents` | agents 定義のみ検証 |
 | `npm run validate:rules` | rules 定義のみ検証 |
+| `npm run validate:drift` | `drift_guard.enabled: true` の family drift を検証 |
 | `npm run typecheck` | scripts/tests の TypeScript 型検査 |
 | `npm run lint` | scripts/tests の ESLint チェック（warning も fail） |
 | `npm run test:unit` | ユニット + 契約テストの実行 |
@@ -244,8 +245,11 @@ mantra/
 - 衝突ポリシーは filename 衝突のみで、`W_SOURCE_CONFLICT_FILENAME` warning を出してユーザー定義を優先します
 - family は `*.family/{family.yml,base.md,overlays/*}` 形式で定義します
 - `family.yml.targets` は overlay 名（例: `codex`）を指定し、`overlays/<name>.md` を解決します
+- `family.yml.drift_guard`（opt-in）で drift 契約を強制できます（`enabled`, `max_overlay_ratio`）
+- lock marker 構文は `<!-- mantra-lock:<id>:start -->` / `<!-- mantra-lock:<id>:end -->`
 - 同一 source で legacy と family が同名出力になる場合は family を優先し、warning を出します
 - agent/rule の name 重複（legacy + family）は warning ではなく、`validate:agents|validate:rules` で `E_INPUT_INVALID` として失敗します
+- drift_guard 違反は `validate:drift` で `E_FAMILY_DRIFT` として失敗します
 - ユーザー定義がある場合、`setup` は `~/.mantra/generated/*` にマージして `~/.claude/agents|rules` へリンクします
 
 ロードマップ上の位置づけ:

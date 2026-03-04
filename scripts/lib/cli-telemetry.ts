@@ -7,6 +7,7 @@ export type CliErrorCode =
   | 'E_FS_PERMISSION'
   | 'E_SCHEMA_FRONTMATTER'
   | 'E_SCHEMA_RULE'
+  | 'E_FAMILY_DRIFT'
   | 'E_SYNC_OUTPUT_PATH'
   | 'E_INPUT_INVALID'
   | 'E_IO'

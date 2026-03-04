@@ -34,6 +34,7 @@ describe.sequential('CLI JSON contract', () => {
       'setup.ts',
       'validate-agents.ts',
       'validate-rules.ts',
+      'validate-drift.ts',
       'sync-agents-to-codex.ts',
       'sync-rules-to-codex.ts',
       'sync-templates-to-codex.ts',
