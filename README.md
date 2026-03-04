@@ -115,8 +115,8 @@ npm run lint
 # 期待される出力: エラーなく完了
 
 # シムリンクの検証
-ls -la ~/.claude/agents  # → mantra/agents へのシムリンク
-ls -la ~/.claude/rules   # → mantra/rules へのシムリンク
+ls -la ~/.claude/agents  # → ~/.mantra/generated/agents（user定義 or family 構成時は merge 経由）
+ls -la ~/.claude/rules   # → mantra/rules へのシムリンク（family がなければ core 直リンク）
 ```
 
 **一般的なトラブルシューティング:**
@@ -250,7 +250,7 @@ mantra/
 - 同一 source で legacy と family が同名出力になる場合は family を優先し、warning を出します
 - agent/rule の name 重複（legacy + family）は warning ではなく、`validate:agents|validate:rules` で `E_INPUT_INVALID` として失敗します
 - drift_guard 違反は `validate:drift` で `E_FAMILY_DRIFT` として失敗します
-- ユーザー定義がある場合、`setup` は `~/.mantra/generated/*` にマージして `~/.claude/agents|rules` へリンクします
+- ユーザー定義または family 構成がある種別では、`setup` は `~/.mantra/generated/*` にマージして `~/.claude/agents|rules` へリンクします
 
 ロードマップ上の位置づけ:
 - Phase 2/3（運用性・一貫性）で作った基盤を使って、Phase 4（ユーザー価値）を回収する代表施策です。

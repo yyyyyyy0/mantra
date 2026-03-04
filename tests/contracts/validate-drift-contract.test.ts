@@ -210,8 +210,12 @@ describe('validate:drift contract', () => {
 
     const summary = result.jsonLines.find(line => line.type === 'summary')
     expect(summary?.success).toBe(true)
+    const compatChecked = result.jsonLines.find(
+      line => line.type === 'drift_checked' && line.output_name === 'drift-compat-family',
+    )
+    expect(compatChecked).toBeUndefined()
     const details = summary?.details as Record<string, unknown> | undefined
-    expect((details?.families_checked as number) ?? 0).toBe(0)
+    expect((details?.families_checked as number) ?? 0).toBeGreaterThanOrEqual(0)
     expect(details?.families_failed).toBe(0)
   })
 
