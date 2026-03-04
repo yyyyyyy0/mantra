@@ -57,12 +57,14 @@ describe('Onboarding smoke', () => {
       .trim()
       .split('\n')
       .map(line => JSON.parse(line) as Record<string, unknown>)
-    expect(records.length).toBeGreaterThanOrEqual(5)
+    expect(records.length).toBeGreaterThanOrEqual(7)
     expect(records.some(r => r.command === 'setup')).toBe(true)
     expect(records.some(r => r.command === 'validate:agents')).toBe(true)
     expect(records.some(r => r.command === 'validate:rules')).toBe(true)
     expect(records.some(r => r.command === 'sync:codex:agents')).toBe(true)
     expect(records.some(r => r.command === 'sync:codex:rules')).toBe(true)
+    expect(records.some(r => r.command === 'sync:codex:templates')).toBe(true)
+    expect(records.some(r => r.command === 'sync:codex:examples')).toBe(true)
   })
 
   it('requires --force to overwrite existing destination paths and succeeds with --force', () => {
