@@ -8,6 +8,23 @@ function createTempDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix))
 }
 
+function writeFamily(args: {
+  dir: string
+  name: string
+  familyYml: string
+  baseContent: string
+  overlays?: Record<string, string>
+}): void {
+  const familyDir = path.join(args.dir, `${args.name}.family`)
+  fs.mkdirSync(path.join(familyDir, 'overlays'), { recursive: true })
+  fs.writeFileSync(path.join(familyDir, 'family.yml'), args.familyYml, 'utf8')
+  fs.writeFileSync(path.join(familyDir, 'base.md'), args.baseContent, 'utf8')
+
+  for (const [name, content] of Object.entries(args.overlays ?? {})) {
+    fs.writeFileSync(path.join(familyDir, 'overlays', name), content, 'utf8')
+  }
+}
+
 describe('setup merge responsibilities', () => {
   const tempDirs: string[] = []
   const originalRootsEnv = process.env.MANTRA_USER_CONTENT_ROOTS
@@ -93,5 +110,74 @@ describe('setup merge responsibilities', () => {
     expect(warning).toBeDefined()
     expect(warning?.winner).toBe('user')
     expect(warning?.loser).toBe(`user:${dirA}`)
+  })
+
+  it('writes composed family content using claude target fallback', () => {
+    const home = createTempDir('mantra-home-')
+    const userRoot = createTempDir('mantra-user-root-')
+    const userAgentsDir = path.join(userRoot, 'agents')
+    tempDirs.push(home, userRoot)
+
+    fs.mkdirSync(userAgentsDir, { recursive: true })
+    writeFamily({
+      dir: userAgentsDir,
+      name: 'family-merge-claude',
+      familyYml: 'targets:\n  generic: generic.md\n',
+      baseContent: 'base body',
+      overlays: {
+        'generic.md': 'generic overlay',
+      },
+    })
+
+    const restoreHome = withHome(home)
+    process.env.MANTRA_USER_CONTENT_ROOTS = userRoot
+
+    const result = buildMergedDirectory('agents', true)
+    restoreHome()
+
+    expect(result.files).toBeGreaterThan(0)
+
+    const mergedPath = path.join(home, '.mantra', 'generated', 'agents', 'family-merge-claude.md')
+    expect(fs.existsSync(mergedPath)).toBe(true)
+    expect(fs.lstatSync(mergedPath).isSymbolicLink()).toBe(false)
+    expect(fs.readFileSync(mergedPath, 'utf8')).toBe('base body\ngeneric overlay')
+  })
+
+  it('emits warning metadata when family overrides legacy within the same source', () => {
+    const home = createTempDir('mantra-home-')
+    const userRoot = createTempDir('mantra-user-root-')
+    const userAgentsDir = path.join(userRoot, 'agents')
+    tempDirs.push(home, userRoot)
+
+    fs.mkdirSync(userAgentsDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(userAgentsDir, 'family-overrides-legacy.md'),
+      '---\nname: family-overrides-legacy\ndescription: legacy\ntools: []\n---\nlegacy\n',
+      'utf8',
+    )
+    writeFamily({
+      dir: userAgentsDir,
+      name: 'family-overrides-legacy',
+      familyYml: 'targets:\n  claude: claude.md\n',
+      baseContent: 'base',
+      overlays: {
+        'claude.md': 'claude',
+      },
+    })
+
+    const restoreHome = withHome(home)
+    process.env.MANTRA_USER_CONTENT_ROOTS = userRoot
+
+    const result = buildMergedDirectory('agents', true)
+    restoreHome()
+
+    const warning = result.warnings.find(w => w.target === 'family-overrides-legacy.md')
+    expect(warning).toBeDefined()
+    expect(warning?.winner).toBe('user')
+    expect(warning?.loser).toBe(`user:${userAgentsDir}`)
+    expect(warning?.message).toMatch(/family-over-legacy/)
+
+    const mergedPath = path.join(home, '.mantra', 'generated', 'agents', 'family-overrides-legacy.md')
+    expect(fs.readFileSync(mergedPath, 'utf8')).toBe('base\nclaude')
   })
 })
