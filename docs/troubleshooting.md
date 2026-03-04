@@ -64,6 +64,7 @@ warning code:
 - 確認:
   - `npm run validate:agents -- --json`
   - `npm run validate:rules -- --json`
+  - `npm run validate:drift -- --json`
 - 補足:
   - 重複 name の場合は `type: "error"` 行の `error_code` に `E_INPUT_INVALID` が出力されます
   - `type: "validated"` 行の `output_name` を見ると、衝突している出力名を特定できます
@@ -72,6 +73,19 @@ warning code:
   - family の `name`（省略時はディレクトリ名）を一意かつ安全文字にする
   - family 構成（`family.yml`, `base.md`, `overlays/*`）を見直す
   - `~/.config/mantra/sources.json` の JSON とスキーマを修正する
+
+## E_FAMILY_DRIFT
+
+- 症状: family の drift_guard 契約違反（lock marker 改変、overlay 比率超過）
+- 確認:
+  - `npm run validate:drift -- --json`
+- 補足:
+  - `type: "drift_error"` 行の `violation_code` で違反種別を判定できます
+  - `summary.details.families_checked` / `families_failed` で影響範囲を把握できます
+- 対処:
+  - `base.md` の lock marker ブロック（`<!-- mantra-lock:<id>:start/end -->`）を固定化する
+  - overlay で lock marker を追加/改変しない
+  - `drift_guard.max_overlay_ratio` を見直すか、overlay を縮小する
 
 ## E_IO / E_INTERNAL
 
@@ -102,5 +116,6 @@ warning code:
 1. `npm run onboarding:json`
 2. `npm run setup -- --json`
 3. `npm run validate:json`
-4. warning/error を確認して上記セクションの対処を実施
-5. `npm run smoke:onboarding` で再検証
+4. `npm run validate:drift -- --json`
+5. warning/error を確認して上記セクションの対処を実施
+6. `npm run smoke:onboarding` で再検証

@@ -33,14 +33,17 @@
 `validate:agents` / `validate:rules` で複数ファイルエラーがある場合、`summary.error_code` は各 `type: "error"` の代表値として次の優先順位で決定します。
 
 - `E_INPUT_INVALID`
+- `E_FAMILY_DRIFT`
 - スキーマ系（`validate:agents` は `E_SCHEMA_FRONTMATTER`、`validate:rules` は `E_SCHEMA_RULE`）
 - その他のエラーコード（検出順の先頭）
 
 ### ファイル単位イベント（任意）
 
 - `type: "validated"`: validate 系でのファイル検証成功
+- `type: "drift_checked"`: validate:drift の family 検証成功
 - `type: "synced"`: sync 系でのファイル同期成功
 - `type: "error"`: ファイル単位エラー
+- `type: "drift_error"`: validate:drift の drift 検証失敗
 - `type: "warning"`: 衝突などの非致命イベント
 
 ### validate イベント契約（legacy / family）
@@ -61,6 +64,48 @@
 - `source_kind`: `legacy` または `family`
 - `output_name`: 実際に出力される名前
 - 一意性は `legacy + family` の合成集合で判定されます（衝突時は `E_INPUT_INVALID`）
+
+### validate:drift イベント契約
+
+`validate:drift --json` は、`drift_guard.enabled: true` の family に対して drift 検証を行います。
+
+```json
+{
+  "type": "drift_checked",
+  "command": "validate:drift",
+  "kind": "agents",
+  "file": "/path/to/agents/planner.family",
+  "source_kind": "family",
+  "output_name": "planner",
+  "max_overlay_ratio": 0.2,
+  "checked_targets": ["claude", "codex", "generic"],
+  "success": true
+}
+```
+
+```json
+{
+  "type": "drift_error",
+  "command": "validate:drift",
+  "kind": "agents",
+  "file": "/path/to/agents/planner.family",
+  "source_kind": "family",
+  "output_name": "planner",
+  "target": "codex",
+  "message": "overlay ratio exceeded ...",
+  "error_code": "E_FAMILY_DRIFT",
+  "retryable": false,
+  "violation_code": "OVERLAY_RATIO_EXCEEDED",
+  "details": {}
+}
+```
+
+- `drift_guard.enabled: false`（または未指定）の family はスキップされます
+- `summary.details` には以下を含みます:
+  - `families_seen`
+  - `families_checked`
+  - `families_failed`
+  - `violations`
 
 ### sync preview 契約
 
@@ -112,6 +157,7 @@
 - `loser`: `core` または `user:<path>`
 - 重複した agent/rule name は warning ではなく、`validate:agents|validate:rules` の `type: "error"` イベントで `E_INPUT_INVALID` を返し、終了コード `1` で失敗
 - family ディレクトリ（`*.family`）の形式不正・重複・legacy/family 間衝突も同様に `E_INPUT_INVALID` で失敗
+- drift_guard 違反（lock marker 不一致 / overlay 比率超過）は `E_FAMILY_DRIFT` で失敗
 
 ## error_code 一覧
 
@@ -119,6 +165,7 @@
 - `E_FS_PERMISSION`
 - `E_SCHEMA_FRONTMATTER`
 - `E_SCHEMA_RULE`
+- `E_FAMILY_DRIFT`
 - `E_SYNC_OUTPUT_PATH`
 - `E_INPUT_INVALID`
 - `E_IO`

@@ -12,7 +12,7 @@
 ## 補助 KPI
 
 - **コマンド失敗率**
-  - 対象: `setup`, `validate:agents`, `validate:rules`, `sync:codex:agents`, `sync:codex:rules`, `sync:codex:templates`, `sync:codex:examples`
+  - 対象: `setup`, `validate:agents`, `validate:rules`, `validate:drift`, `sync:codex:agents`, `sync:codex:rules`, `sync:codex:templates`, `sync:codex:examples`
   - 式: `失敗実行回数 / 実行回数`
 - **外部ソース利用率**
   - 定義: 実行時に user source が1つ以上解決された割合
@@ -23,6 +23,7 @@
   - 補足: agent/rule の name 重複は warning ではなく、`E_INPUT_INVALID` の失敗として「コマンド失敗率」に計上
 - **原因特定時間（MTTI）**
   - 定義: 最初の失敗発生から `error_code` と対処手順が特定されるまでの時間
+  - 補足: `E_FAMILY_DRIFT` は drift_guard 契約違反（lock marker/overlay 比率）の専用コード
 - **初回完了時間（P50）**
   - 定義: onboarding 完了までの中央値時間
 

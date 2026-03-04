@@ -7,6 +7,9 @@ export function selectSummaryErrorCode(
   if (errorCodes.includes('E_INPUT_INVALID')) {
     return 'E_INPUT_INVALID'
   }
+  if (errorCodes.includes('E_FAMILY_DRIFT')) {
+    return 'E_FAMILY_DRIFT'
+  }
   if (errorCodes.includes(schemaFallback)) {
     return schemaFallback
   }

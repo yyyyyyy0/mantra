@@ -134,11 +134,20 @@ targets:
   claude: claude
   codex: codex
   generic: generic
+drift_guard:
+  enabled: true
+  max_overlay_ratio: 0.2
 ```
 
 - fallback: `target -> generic -> base`
 - `targets` は overlay 名（拡張子なし）を推奨。`overlays/<name>.md` を解決します（`<name>.md` の直接指定も可）
 - 合成は静的連結（`base + overlay`）のみ
+- `drift_guard` は opt-in。`enabled: true` のとき drift 検証が有効化されます
+- `drift_guard.max_overlay_ratio` の既定値は `0.2`（`enabled: true` 時）
+- lock marker 構文（byte-level 契約）:
+  - `<!-- mantra-lock:<id>:start -->`
+  - `<!-- mantra-lock:<id>:end -->`
+- lock marker は base のブロックと生成結果の一致が必須です。overlay からの marker 追加・改変は `E_FAMILY_DRIFT` になります
 - 同一 source 内で legacy と family が同名出力になる場合は family を優先し、`W_SOURCE_CONFLICT_FILENAME` warning を出します
 - `agents/rules` の出力名（legacy + family）は全体で一意である必要があります（重複時は `E_INPUT_INVALID`）
 
@@ -245,12 +254,16 @@ npm run validate:agents
 # Rule の検証
 npm run validate:rules
 
-# 両方の検証
+# Drift guard の検証
+npm run validate:drift
+
+# まとめて検証
 npm run validate
 
 # JSON 契約で検証（機械可読）
 npm run validate:agents -- --json
 npm run validate:rules -- --json
+npm run validate:drift -- --json
 ```
 
 `--json` の `type: "validated"` イベントには `source_kind` / `output_name` が含まれます。
@@ -317,6 +330,7 @@ ls -la ~/.claude/agents/your-agent-name
 - [ ] `model` 指定がある場合は正しいモデルで動作する
 - [ ] エージェントの説明に従った出力が得られる
 - [ ] family を使う場合、`family.yml` / `base.md` / `overlays/*` が正しい構造になっている
+- [ ] `drift_guard.enabled: true` を使う場合、`npm run validate:drift` が通る
 
 ---
 
@@ -345,3 +359,4 @@ ls -la ~/.claude/agents/your-agent-name
 - **メトリクス仕様:** `docs/ops-metrics.md`
 - **トラブルシュート:** `docs/troubleshooting.md`
 - **スキーマ定義:** `scripts/lib/agent-schema.ts`, `scripts/lib/rule-schema.ts`, `scripts/lib/skill-family-schema.ts`
+- **drift 検証:** `scripts/lib/skill-family-drift.ts`, `scripts/validate-drift.ts`

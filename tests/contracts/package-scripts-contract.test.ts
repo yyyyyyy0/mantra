@@ -64,4 +64,14 @@ describe('Package scripts contract', () => {
     expect(scripts.lint.includes('eslint')).toBe(true)
     expect(scripts.lint.includes('--max-warnings=0')).toBe(true)
   })
+
+  it('includes validate:drift in validate aggregates', () => {
+    const scripts = loadScripts()
+
+    const validateSteps = parseSteps(scripts.validate)
+    const validateJsonSteps = parseSteps(scripts['validate:json'])
+
+    expect(validateSteps).toContain('npm run validate:drift')
+    expect(validateJsonSteps).toContain('npm run validate:drift -- --json')
+  })
 })

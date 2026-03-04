@@ -25,9 +25,10 @@
     "test:coverage": "vitest run --coverage tests/agents.test.ts tests/rules.test.ts tests/contracts tests/setup-fs.test.ts tests/setup-merge.test.ts tests/setup-orchestrator.test.ts",
     "smoke:onboarding": "vitest run tests/smoke/onboarding.test.ts",
     "validate:agents": "tsx scripts/validate-agents.ts",
+    "validate:drift": "tsx scripts/validate-drift.ts",
     "validate:rules": "tsx scripts/validate-rules.ts",
-    "validate:json": "npm run validate:agents -- --json && npm run validate:rules -- --json",
-    "validate": "npm run validate:agents && npm run validate:rules",
+    "validate:json": "npm run validate:agents -- --json && npm run validate:rules -- --json && npm run validate:drift -- --json",
+    "validate": "npm run validate:agents && npm run validate:rules && npm run validate:drift",
     "prepare": "husky"
   },
   "lint-staged": {
