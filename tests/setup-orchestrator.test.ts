@@ -37,7 +37,7 @@ describe('setup orchestration', () => {
     }
   })
 
-  it('uses core directories when no user sources exist', () => {
+  it('uses merged agents source when core includes family directories', () => {
     const home = createTempDir('mantra-home-')
     tempDirs.push(home)
     const restoreHome = withHome(home)
@@ -48,14 +48,15 @@ describe('setup orchestration', () => {
 
     expect(plan.links).toHaveLength(2)
     expect(plan.warnings).toHaveLength(0)
-    expect(plan.mergedKinds).toHaveLength(0)
+    expect(plan.mergedKinds).toHaveLength(1)
     expect(plan.links[0].dest).toBe(path.join(home, '.claude', 'agents'))
     expect(plan.links[1].dest).toBe(path.join(home, '.claude', 'rules'))
-    expect(plan.links[0].src).toBe(path.join(process.cwd(), 'agents'))
+    expect(plan.links[0].src).toBe(path.join(home, '.mantra', 'generated', 'agents'))
     expect(plan.links[1].src).toBe(path.join(process.cwd(), 'rules'))
+    expect(plan.mergedKinds[0]).toMatchObject({ kind: 'agents' })
   })
 
-  it('creates merged agent source only when user agents are defined', () => {
+  it('keeps rules on core path when only agents are merged', () => {
     const home = createTempDir('mantra-home-')
     const userRoot = createTempDir('mantra-user-root-')
     const userAgentsDir = path.join(userRoot, 'agents')

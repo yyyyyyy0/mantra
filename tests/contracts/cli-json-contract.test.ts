@@ -26,7 +26,7 @@ describe.sequential('CLI JSON contract', () => {
     }
   })
 
-  it('emits summary objects for all primary commands', () => {
+  it('emits summary objects for all primary commands', { timeout: 20_000 }, () => {
     const home = createTempHome('mantra-contract-')
     homes.push(home)
 

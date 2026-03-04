@@ -1,0 +1,15 @@
+name: autonomous-improvement-loop
+description: Run a bounded QA -> plan -> fix -> verify loop for incremental repository improvement. Use for scoped cleanup, defect reduction, and post-change hardening on existing code. Avoid for greenfield architecture or high-risk migrations.
+tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash
+model: opus
+targets:
+  claude: claude
+  codex: codex
+  generic: generic
+drift_guard:
+  enabled: true
+  max_overlay_ratio: 0.22

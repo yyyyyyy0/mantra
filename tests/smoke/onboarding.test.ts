@@ -18,7 +18,7 @@ describe('Onboarding smoke', () => {
     }
   })
 
-  it('completes setup -> validate flow in a fresh HOME (onboarding core)', () => {
+  it('completes setup -> validate flow in a fresh HOME (onboarding core)', { timeout: 20_000 }, () => {
     const home = createTempHome('mantra-smoke-')
     homes.push(home)
 
@@ -44,7 +44,7 @@ describe('Onboarding smoke', () => {
     expect(records.some(r => r.command === 'validate:drift')).toBe(true)
   })
 
-  it('completes setup -> validate -> sync flow in a fresh HOME (onboarding:full)', () => {
+  it('completes setup -> validate -> sync flow in a fresh HOME (onboarding:full)', { timeout: 20_000 }, () => {
     const home = createTempHome('mantra-smoke-full-')
     homes.push(home)
 

@@ -15,6 +15,7 @@ import { type ContentKind, hasUserSources } from './content-sources'
 import {
   buildMergedDirectory,
   coreDirectory,
+  hasFamilyDirectories,
   type MergedKindSummary,
 } from './setup-merge'
 import { createSymlink, type SetupLink, type SymlinkFailure, type SymlinkSuccess } from './setup-fs'
@@ -44,7 +45,7 @@ export function writeSetupSuccessOutput(json: boolean): void {
 }
 
 function buildSourceDirectory(json: boolean, kind: ContentKind, mergedKinds: MergedKindSummary[], warnings: WarningEvent[]): string {
-  if (!hasUserSources(kind)) {
+  if (!hasUserSources(kind) && !hasFamilyDirectories(kind)) {
     return coreDirectory(kind)
   }
 

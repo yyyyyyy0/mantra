@@ -14,6 +14,7 @@ import {
   type ContentEntryWarningHook,
 } from './content-entries'
 import { ContentKind, ContentSource, resolveContentSources } from './content-sources'
+import { isSkillFamilyDirectoryName } from './skill-family'
 
 export interface BuildMergedDirectoryResult {
   dir: string
@@ -43,6 +44,24 @@ export function coreDirectory(kind: ContentKind): string {
   }
 
   return sources[0].dir
+}
+
+export function hasFamilyDirectories(kind: ContentKind): boolean {
+  for (const source of resolveContentSources(kind)) {
+    const names = fs.readdirSync(source.dir)
+    for (const name of names) {
+      if (!isSkillFamilyDirectoryName(name)) {
+        continue
+      }
+
+      const fullPath = path.join(source.dir, name)
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
+        return true
+      }
+    }
+  }
+
+  return false
 }
 
 export function buildMergedDirectory(
