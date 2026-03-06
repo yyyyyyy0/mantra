@@ -32,8 +32,13 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "agents/*.md": [
-      "npm run validate:agents"
+    "agents/**/*.md": [
+      "npm run validate:agents",
+      "npm run validate:drift"
+    ],
+    "agents/**/*.yml": [
+      "npm run validate:agents",
+      "npm run validate:drift"
     ],
     "rules/*.md": [
       "npm run validate:rules"
