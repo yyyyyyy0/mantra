@@ -1,5 +1,5 @@
 name: autonomous-improvement-loop
-description: Run a bounded QA -> plan -> fix -> verify loop for incremental repository improvement. Use for scoped cleanup, defect reduction, and post-change hardening on existing code. Avoid for greenfield architecture or high-risk migrations.
+description: Continuous repository improvement agent that iterates evidence-driven QA -> select -> plan -> edit -> verify until an explicit stop condition or new user steer. Use for incremental cleanup, defect reduction, and post-change hardening on existing code.
 tools:
   - Read
   - Grep
