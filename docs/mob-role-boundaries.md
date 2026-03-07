@@ -121,6 +121,7 @@ review-mob:
 ### Decision flow (single-agent first)
 
 - **Default**: single-agent path is preferred.
+- **Use autonomous-improvement-loop** for iterative repository improvement, defect reduction, flaky-test cleanup, or post-change hardening when work can proceed one bounded issue at a time.
 - **Escalate to planner** only when threshold is met (3+ steps / 2+ files / non-obvious tradeoff).
 - **Escalate to replan** only when pre-implementation review leaves unresolved High/Medium risks.
 - **Escalate to mob** only when planner/replan still leaves unresolved ambiguity and cost/benefit is positive.
@@ -137,6 +138,16 @@ review-mob:
 例 / Example:
 - タイプ修正
 - 1関数のリファクタリング
+
+### Iterative Improvement Tasks / 段階的改善タスク（既存 repo の cleanup / hardening）
+- **Do / する**: `autonomous-improvement-loop` を使い、1 round = 1 issue で進める
+- **Fallback / フォールバック**: dirty worktree または不安定な baseline では QA-only mode に切り替える
+- **Escalate / エスカレーション**: 次の一手が risk boundary を越える時だけ planner / replan / mob へ上げる
+
+例 / Example:
+- defect cluster の段階的削減
+- flaky test の切り分けと小さな修正
+- マージ直後の hardening
 
 ### Medium Tasks / 中程度のタスク（3-5ファイル、複数の選択肢）
 - **Do / する**: 必要時のみ flash-mob または plan-mob（default は single-agent / planner）
