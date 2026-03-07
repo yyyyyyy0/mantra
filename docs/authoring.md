@@ -8,7 +8,8 @@
 
 ### 必須 Frontmatter フィールド
 
-すべてのエージェント定義 (`agents/*.md`) には、以下の YAML frontmatter が必須です：
+legacy 形式のエージェント定義 (`agents/*.md`) には、以下の YAML frontmatter が必須です。
+`*.family` 形式の定義は後述の「Skill Family の定義」を参照してください。
 
 ```yaml
 ---
@@ -111,7 +112,7 @@ model: haiku  # 高頻度呼び出し向けに軽量モデルを選択
 
 ### Skill Family の定義（Agent/Rule/Template/Example）
 
-`.family` ディレクトリで、shared base + tool overlay を定義できます。
+`.family` ディレクトリで、shared base + target overlay を定義できます。
 
 ```text
 agents/planner.family/
@@ -150,6 +151,9 @@ drift_guard:
 - lock marker は base のブロックと生成結果の一致が必須です。overlay からの marker 追加・改変は `E_FAMILY_DRIFT` になります
 - 同一 source 内で legacy と family が同名出力になる場合は family を優先し、`W_SOURCE_CONFLICT_FILENAME` warning を出します
 - `agents/rules` の出力名（legacy + family）は全体で一意である必要があります（重複時は `E_INPUT_INVALID`）
+- stop 条件、構造化 summary、handoff fields のような継続的な運用契約は `base.md` に置き、必要なら lock marker で保護します
+- overlay は target 固有の reporting style や narrative 補助に限定し、base 契約を上書きしない薄い差分に保ちます
+- 参照例として [`agents/autonomous-improvement-loop.family`](../agents/autonomous-improvement-loop.family/) は「base-heavy / overlay-thin」の family 構成になっています
 
 ### 良い説明トリガーの例
 
@@ -290,9 +294,15 @@ npm run sync:codex
 npm run sync:codex:agents -- --json
 npm run sync:codex:rules -- --json
 
+# Effective output を確認（人間向け）
+npm run sync:codex:preview
+
 # Effective output を確認（書き込みなし）
 npm run sync:codex:preview:json
 ```
+
+family を編集したら、`preview` で target ごとの合成結果を確認してください。
+特に lock marker で保護した構造化出力（例: `[AIL][rNN]` summary や final handoff fields）が残っているかを先に見ると安全です。
 
 ### スモークテスト
 
@@ -331,6 +341,8 @@ ls -la ~/.claude/agents/your-agent-name
 - [ ] エージェントの説明に従った出力が得られる
 - [ ] family を使う場合、`family.yml` / `base.md` / `overlays/*` が正しい構造になっている
 - [ ] `drift_guard.enabled: true` を使う場合、`npm run validate:drift` が通る
+- [ ] family の合成結果を `npm run sync:codex:preview` または `--json` で確認している
+- [ ] 共有契約は `base.md` にあり、overlay が target 固有の薄い差分に収まっている
 
 ---
 
