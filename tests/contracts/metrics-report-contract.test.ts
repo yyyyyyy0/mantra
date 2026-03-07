@@ -54,7 +54,7 @@ describe('metrics report contract', () => {
         command: 'setup',
         duration_ms: 25,
         success: true,
-        warning_count: 1,
+        warning_count: 3,
         warning_types: ['W_SOURCE_CONFLICT_FILENAME'],
         schema_version: 2,
         record_kind: 'command',
@@ -68,7 +68,27 @@ describe('metrics report contract', () => {
             winner: 'user',
             loser: 'core',
           },
+          {
+            code: 'W_SOURCE_CONFLICT_FILENAME',
+            target: 'planner.md',
+            winner: 'user',
+            loser: 'core',
+          },
+          {
+            code: 'W_SOURCE_CONFLICT_FILENAME',
+            target: 'planner.md',
+            winner: 'user',
+            loser: 'core',
+          },
         ],
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-07T00:01:30.000Z',
+        command: 'setup',
+        duration_ms: 15,
+        success: true,
+        warning_count: 2,
+        warning_types: ['W_SOURCE_CONFLICT_FILENAME'],
       }),
       JSON.stringify({
         timestamp: '2026-03-07T00:02:00.000Z',
@@ -114,11 +134,11 @@ describe('metrics report contract', () => {
     expect(commands).toEqual([
       {
         command: 'setup',
-        runs: 1,
-        successes: 1,
+        runs: 2,
+        successes: 2,
         failures: 0,
         success_rate: 100,
-        avg_duration_ms: 25,
+        avg_duration_ms: 20,
         user_source_runs: 1,
       },
       {
@@ -133,10 +153,10 @@ describe('metrics report contract', () => {
     ])
 
     expect(report.top_warning_types).toEqual([
-      { warning_code: 'W_SOURCE_CONFLICT_FILENAME', count: 1 },
+      { warning_code: 'W_SOURCE_CONFLICT_FILENAME', count: 5 },
     ])
     expect(report.top_conflicts).toEqual([
-      { target: 'planner.md', count: 1 },
+      { target: 'planner.md', count: 3 },
     ])
   })
 })

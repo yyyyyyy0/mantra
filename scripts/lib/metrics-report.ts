@@ -283,6 +283,30 @@ function sortByCountAndName<T extends { count: number }>(
   })
 }
 
+function incrementWarningCounts(
+  counts: Map<WarningCode, number>,
+  record: NormalizedMetricRecord,
+): void {
+  if (record.warning_details.length > 0) {
+    for (const detail of record.warning_details) {
+      counts.set(detail.code, (counts.get(detail.code) ?? 0) + 1)
+    }
+    return
+  }
+
+  if (record.warning_types.length === 1 && record.warning_count > 0) {
+    const [warningType] = record.warning_types
+    if (warningType !== undefined) {
+      counts.set(warningType, (counts.get(warningType) ?? 0) + record.warning_count)
+    }
+    return
+  }
+
+  for (const warningType of record.warning_types) {
+    counts.set(warningType, (counts.get(warningType) ?? 0) + 1)
+  }
+}
+
 export function buildMetricsReport(days: number, now = new Date(), homeDir?: string): MetricsReport {
   const { window, records, skippedRecords } = loadMetricsWindow(days, now, homeDir)
 
@@ -297,9 +321,7 @@ export function buildMetricsReport(days: number, now = new Date(), homeDir?: str
       errorCounts.set(record.error_code, (errorCounts.get(record.error_code) ?? 0) + 1)
     }
 
-    for (const warningType of record.warning_types) {
-      warningCounts.set(warningType, (warningCounts.get(warningType) ?? 0) + 1)
-    }
+    incrementWarningCounts(warningCounts, record)
 
     for (const detail of record.warning_details) {
       if (detail.code !== 'W_SOURCE_CONFLICT_FILENAME' || detail.target === undefined) {
