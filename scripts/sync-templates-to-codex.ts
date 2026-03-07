@@ -14,7 +14,7 @@ import {
   writeWarn,
 } from './lib/cli-telemetry'
 import { listContentEntries, type ContentEntry } from './lib/content-entries'
-import { resolveContentSources } from './lib/content-sources'
+import { countUserSources, resolveContentSources } from './lib/content-sources'
 import { writeAtomic } from './lib/fs-utils'
 import { composeSkillFamily } from './lib/skill-family'
 
@@ -64,9 +64,11 @@ function main(): void {
   const startedAt = Date.now()
   const outputBase = path.join(os.homedir(), '.codex', 'skills', 'mantra-templates')
   const command = 'sync:codex:templates'
+  let userSourceCount = 0
 
   try {
     ensureNodeVersion(20)
+    userSourceCount = countUserSources('templates')
 
     const sourceDirs = resolveContentSources('templates')
     if (sourceDirs.length === 0) {
@@ -199,6 +201,7 @@ function main(): void {
             message: f.message,
           })),
         },
+        metricContext: { user_source_count: userSourceCount },
       })
       process.exit(1)
     }
@@ -211,6 +214,7 @@ function main(): void {
       details: preview
         ? { previewed: previewedCount, total: entries.length }
         : { synced: successes.length, total: entries.length },
+      metricContext: { user_source_count: userSourceCount },
     })
   } catch (error) {
     const cliErr = toCliError(error, 'E_INTERNAL')
@@ -221,6 +225,7 @@ function main(): void {
       startedAt,
       success: false,
       error: cliErr,
+      metricContext: { user_source_count: userSourceCount },
     })
     process.exit(1)
   }

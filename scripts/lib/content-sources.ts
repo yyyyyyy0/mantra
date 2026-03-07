@@ -228,3 +228,19 @@ export function listContentFiles(kind: ContentKind): ContentFile[] {
 export function hasUserSources(kind: ContentKind): boolean {
   return resolveContentSources(kind).some(s => s.origin === 'user')
 }
+
+export function countUserSources(kinds: ContentKind | ContentKind[]): number {
+  const targetKinds = Array.isArray(kinds) ? kinds : [kinds]
+  const seen = new Set<string>()
+
+  for (const kind of targetKinds) {
+    for (const source of resolveContentSources(kind)) {
+      if (source.origin !== 'user') {
+        continue
+      }
+      seen.add(source.dir)
+    }
+  }
+
+  return seen.size
+}

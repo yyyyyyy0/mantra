@@ -1,6 +1,7 @@
 # CLI Contract
 
 `mantra` の `setup/sync/validate` 系 CLI は、従来の人間向け出力に加えて `--json` をサポートします。
+`metrics:report` は例外で、`--json` 時に JSON Lines ではなく単一 JSON object を返します。
 
 `sync:codex` は互換エイリアスで、正規経路は対象別 subcommand（`sync:codex:agents|rules|templates|examples`）です。
 
@@ -178,7 +179,67 @@
 
 warning は失敗扱いにしない（`0`を維持）。
 
+## `metrics:report --json` 契約
+
+`npm run metrics:report -- --json` は単一 JSON object を返します。
+
+```json
+{
+  "type": "metrics_report",
+  "window": {
+    "days": 7,
+    "from": "2026-03-01",
+    "to": "2026-03-07",
+    "files_scanned": 7,
+    "files_found": 1,
+    "records_loaded": 12
+  },
+  "workflows": [
+    {
+      "workflow": "onboarding",
+      "runs": 1,
+      "successes": 1,
+      "failures": 0,
+      "success_rate": 100,
+      "p50_duration_ms": 1234
+    }
+  ],
+  "commands": [
+    {
+      "command": "setup",
+      "runs": 1,
+      "successes": 1,
+      "failures": 0,
+      "success_rate": 100,
+      "avg_duration_ms": 321,
+      "user_source_runs": 0
+    }
+  ],
+  "top_error_codes": [],
+  "top_warning_types": [],
+  "top_conflicts": [],
+  "skipped_records": 0
+}
+```
+
+トップレベル required keys:
+- `type`
+- `window`
+- `workflows`
+- `commands`
+- `top_error_codes`
+- `top_warning_types`
+- `top_conflicts`
+- `skipped_records`
+
+補足:
+- `workflows` は `record_kind: "workflow"` row から集計します
+- `commands` は `record_kind: "command"` row から集計します
+- v1 row は `record_kind: "command"` 相当として読みます
+- 不正な row は `skipped_records` に計上されます
+
 ## メトリクス記録規約
 
 - 各コマンド終了時に `~/.mantra/metrics/YYYY-MM-DD.jsonl` へ追記
-- 出力項目: `timestamp`, `command`, `duration_ms`, `success`, `error_code`
+- v2 row の追加項目: `schema_version`, `record_kind`, `session_id`, `workflow`, `user_source_count`, `warning_details`
+- 既存 row との後方互換は維持し、reader は v1/v2 混在を許容する

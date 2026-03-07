@@ -1,4 +1,5 @@
 import * as fs from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import * as os from 'node:os'
 import * as path from 'node:path'
 
@@ -14,6 +15,11 @@ export type CliErrorCode =
   | 'E_INTERNAL'
 
 export type WarningCode = 'W_SOURCE_CONFLICT_FILENAME'
+export type WorkflowName = 'onboarding' | 'onboarding:full'
+export type MetricRecordKind = 'command' | 'workflow'
+
+export const METRIC_SESSION_ID_ENV = 'MANTRA_METRICS_SESSION_ID'
+export const METRIC_WORKFLOW_ENV = 'MANTRA_METRICS_WORKFLOW'
 
 export interface WarningEvent {
   type: 'warning'
@@ -23,6 +29,13 @@ export interface WarningEvent {
   loser: 'core' | `user:${string}`
   target: string
   message: string
+}
+
+export interface WarningDetail {
+  code: WarningCode
+  target?: string
+  winner?: 'user' | 'core'
+  loser?: string
 }
 
 export class CliError extends Error {
@@ -37,7 +50,7 @@ export class CliError extends Error {
   }
 }
 
-interface MetricRecord {
+export interface MetricRecord {
   timestamp: string
   command: string
   duration_ms: number
@@ -45,6 +58,12 @@ interface MetricRecord {
   error_code?: CliErrorCode
   warning_count: number
   warning_types: WarningCode[]
+  schema_version?: 2
+  record_kind?: MetricRecordKind
+  session_id?: string
+  workflow?: WorkflowName
+  user_source_count?: number
+  warning_details?: WarningDetail[]
 }
 
 interface SummaryPayload {
@@ -57,6 +76,13 @@ interface SummaryPayload {
   details?: Record<string, unknown>
   warning_count?: number
   warning_types?: WarningCode[]
+}
+
+export interface MetricContext {
+  session_id?: string
+  workflow?: WorkflowName
+  user_source_count?: number
+  warning_details?: WarningDetail[]
 }
 
 export function hasJsonFlag(argv = process.argv): boolean {
@@ -97,6 +123,10 @@ function metricsPathForNow(): string {
   return path.join(os.homedir(), '.mantra', 'metrics', `${y}-${m}-${d}.jsonl`)
 }
 
+export function metricsDirectoryPath(homeDir = os.homedir()): string {
+  return path.join(homeDir, '.mantra', 'metrics')
+}
+
 export function recordMetric(record: MetricRecord): void {
   const metricsPath = metricsPathForNow()
   const metricsDir = path.dirname(metricsPath)
@@ -106,6 +136,60 @@ export function recordMetric(record: MetricRecord): void {
     fs.appendFileSync(metricsPath, `${JSON.stringify(record)}\n`, 'utf8')
   } catch {
     // Metrics write failures should never block CLI usage.
+  }
+}
+
+export function createMetricSessionId(): string {
+  return randomUUID()
+}
+
+let processMetricSessionId: string | undefined
+
+function getMetricSessionId(explicit?: string): string {
+  if (typeof explicit === 'string' && explicit.length > 0) {
+    return explicit
+  }
+
+  const fromEnv = process.env[METRIC_SESSION_ID_ENV]
+  if (typeof fromEnv === 'string' && fromEnv.length > 0) {
+    return fromEnv
+  }
+
+  if (processMetricSessionId === undefined) {
+    processMetricSessionId = createMetricSessionId()
+  }
+
+  return processMetricSessionId
+}
+
+function getWorkflowName(explicit?: WorkflowName): WorkflowName | undefined {
+  if (explicit !== undefined) {
+    return explicit
+  }
+
+  const fromEnv = process.env[METRIC_WORKFLOW_ENV]
+  if (fromEnv === 'onboarding' || fromEnv === 'onboarding:full') {
+    return fromEnv
+  }
+
+  return undefined
+}
+
+function toWarningDetails(warnings: WarningEvent[]): WarningDetail[] {
+  return warnings.map(warning => ({
+    code: warning.code,
+    target: warning.target,
+    winner: warning.winner,
+    loser: warning.loser,
+  }))
+}
+
+function resolveMetricContext(metricContext: MetricContext | undefined, warnings: WarningEvent[]): Required<Pick<MetricRecord, 'session_id'>> & Omit<MetricContext, 'session_id'> {
+  return {
+    session_id: getMetricSessionId(metricContext?.session_id),
+    workflow: getWorkflowName(metricContext?.workflow),
+    user_source_count: metricContext?.user_source_count,
+    warning_details: metricContext?.warning_details ?? toWarningDetails(warnings),
   }
 }
 
@@ -171,10 +255,12 @@ export function finishCommand(params: {
   error?: CliError
   details?: Record<string, unknown>
   warnings?: WarningEvent[]
+  metricContext?: MetricContext
 }): void {
   const duration = Date.now() - params.startedAt
   const warnings = params.warnings ?? []
   const warningCodes = [...new Set(warnings.map(w => w.code))]
+  const metricContext = resolveMetricContext(params.metricContext, warnings)
 
   const summary: SummaryPayload = {
     type: 'summary',
@@ -202,5 +288,11 @@ export function finishCommand(params: {
     error_code: params.error?.code,
     warning_count: warnings.length,
     warning_types: warningCodes,
+    schema_version: 2,
+    record_kind: 'command',
+    session_id: metricContext.session_id,
+    workflow: metricContext.workflow,
+    user_source_count: metricContext.user_source_count,
+    warning_details: metricContext.warning_details,
   })
 }

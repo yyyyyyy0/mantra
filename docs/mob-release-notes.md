@@ -66,7 +66,8 @@ Each anti-pattern includes symptom, problem, and fix details.
 - 外部ツール統合なし（Jira、GitHub Projects など）/ No external tool integrations (Jira, GitHub Projects, etc.)
 
 ### Metrics / メトリクス
-- 実運用データに基づくメトリクス定義は未実装 / Metrics definitions based on production data not implemented
+- ローカル JSONL metrics と `metrics:report` CLI が利用可能 / Local JSONL metrics and the `metrics:report` CLI are available
+- ダッシュボードや外部集計基盤は未実装 / Dashboards and external analytics remain out of scope
 
 ### Tooling / ツール
 - ヘルパースクリプトは提供しない（手動プロセス） / No helper scripts provided (manual process)

@@ -10,7 +10,7 @@ import {
   writeWarn,
 } from './lib/cli-telemetry'
 import { listContentEntries } from './lib/content-entries'
-import { resolveContentSources, type ContentKind } from './lib/content-sources'
+import { countUserSources, resolveContentSources, type ContentKind } from './lib/content-sources'
 import { validateSkillFamilyDrift } from './lib/skill-family-drift'
 import { selectSummaryErrorCode } from './lib/validation-summary'
 
@@ -20,6 +20,7 @@ function main(): void {
   const json = hasJsonFlag(process.argv)
   const startedAt = Date.now()
   const errorCodes: CliError['code'][] = []
+  let userSourceCount = 0
 
   let familiesSeen = 0
   let familiesChecked = 0
@@ -28,6 +29,7 @@ function main(): void {
 
   try {
     ensureNodeVersion(20)
+    userSourceCount = countUserSources(CONTENT_KINDS)
 
     for (const kind of CONTENT_KINDS) {
       const sources = resolveContentSources(kind)
@@ -110,6 +112,7 @@ function main(): void {
           families_failed: familiesFailed,
           violations: violationsTotal,
         },
+        metricContext: { user_source_count: userSourceCount },
       })
       process.exit(1)
     }
@@ -129,6 +132,7 @@ function main(): void {
         families_failed: familiesFailed,
         violations: 0,
       },
+      metricContext: { user_source_count: userSourceCount },
     })
   } catch (err) {
     const cliErr = toCliError(err, 'E_INTERNAL')
@@ -151,6 +155,7 @@ function main(): void {
         families_checked: familiesChecked,
         families_failed: familiesFailed,
       },
+      metricContext: { user_source_count: userSourceCount },
     })
     process.exit(1)
   }

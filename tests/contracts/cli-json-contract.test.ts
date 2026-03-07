@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   createTempHome,
   removeTempHome,
+  readTodayMetricRecords,
   runScript,
-  todayMetricsPath,
 } from '../helpers/cli-runner'
 
 function expectSummaryShape(summary: Record<string, unknown> | undefined): void {
@@ -49,19 +49,18 @@ describe.sequential('CLI JSON contract', () => {
       expect(summary?.success).toBe(true)
     }
 
-    const metricsPath = todayMetricsPath(home)
-    const last = fs
-      .readFileSync(metricsPath, 'utf8')
-      .trim()
-      .split('\n')
-      .map(line => JSON.parse(line) as Record<string, unknown>)
-      .at(-1)
+    const last = readTodayMetricRecords(home).at(-1)
     expect(typeof last?.timestamp).toBe('string')
     expect(typeof last?.command).toBe('string')
     expect(typeof last?.duration_ms).toBe('number')
     expect(typeof last?.success).toBe('boolean')
+    expect(last?.schema_version).toBe(2)
+    expect(last?.record_kind).toBe('command')
+    expect(typeof last?.session_id).toBe('string')
     expect(last?.warning_count).toBe(0)
     expect(last?.warning_types).toEqual([])
+    expect(last?.user_source_count).toBe(0)
+    expect(last?.warning_details).toEqual([])
   })
 
   it('emits preview events and summary preview counts for sync preview mode', () => {
@@ -120,6 +119,43 @@ describe.sequential('CLI JSON contract', () => {
       expectSummaryShape(summary)
       expect(summary?.success).toBe(false)
       expect(summary?.error_code).toBe('E_SCHEMA_FRONTMATTER')
+    } finally {
+      fs.rmSync(tempAgentsDir, { recursive: true, force: true })
+    }
+  })
+
+  it('stores warning_details for setup filename conflicts', () => {
+    const home = createTempHome('mantra-contract-warning-details-')
+    homes.push(home)
+    const tempAgentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mantra-warning-agents-'))
+
+    try {
+      fs.writeFileSync(
+        path.join(tempAgentsDir, 'planner.md'),
+        '---\nname: planner\ndescription: Conflict\ntools: []\n---\nBody\n',
+        'utf8',
+      )
+
+      const result = runScript(
+        'setup.ts',
+        ['--json'],
+        home,
+        { MANTRA_USER_AGENTS_DIRS: tempAgentsDir },
+      )
+
+      expect(result.raw.status, `${result.command}\n${result.stderr}`).toBe(0)
+
+      const setupMetric = readTodayMetricRecords(home)
+        .find(record => record.command === 'setup' && record.record_kind === 'command')
+
+      expect(setupMetric?.warning_types).toEqual(['W_SOURCE_CONFLICT_FILENAME'])
+      expect(Array.isArray(setupMetric?.warning_details)).toBe(true)
+      expect((setupMetric?.warning_details as Array<Record<string, unknown>>)[0]).toMatchObject({
+        code: 'W_SOURCE_CONFLICT_FILENAME',
+        target: 'planner.md',
+        winner: 'user',
+        loser: 'core',
+      })
     } finally {
       fs.rmSync(tempAgentsDir, { recursive: true, force: true })
     }

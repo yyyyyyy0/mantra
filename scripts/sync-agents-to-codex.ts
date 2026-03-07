@@ -16,7 +16,7 @@ import {
   writeWarn,
 } from './lib/cli-telemetry'
 import { listContentEntries, type ContentEntry } from './lib/content-entries'
-import { resolveContentSources } from './lib/content-sources'
+import { countUserSources, resolveContentSources } from './lib/content-sources'
 import { buildSkillContent, type CodexFrontmatter } from './lib/codex-utils'
 import { writeAtomic } from './lib/fs-utils'
 import { getProjectMeta } from './lib/project-meta'
@@ -150,9 +150,11 @@ function main(): void {
   const preview = process.argv.includes('--preview')
   const startedAt = Date.now()
   const outputBase = path.join(os.homedir(), '.codex', 'skills', 'mantra')
+  let userSourceCount = 0
 
   try {
     ensureNodeVersion(20)
+    userSourceCount = countUserSources('agents')
 
     const sourceDirs = resolveContentSources('agents')
     if (sourceDirs.length === 0) {
@@ -291,6 +293,7 @@ function main(): void {
             message: f.message,
           })),
         },
+        metricContext: { user_source_count: userSourceCount },
       })
       process.exit(1)
     }
@@ -303,6 +306,7 @@ function main(): void {
       details: preview
         ? { previewed: previewedCount, total: entries.length }
         : { synced: successes.length, total: entries.length },
+      metricContext: { user_source_count: userSourceCount },
     })
   } catch (err) {
     const cliErr = toCliError(err, 'E_INTERNAL')
@@ -313,6 +317,7 @@ function main(): void {
       startedAt,
       success: false,
       error: cliErr,
+      metricContext: { user_source_count: userSourceCount },
     })
     process.exit(1)
   }
