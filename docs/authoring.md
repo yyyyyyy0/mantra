@@ -361,6 +361,15 @@ ls -la ~/.claude/agents/your-agent-name
 - [ ] ツール権限が最小限に抑えられている
 - [ ] 既存の agent/rule と重複していない
 
+## Historical issue docs
+
+issue 固有の closeout/checklist 文書を `docs/` に残す場合は、active backlog と誤認されないよう
+冒頭で `historical` / `archived` ステータスを明示してください。
+
+- closed issue 番号、close date、関連 PR を先頭近くに記載する
+- 未チェック項目が残る場合は、履歴保存用であり current work ではないと明記する
+- これは issue 固有の closeout/checklist artifact に対する運用ルールであり、一般的な docs 全体には適用しない
+
 ---
 
 ## 関連ファイル
