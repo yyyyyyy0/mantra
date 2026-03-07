@@ -287,6 +287,7 @@ function incrementWarningCounts(
   counts: Map<WarningCode, number>,
   record: NormalizedMetricRecord,
 ): void {
+  // v2 rows preserve per-event warning details; legacy rows can only approximate.
   if (record.warning_details.length > 0) {
     for (const detail of record.warning_details) {
       counts.set(detail.code, (counts.get(detail.code) ?? 0) + 1)
