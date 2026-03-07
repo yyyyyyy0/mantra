@@ -1,10 +1,15 @@
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import {
+  type CliErrorCode,
   CliError,
   createMetricSessionId,
   ensureNodeVersion,
   METRIC_SESSION_ID_ENV,
   METRIC_WORKFLOW_ENV,
+  metricsDirectoryPath,
+  type MetricRecord,
   recordMetric,
   toCliError,
   type WorkflowName,
@@ -19,6 +24,45 @@ interface OnboardingArgs {
 interface ScriptInvocation {
   script: string
   args: string[]
+}
+
+function todayMetricsFilePath(): string {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return path.join(metricsDirectoryPath(), `${y}-${m}-${d}.jsonl`)
+}
+
+function readLatestStepErrorCode(sessionId: string): CliErrorCode | undefined {
+  const metricsPath = todayMetricsFilePath()
+  if (!fs.existsSync(metricsPath)) {
+    return undefined
+  }
+
+  const lines = fs.readFileSync(metricsPath, 'utf8')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .reverse()
+
+  for (const line of lines) {
+    try {
+      const record = JSON.parse(line) as MetricRecord
+      if (
+        record.session_id === sessionId
+        && record.record_kind === 'command'
+        && record.success === false
+        && typeof record.error_code === 'string'
+      ) {
+        return record.error_code as CliErrorCode
+      }
+    } catch {
+      // Ignore malformed lines; metrics are best-effort.
+    }
+  }
+
+  return undefined
 }
 
 function parseArgs(argv = process.argv): OnboardingArgs {
@@ -96,13 +140,14 @@ function main(): void {
     })
   } catch (error) {
     const cliErr = toCliError(error)
+    const workflowErrorCode = readLatestStepErrorCode(sessionId) ?? cliErr.code
     writeWarn(args.json, cliErr.message)
     recordMetric({
       timestamp: new Date().toISOString(),
       command: workflow,
       duration_ms: Date.now() - startedAt,
       success: false,
-      error_code: cliErr.code,
+      error_code: workflowErrorCode,
       warning_count: 0,
       warning_types: [],
       schema_version: 2,

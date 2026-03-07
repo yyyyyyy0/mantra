@@ -109,4 +109,25 @@ describe('Onboarding smoke', () => {
     const normalSummary = normalResult.jsonLines.find(line => line.type === 'summary')
     expect(normalSummary?.success).toBe(false)
   })
+
+  it('preserves the failing child error_code in workflow metrics', () => {
+    const home = createTempHome('mantra-smoke-onboarding-error-')
+    homes.push(home)
+    const tempAgentsDir = fs.mkdtempSync(path.join(home, 'invalid-agents-'))
+
+    try {
+      fs.writeFileSync(path.join(tempAgentsDir, 'broken.md'), '# invalid file\n', 'utf8')
+
+      const result = runNpmScript('onboarding:json', home, [], { MANTRA_USER_AGENTS_DIRS: tempAgentsDir })
+      expect(result.raw.status, `${result.command}\n${result.stderr}`).toBe(1)
+
+      const workflowMetric = readTodayMetricRecords(home)
+        .find(record => record.command === 'onboarding' && record.record_kind === 'workflow')
+
+      expect(workflowMetric?.success).toBe(false)
+      expect(workflowMetric?.error_code).toBe('E_SCHEMA_FRONTMATTER')
+    } finally {
+      fs.rmSync(tempAgentsDir, { recursive: true, force: true })
+    }
+  })
 })
