@@ -117,6 +117,17 @@ describe('metrics report contract', () => {
         duration_ms: 'nope',
         success: true,
       }),
+      JSON.stringify({
+        timestamp: `${dateStamp}T00:04:00.000Z`,
+        command: 'typo-kind',
+        duration_ms: 5,
+        success: true,
+        warning_count: 0,
+        warning_types: [],
+        schema_version: 2,
+        record_kind: 'commnad',
+        session_id: 'session-typo',
+      }),
     ])
 
     const result = runNpmScript('metrics:report', home, ['--json'])
@@ -124,7 +135,7 @@ describe('metrics report contract', () => {
 
     const report = result.jsonLines[0] as Record<string, unknown>
     expect(report.type).toBe('metrics_report')
-    expect(report.skipped_records).toBe(2)
+    expect(report.skipped_records).toBe(3)
 
     const workflows = report.workflows as Array<Record<string, unknown>>
     expect(workflows).toEqual([

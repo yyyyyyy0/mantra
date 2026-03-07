@@ -146,6 +146,11 @@ export function normalizeMetricRecord(input: unknown): NormalizedMetricRecord | 
   const warningTypes = Array.isArray(input.warning_types)
     ? input.warning_types.filter((value): value is WarningCode => typeof value === 'string')
     : []
+  const hasRecordKind = Object.hasOwn(input, 'record_kind')
+
+  if (hasRecordKind && input.record_kind !== 'command' && input.record_kind !== 'workflow') {
+    return null
+  }
 
   const normalized: NormalizedMetricRecord = {
     timestamp: input.timestamp,
