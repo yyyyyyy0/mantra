@@ -201,6 +201,7 @@ mantra/
 | `npm run onboarding:full` | セットアップ + 検証 + Codex 同期を一括実行（optional） |
 | `npm run onboarding:json` | onboarding を JSON 出力モードで実行 |
 | `npm run onboarding:full:json` | onboarding:full を JSON 出力モードで実行 |
+| `npm run metrics:report -- --days 7` | 直近メトリクスをローカル集計（`--json` 対応） |
 | `npm run setup -- --force` | 既存の実ディレクトリ/ファイルを `.bak-YYYYMMDDHHmmss` に退避して再作成 |
 | `npm run sync:codex` | agents/rules/templates/examples を Codex へ同期 |
 | `npm run sync:codex:json` | sync を JSON 出力モードで実行 |
@@ -290,6 +291,7 @@ mantra/
 4. ESLint (`npm run lint`)
 5. ユニット/契約テスト + coverage gate の実行 (`npm run test:coverage`)
 6. onboarding スモークテストの実行 (`npm run smoke:onboarding`)
+7. ローカル metrics report の確認 (`npm run metrics:report -- --days 7`)
 
 **Node.js バージョン:**
 - CI 環境: Node.js v20
@@ -367,7 +369,7 @@ cat rules/mob-programming.md
 |-------------|------|
 | [Authoring Guide](./docs/authoring.md) | エージェント・ルールの作成ガイド |
 | [CLI Contract](./docs/cli-contract.md) | `--json` 出力・error_code・終了コードの契約 |
-| [Ops Metrics](./docs/ops-metrics.md) | KPI 定義、計測イベント、集計粒度 |
+| [Ops Metrics](./docs/ops-metrics.md) | KPI 定義、計測イベント、`metrics:report` の集計粒度 |
 | [Troubleshooting](./docs/troubleshooting.md) | `error_code` ごとの復旧手順 |
 | [Mob Programming](#mob-programming実験的-mob-programming-experimental) | 複雑タスク向けオーケストレーション |
 

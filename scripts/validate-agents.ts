@@ -13,7 +13,7 @@ import {
   writeWarn,
 } from './lib/cli-telemetry'
 import { listContentEntries } from './lib/content-entries'
-import { resolveContentSources } from './lib/content-sources'
+import { countUserSources, resolveContentSources } from './lib/content-sources'
 import { selectSummaryErrorCode } from './lib/validation-summary'
 
 interface ParsedAgent {
@@ -39,9 +39,11 @@ function parseAgentFrontmatter(content: string): ParsedAgent {
 function main(): void {
   const json = hasJsonFlag(process.argv)
   const startedAt = Date.now()
+  let userSourceCount = 0
 
   try {
     ensureNodeVersion(20)
+    userSourceCount = countUserSources('agents')
 
     const sourceDirs = resolveContentSources('agents')
     if (sourceDirs.length === 0) {
@@ -116,6 +118,7 @@ function main(): void {
         success: false,
         error: new CliError(`${errors} 件のエラーが見つかりました`, summaryErrorCode, false),
         details: { checked: entries.length, errors },
+        metricContext: { user_source_count: userSourceCount },
       })
       process.exit(1)
     }
@@ -127,6 +130,7 @@ function main(): void {
       startedAt,
       success: true,
       details: { checked: entries.length, errors: 0 },
+      metricContext: { user_source_count: userSourceCount },
     })
   } catch (err) {
     const cliErr = toCliError(err, 'E_INTERNAL')
@@ -137,6 +141,7 @@ function main(): void {
       startedAt,
       success: false,
       error: cliErr,
+      metricContext: { user_source_count: userSourceCount },
     })
     process.exit(1)
   }

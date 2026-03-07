@@ -11,7 +11,7 @@ import {
   writeInfo,
   type WarningEvent,
 } from './cli-telemetry'
-import { type ContentKind, hasUserSources } from './content-sources'
+import { countUserSources, type ContentKind, hasUserSources } from './content-sources'
 import {
   buildMergedDirectory,
   coreDirectory,
@@ -91,9 +91,11 @@ export function buildSetupLinks(json: boolean): SetupLinkPlan {
 export function runSetup(args: SetupArgs): void {
   const { force, json } = args
   const startedAt = Date.now()
+  let userSourceCount = 0
 
   try {
     ensureNodeVersion(20)
+    userSourceCount = countUserSources(['agents', 'rules', 'templates', 'examples'])
     const { links, mergedKinds, warnings } = buildSetupLinks(json)
 
     for (const link of links) {
@@ -130,6 +132,7 @@ export function runSetup(args: SetupArgs): void {
           })),
         },
         warnings,
+        metricContext: { user_source_count: userSourceCount },
       })
       process.exit(1)
     }
@@ -148,6 +151,7 @@ export function runSetup(args: SetupArgs): void {
         merged: mergedKinds,
       },
       warnings,
+      metricContext: { user_source_count: userSourceCount },
     })
   } catch (error) {
     const cliErr = toCliError(error)
@@ -158,6 +162,7 @@ export function runSetup(args: SetupArgs): void {
       startedAt,
       success: false,
       error: cliErr,
+      metricContext: { user_source_count: userSourceCount },
     })
     process.exit(1)
   }

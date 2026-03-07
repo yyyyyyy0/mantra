@@ -93,3 +93,16 @@ export function todayMetricsPath(homeDir: string): string {
   const d = String(now.getDate()).padStart(2, '0')
   return path.join(homeDir, '.mantra', 'metrics', `${y}-${m}-${d}.jsonl`)
 }
+
+export function readTodayMetricRecords(homeDir: string): Array<Record<string, unknown>> {
+  const metricsPath = todayMetricsPath(homeDir)
+  if (!fs.existsSync(metricsPath)) {
+    return []
+  }
+
+  return fs.readFileSync(metricsPath, 'utf8')
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map(line => JSON.parse(line) as Record<string, unknown>)
+}

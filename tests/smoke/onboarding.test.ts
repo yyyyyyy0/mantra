@@ -3,6 +3,7 @@ import * as path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   createTempHome,
+  readTodayMetricRecords,
   removeTempHome,
   runScript,
   runNpmScript,
@@ -32,16 +33,20 @@ describe('Onboarding smoke', () => {
 
     const metricsPath = todayMetricsPath(home)
     expect(fs.existsSync(metricsPath)).toBe(true)
-    const records = fs
-      .readFileSync(metricsPath, 'utf8')
-      .trim()
-      .split('\n')
-      .map(line => JSON.parse(line) as Record<string, unknown>)
-    expect(records.length).toBeGreaterThanOrEqual(4)
-    expect(records.some(r => r.command === 'setup')).toBe(true)
-    expect(records.some(r => r.command === 'validate:agents')).toBe(true)
-    expect(records.some(r => r.command === 'validate:rules')).toBe(true)
-    expect(records.some(r => r.command === 'validate:drift')).toBe(true)
+    const records = readTodayMetricRecords(home)
+    expect(records.length).toBeGreaterThanOrEqual(5)
+    expect(records.some(r => r.command === 'setup' && r.record_kind === 'command')).toBe(true)
+    expect(records.some(r => r.command === 'validate:agents' && r.record_kind === 'command')).toBe(true)
+    expect(records.some(r => r.command === 'validate:rules' && r.record_kind === 'command')).toBe(true)
+    expect(records.some(r => r.command === 'validate:drift' && r.record_kind === 'command')).toBe(true)
+    expect(records.some(r => r.command === 'onboarding' && r.record_kind === 'workflow')).toBe(true)
+
+    const sessionIds = new Set(
+      records
+        .map(record => record.session_id)
+        .filter((value): value is string => typeof value === 'string' && value.length > 0),
+    )
+    expect(sessionIds.size).toBe(1)
   })
 
   it('completes setup -> validate -> sync flow in a fresh HOME (onboarding:full)', { timeout: 20_000 }, () => {
@@ -53,20 +58,24 @@ describe('Onboarding smoke', () => {
 
     const metricsPath = todayMetricsPath(home)
     expect(fs.existsSync(metricsPath)).toBe(true)
-    const records = fs
-      .readFileSync(metricsPath, 'utf8')
-      .trim()
-      .split('\n')
-      .map(line => JSON.parse(line) as Record<string, unknown>)
-    expect(records.length).toBeGreaterThanOrEqual(8)
-    expect(records.some(r => r.command === 'setup')).toBe(true)
-    expect(records.some(r => r.command === 'validate:agents')).toBe(true)
-    expect(records.some(r => r.command === 'validate:rules')).toBe(true)
-    expect(records.some(r => r.command === 'validate:drift')).toBe(true)
-    expect(records.some(r => r.command === 'sync:codex:agents')).toBe(true)
-    expect(records.some(r => r.command === 'sync:codex:rules')).toBe(true)
-    expect(records.some(r => r.command === 'sync:codex:templates')).toBe(true)
-    expect(records.some(r => r.command === 'sync:codex:examples')).toBe(true)
+    const records = readTodayMetricRecords(home)
+    expect(records.length).toBeGreaterThanOrEqual(9)
+    expect(records.some(r => r.command === 'setup' && r.record_kind === 'command')).toBe(true)
+    expect(records.some(r => r.command === 'validate:agents' && r.record_kind === 'command')).toBe(true)
+    expect(records.some(r => r.command === 'validate:rules' && r.record_kind === 'command')).toBe(true)
+    expect(records.some(r => r.command === 'validate:drift' && r.record_kind === 'command')).toBe(true)
+    expect(records.some(r => r.command === 'sync:codex:agents' && r.record_kind === 'command')).toBe(true)
+    expect(records.some(r => r.command === 'sync:codex:rules' && r.record_kind === 'command')).toBe(true)
+    expect(records.some(r => r.command === 'sync:codex:templates' && r.record_kind === 'command')).toBe(true)
+    expect(records.some(r => r.command === 'sync:codex:examples' && r.record_kind === 'command')).toBe(true)
+    expect(records.some(r => r.command === 'onboarding:full' && r.record_kind === 'workflow')).toBe(true)
+
+    const sessionIds = new Set(
+      records
+        .map(record => record.session_id)
+        .filter((value): value is string => typeof value === 'string' && value.length > 0),
+    )
+    expect(sessionIds.size).toBe(1)
   })
 
   it('requires --force to overwrite existing destination paths and succeeds with --force', () => {
@@ -99,5 +108,26 @@ describe('Onboarding smoke', () => {
 
     const normalSummary = normalResult.jsonLines.find(line => line.type === 'summary')
     expect(normalSummary?.success).toBe(false)
+  })
+
+  it('preserves the failing child error_code in workflow metrics', () => {
+    const home = createTempHome('mantra-smoke-onboarding-error-')
+    homes.push(home)
+    const tempAgentsDir = fs.mkdtempSync(path.join(home, 'invalid-agents-'))
+
+    try {
+      fs.writeFileSync(path.join(tempAgentsDir, 'broken.md'), '# invalid file\n', 'utf8')
+
+      const result = runNpmScript('onboarding:json', home, [], { MANTRA_USER_AGENTS_DIRS: tempAgentsDir })
+      expect(result.raw.status, `${result.command}\n${result.stderr}`).toBe(1)
+
+      const workflowMetric = readTodayMetricRecords(home)
+        .find(record => record.command === 'onboarding' && record.record_kind === 'workflow')
+
+      expect(workflowMetric?.success).toBe(false)
+      expect(workflowMetric?.error_code).toBe('E_SCHEMA_FRONTMATTER')
+    } finally {
+      fs.rmSync(tempAgentsDir, { recursive: true, force: true })
+    }
   })
 })
