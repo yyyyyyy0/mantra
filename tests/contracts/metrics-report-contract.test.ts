@@ -9,6 +9,13 @@ function writeMetricsFile(home: string, filename: string, lines: string[]): void
   fs.writeFileSync(path.join(metricsDir, filename), `${lines.join('\n')}\n`, 'utf8')
 }
 
+function currentMetricsDateStamp(now = new Date()): string {
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 describe('metrics report contract', () => {
   const homes: string[] = []
 
@@ -39,10 +46,11 @@ describe('metrics report contract', () => {
   it('parses mixed v1/v2 records and skips malformed lines without failing', () => {
     const home = createTempHome('mantra-metrics-mixed-')
     homes.push(home)
+    const dateStamp = currentMetricsDateStamp()
 
-    writeMetricsFile(home, '2026-03-07.jsonl', [
+    writeMetricsFile(home, `${dateStamp}.jsonl`, [
       JSON.stringify({
-        timestamp: '2026-03-07T00:00:00.000Z',
+        timestamp: `${dateStamp}T00:00:00.000Z`,
         command: 'validate:agents',
         duration_ms: 10,
         success: true,
@@ -50,7 +58,7 @@ describe('metrics report contract', () => {
         warning_types: [],
       }),
       JSON.stringify({
-        timestamp: '2026-03-07T00:01:00.000Z',
+        timestamp: `${dateStamp}T00:01:00.000Z`,
         command: 'setup',
         duration_ms: 25,
         success: true,
@@ -83,7 +91,7 @@ describe('metrics report contract', () => {
         ],
       }),
       JSON.stringify({
-        timestamp: '2026-03-07T00:01:30.000Z',
+        timestamp: `${dateStamp}T00:01:30.000Z`,
         command: 'setup',
         duration_ms: 15,
         success: true,
@@ -91,7 +99,7 @@ describe('metrics report contract', () => {
         warning_types: ['W_SOURCE_CONFLICT_FILENAME'],
       }),
       JSON.stringify({
-        timestamp: '2026-03-07T00:02:00.000Z',
+        timestamp: `${dateStamp}T00:02:00.000Z`,
         command: 'onboarding',
         duration_ms: 50,
         success: true,
@@ -104,7 +112,7 @@ describe('metrics report contract', () => {
       }),
       '{ bad json',
       JSON.stringify({
-        timestamp: '2026-03-07T00:03:00.000Z',
+        timestamp: `${dateStamp}T00:03:00.000Z`,
         command: 'broken',
         duration_ms: 'nope',
         success: true,
