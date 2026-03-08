@@ -38,6 +38,44 @@
 - スキーマ系（`validate:agents` は `E_SCHEMA_FRONTMATTER`、`validate:rules` は `E_SCHEMA_RULE`）
 - その他のエラーコード（検出順の先頭）
 
+### onboarding workflow 契約
+
+`npm run onboarding:json` / `npm run onboarding:full:json` は、child command の JSON Lines をそのまま流しつつ、最後に workflow-level の `type: "summary"` を 1 行出力します。
+
+```json
+{
+  "type": "summary",
+  "command": "onboarding",
+  "success": true,
+  "duration_ms": 1234,
+  "details": {
+    "steps": ["setup", "validate"],
+    "full": false
+  }
+}
+```
+
+```json
+{
+  "type": "summary",
+  "command": "onboarding:full",
+  "success": false,
+  "duration_ms": 456,
+  "error_code": "E_SCHEMA_FRONTMATTER",
+  "retryable": false,
+  "details": {
+    "steps": ["setup", "validate", "sync"],
+    "full": true
+  }
+}
+```
+
+- 最後の JSON Lines event は workflow-level summary
+- success 時は `details.steps` と `details.full` を含む
+- `details.steps` は logical step 名（`setup` / `validate` / `sync`）を使う
+- failure 時は failing child command の `error_code` を可能な限り引き継ぐ
+- child stdout はパースせず、そのまま継承する
+
 ### ファイル単位イベント（任意）
 
 - `type: "validated"`: validate 系でのファイル検証成功

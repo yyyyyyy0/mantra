@@ -6,11 +6,11 @@ import {
   CliError,
   createMetricSessionId,
   ensureNodeVersion,
+  finishCommand,
   METRIC_SESSION_ID_ENV,
   METRIC_WORKFLOW_ENV,
   metricsDirectoryPath,
   type MetricRecord,
-  recordMetric,
   toCliError,
   type WorkflowName,
   writeWarn,
@@ -24,6 +24,13 @@ interface OnboardingArgs {
 interface ScriptInvocation {
   script: string
   args: string[]
+}
+
+function workflowDetails(args: OnboardingArgs): Record<string, unknown> {
+  return {
+    steps: args.full ? ['setup', 'validate', 'sync'] : ['setup', 'validate'],
+    full: args.full,
+  }
 }
 
 function todayMetricsFilePath(): string {
@@ -126,34 +133,34 @@ function main(): void {
       runStep(step, env)
     }
 
-    recordMetric({
-      timestamp: new Date().toISOString(),
+    finishCommand({
       command: workflow,
-      duration_ms: Date.now() - startedAt,
+      json: args.json,
+      startedAt,
       success: true,
-      warning_count: 0,
-      warning_types: [],
-      schema_version: 2,
-      record_kind: 'workflow',
-      session_id: sessionId,
-      workflow,
+      details: workflowDetails(args),
+      metricContext: {
+        session_id: sessionId,
+        workflow,
+      },
+      metricRecordKind: 'workflow',
     })
   } catch (error) {
     const cliErr = toCliError(error)
     const workflowErrorCode = readLatestStepErrorCode(sessionId) ?? cliErr.code
     writeWarn(args.json, cliErr.message)
-    recordMetric({
-      timestamp: new Date().toISOString(),
+    finishCommand({
       command: workflow,
-      duration_ms: Date.now() - startedAt,
+      json: args.json,
+      startedAt,
       success: false,
-      error_code: workflowErrorCode,
-      warning_count: 0,
-      warning_types: [],
-      schema_version: 2,
-      record_kind: 'workflow',
-      session_id: sessionId,
-      workflow,
+      error: new CliError(cliErr.message, workflowErrorCode, cliErr.retryable),
+      details: workflowDetails(args),
+      metricContext: {
+        session_id: sessionId,
+        workflow,
+      },
+      metricRecordKind: 'workflow',
     })
     process.exit(1)
   }

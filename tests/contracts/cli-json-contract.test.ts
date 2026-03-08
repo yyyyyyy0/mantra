@@ -6,6 +6,7 @@ import {
   createTempHome,
   removeTempHome,
   readTodayMetricRecords,
+  runNpmScript,
   runScript,
 } from '../helpers/cli-runner'
 
@@ -155,6 +156,61 @@ describe.sequential('CLI JSON contract', () => {
         target: 'planner.md',
         winner: 'user',
         loser: 'core',
+      })
+    } finally {
+      fs.rmSync(tempAgentsDir, { recursive: true, force: true })
+    }
+  })
+
+  it('emits a final workflow summary for onboarding wrappers', { timeout: 20_000 }, () => {
+    const scripts = [
+      { script: 'onboarding:json', command: 'onboarding', steps: ['setup', 'validate'], full: false },
+      { script: 'onboarding:full:json', command: 'onboarding:full', steps: ['setup', 'validate', 'sync'], full: true },
+    ] as const
+
+    for (const item of scripts) {
+      const home = createTempHome('mantra-contract-onboarding-')
+      homes.push(home)
+      const result = runNpmScript(item.script, home)
+      expect(result.raw.status, `${result.command}\n${result.stderr}`).toBe(0)
+
+      const summary = result.jsonLines.at(-1)
+      expectSummaryShape(summary)
+      expect(summary?.command).toBe(item.command)
+      expect(summary?.success).toBe(true)
+      expect(summary?.details).toEqual({
+        steps: item.steps,
+        full: item.full,
+      })
+    }
+  })
+
+  it('emits a failing workflow summary for onboarding json mode with child error_code', () => {
+    const home = createTempHome('mantra-contract-onboarding-error-')
+    homes.push(home)
+    const tempAgentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mantra-invalid-onboarding-agents-'))
+
+    try {
+      fs.writeFileSync(path.join(tempAgentsDir, 'broken.md'), '# invalid file\n', 'utf8')
+
+      const result = runNpmScript(
+        'onboarding:json',
+        home,
+        [],
+        { MANTRA_USER_AGENTS_DIRS: tempAgentsDir },
+      )
+
+      expect(result.raw.status, `${result.command}\n${result.stderr}`).toBe(1)
+
+      const summary = result.jsonLines.at(-1)
+      expectSummaryShape(summary)
+      expect(summary?.command).toBe('onboarding')
+      expect(summary?.success).toBe(false)
+      expect(summary?.error_code).toBe('E_SCHEMA_FRONTMATTER')
+      expect(summary?.retryable).toBe(false)
+      expect(summary?.details).toEqual({
+        steps: ['setup', 'validate'],
+        full: false,
       })
     } finally {
       fs.rmSync(tempAgentsDir, { recursive: true, force: true })
