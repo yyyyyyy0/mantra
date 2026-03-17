@@ -23,6 +23,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:unit": "vitest run tests/agents.test.ts tests/rules.test.ts tests/contracts tests/setup-fs.test.ts tests/setup-merge.test.ts tests/setup-orchestrator.test.ts",
+    "verify": "npm run validate && npm run typecheck && npm run lint && npm run test:unit",
     "test:coverage": "vitest run --coverage tests/agents.test.ts tests/rules.test.ts tests/contracts tests/setup-fs.test.ts tests/setup-merge.test.ts tests/setup-orchestrator.test.ts",
     "smoke:onboarding": "vitest run tests/smoke/onboarding.test.ts",
     "validate:agents": "tsx scripts/validate-agents.ts",

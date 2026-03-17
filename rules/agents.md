@@ -56,6 +56,24 @@ Use this sequence:
 Suggested escalation:
 - `single-agent` → `planner` (if P1) → `replan` (if P2) → `mob-navigator`/`mob-critic`/`mob-scribe` (if P3) → `code-reviewer` (if P4)
 
+## Plan / Execute Split
+
+Keep planning and execution separate when:
+
+- work spans 3+ implementation steps
+- change touches multiple files and alters behavior
+- auth / migration / billing / data-loss risk exists
+- rollback is hard
+
+In those cases:
+
+- use a planner first
+- keep `AGENTS.md` thin and point to SSOT docs instead of embedding long playbooks
+- expose one canonical verify command and one test ladder per repo
+
+See [docs/harness-engineering.md](../docs/harness-engineering.md) and
+[templates/repo-agents-pointer.md](../templates/repo-agents-pointer.md).
+
 ## Parallel Task Execution
 
 ALWAYS use parallel Task execution for independent operations:
