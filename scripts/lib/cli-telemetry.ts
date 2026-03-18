@@ -256,6 +256,7 @@ export function finishCommand(params: {
   details?: Record<string, unknown>
   warnings?: WarningEvent[]
   metricContext?: MetricContext
+  metricRecordKind?: MetricRecordKind
 }): void {
   const duration = Date.now() - params.startedAt
   const warnings = params.warnings ?? []
@@ -289,7 +290,7 @@ export function finishCommand(params: {
     warning_count: warnings.length,
     warning_types: warningCodes,
     schema_version: 2,
-    record_kind: 'command',
+    record_kind: params.metricRecordKind ?? 'command',
     session_id: metricContext.session_id,
     workflow: metricContext.workflow,
     user_source_count: metricContext.user_source_count,

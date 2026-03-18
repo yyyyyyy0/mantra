@@ -291,7 +291,6 @@ mantra/
 4. ESLint (`npm run lint`)
 5. ユニット/契約テスト + coverage gate の実行 (`npm run test:coverage`)
 6. onboarding スモークテストの実行 (`npm run smoke:onboarding`)
-7. ローカル metrics report の確認 (`npm run metrics:report -- --days 7`)
 
 **Node.js バージョン:**
 - CI 環境: Node.js v20
