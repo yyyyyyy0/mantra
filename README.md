@@ -218,9 +218,27 @@ mantra/
 | `npm run validate:drift` | `drift_guard.enabled: true` の family drift を検証 |
 | `npm run typecheck` | scripts/tests の TypeScript 型検査 |
 | `npm run lint` | scripts/tests の ESLint チェック（warning も fail） |
+| `npm run verify` | canonical verify（validate + typecheck + lint + unit/contract） |
 | `npm run test:unit` | ユニット + 契約テストの実行 |
 | `npm run test:coverage` | ユニット + 契約テストを coverage gate（80%）付きで実行 |
 | `npm run smoke:onboarding` | onboarding フローのスモークテスト |
+
+## Harness Engineering / MVH
+
+repo 横断の最小実行可能ハーネス（MVH: Minimum Viable Harness）の正本は次を参照します。
+
+- [docs/harness-engineering.md](./docs/harness-engineering.md)
+- [templates/repo-agents-pointer.md](./templates/repo-agents-pointer.md)
+- [templates/repo-pre-push.example.sh](./templates/repo-pre-push.example.sh)
+- [templates/repo-obsidian-ledger.md](./templates/repo-obsidian-ledger.md)
+
+このセットで定義する内容:
+
+- 1画面で読めるポインタ型 `AGENTS.md`
+- repo ごとに 1 本へ寄せる canonical verify command
+- unit / visual / acceptance の test ladder
+- PreToolUse / PostToolUse / Stop と repo hook の役割分担
+- `maw handover/takeover` と Obsidian ledger を使う継続契約
 
 ### 導線ガイド / Execution guidance
 
