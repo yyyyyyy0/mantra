@@ -2,20 +2,19 @@
 
 ## Model Selection Strategy
 
-**Haiku 4.5** (90% of Sonnet capability, 3x cost savings):
-- Lightweight agents with frequent invocation
-- Pair programming and code generation
-- Worker agents in multi-agent systems
+**Codex**（コード生成全般のデフォルト）:
+- 実装・ボイラープレート・scaffold・テスト生成・コードレビュー補助
+- `mcp__codex__codex` ツールを使って委譲
 
-**Sonnet 4.5** (Best coding model):
-- Main development work
-- Orchestrating multi-agent workflows
-- Complex coding tasks
+**Sonnet 4.6**（コード以外のサブエージェント）:
+- 調査・検索・ドキュメント生成・非コード分析
+- Agent tool で spawn する際は `model: "sonnet"` を指定
 
-**Opus 4.5** (Deepest reasoning):
-- Complex architectural decisions
-- Maximum reasoning requirements
-- Research and analysis tasks
+**Opus 4.6**（重い思考が必要な場合のみ）:
+- 複雑なアーキテクチャ決定
+- plan-mob / flash-mob のオーケストレーター
+- 深い推論が必要な調査・分析
+- Agent tool で spawn する際は `model: "opus"` を明示指定
 
 ## Context Window Management
 
