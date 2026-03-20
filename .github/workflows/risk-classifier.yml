@@ -1,0 +1,165 @@
+name: Risk Classification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    branches: [main]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    outputs:
+      risk-level: ${{ steps.classify.outputs.risk-level }}
+    steps:
+      - name: Checkout base branch config
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.base_ref }}
+          sparse-checkout: .github/risk-paths.json
+          path: base-config
+
+      - name: Get changed files
+        id: changed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Invalid PR number" >&2
+            exit 1
+          fi
+          FILES=$(gh pr diff "$PR_NUMBER" --name-only)
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$FILES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Load risk paths config
+        id: config
+        run: |
+          CONFIG_PATH="base-config/.github/risk-paths.json"
+          if [ ! -f "$CONFIG_PATH" ]; then
+            echo "No project-level risk-paths.json found, using defaults"
+            CONFIG_PATH=""
+          fi
+          echo "config-path=$CONFIG_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Classify risk level
+        id: classify
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          CHANGED_FILES: ${{ steps.changed.outputs.files }}
+          CONFIG_PATH: ${{ steps.config.outputs.config-path }}
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Load config
+            let config;
+            const configPath = process.env.CONFIG_PATH;
+            if (configPath) {
+              config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            } else {
+              config = {
+                highRiskPaths: [
+                  '**/auth/**', '**/session/**', '**/migrations/**',
+                  '.github/**', '**/billing/**', '**/payment/**',
+                  '**/infra/**', '**/Dockerfile', 'Dockerfile',
+                  '**/docker-compose*.yml', 'docker-compose*.yml',
+                  '**/*.tf', '**/*.tfvars', '**/security/**',
+                  '**/.env*', '**/secrets/**'
+                ],
+                lowRiskOnlyPaths: {
+                  docs: ['*.md', 'docs/**', 'LICENSE', 'CHANGELOG*'],
+                  tests: ['tests/**', '**/*.test.*', '**/*.spec.*', '__tests__/**'],
+                  generated: ['**/generated/**', '**/*.gen.*', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml']
+                },
+                lowRiskLabels: ['dependencies', 'dependabot', 'renovate']
+              };
+            }
+
+            const files = process.env.CHANGED_FILES.trim().split('\n').filter(Boolean);
+            const fileCount = files.length;
+            const prLabels = context.payload.pull_request.labels.map(l => l.name);
+
+            // Handle empty file list
+            if (fileCount === 0) {
+              core.setOutput('risk-level', 'medium');
+              core.info('Risk: MEDIUM - no changed files detected (unexpected state)');
+              return;
+            }
+
+            // Glob matching: escape regex metacharacters first, then expand glob tokens
+            function matchesGlob(file, pattern) {
+              const regex = pattern
+                .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // escape regex metacharacters
+                .replace(/\\\*\\\*/g, '{{GLOBSTAR}}')    // preserve ** (now escaped as \*\*)
+                .replace(/\\\*/g, '[^/]*')               // * -> [^/]*
+                .replace(/\{\{GLOBSTAR\}\}/g, '.*')      // ** -> .*
+                .replace(/\\\?/g, '.');                   // ? -> .
+              return new RegExp(`^${regex}$`).test(file);
+            }
+
+            function matchesAny(file, patterns) {
+              return patterns.some(p => matchesGlob(file, p));
+            }
+
+            // Check for high-risk paths
+            const hasHighRisk = files.some(f => matchesAny(f, config.highRiskPaths));
+            if (hasHighRisk) {
+              core.setOutput('risk-level', 'high');
+              core.info('Risk: HIGH - contains high-risk paths');
+              return;
+            }
+
+            // Check for low-risk labels (exact match)
+            const hasLowRiskLabel = prLabels.some(l =>
+              config.lowRiskLabels.some(ll => l.toLowerCase() === ll.toLowerCase())
+            );
+
+            // Check if ALL files are low-risk-only
+            const allLowRiskPaths = Object.values(config.lowRiskOnlyPaths).flat();
+            const allFilesLowRisk = files.every(f => matchesAny(f, allLowRiskPaths));
+
+            if (allFilesLowRisk || hasLowRiskLabel) {
+              core.setOutput('risk-level', 'low');
+              core.info('Risk: LOW - docs/tests/generated/deps only');
+              return;
+            }
+
+            // Default: medium
+            core.setOutput('risk-level', 'medium');
+            core.info(`Risk: MEDIUM - ${fileCount} file(s), no high-risk paths`);
+
+      - name: Apply risk label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RISK_LEVEL: ${{ steps.classify.outputs.risk-level }}
+        run: |
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Invalid PR number" >&2
+            exit 1
+          fi
+
+          # Remove existing risk labels
+          for label in risk:low risk:medium risk:high; do
+            gh pr edit "$PR_NUMBER" --remove-label "$label" 2>/dev/null || true
+          done
+
+          # Determine label color
+          case "$RISK_LEVEL" in
+            low)    COLOR="0e8a16" ;;
+            medium) COLOR="fbca04" ;;
+            high)   COLOR="d93f0b" ;;
+            *)      COLOR="cccccc" ;;
+          esac
+
+          # Ensure label exists and apply
+          gh label create "risk:${RISK_LEVEL}" --force --color "$COLOR" \
+            --description "Auto-classified risk level" 2>/dev/null || true
+          gh pr edit "$PR_NUMBER" --add-label "risk:${RISK_LEVEL}"
+          echo "Applied label: risk:${RISK_LEVEL}"
