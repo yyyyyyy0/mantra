@@ -5,6 +5,8 @@ export interface CodexFrontmatter {
   description: string
   license: string
   compatibility: string
+  allowed_tools?: string[]
+  model?: string
   metadata: {
     author: string
     version: string

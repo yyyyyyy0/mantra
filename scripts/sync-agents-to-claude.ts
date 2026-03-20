@@ -84,7 +84,7 @@ function parseAgentFile(content: string): ParsedAgent {
 }
 
 function convertFrontmatter(
-  src: Pick<AgentFrontmatter, 'name' | 'description'>,
+  src: Pick<AgentFrontmatter, 'name' | 'description' | 'tools' | 'model'>,
   metadataVersion: string,
   metadataLicense: string,
 ): CodexFrontmatter {
@@ -93,6 +93,8 @@ function convertFrontmatter(
     description: src.description,
     license: metadataLicense,
     compatibility: 'Works with any codebase',
+    ...(src.tools && src.tools.length > 0 ? { allowed_tools: src.tools } : {}),
+    ...(src.model != null ? { model: src.model } : {}),
     metadata: {
       author: 'mantra-project',
       version: metadataVersion,
@@ -149,7 +151,7 @@ function main(): void {
   const json = hasJsonFlag(process.argv)
   const preview = process.argv.includes('--preview')
   const startedAt = Date.now()
-  const outputBase = path.join(os.homedir(), '.claude', 'skills', 'mantra')
+  const outputBase = path.join(os.homedir(), '.claude', 'skills')
   let userSourceCount = 0
 
   try {
@@ -222,7 +224,7 @@ function main(): void {
         }
 
         const codexFm = convertFrontmatter(
-          { name: input.name, description: input.description },
+          { name: input.name, description: input.description, tools: input.tools, model: input.model },
           projectMeta.version,
           projectMeta.license,
         )

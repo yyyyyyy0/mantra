@@ -23,7 +23,7 @@
     "sync:claude:agents": "tsx scripts/sync-agents-to-claude.ts",
     "sync:claude:rules": "tsx scripts/sync-rules-to-claude.ts",
     "sync:claude:preview": "npm run sync:claude:agents -- --preview && npm run sync:claude:rules -- --preview",
-    "onboarding:claude": "tsx scripts/onboarding.ts && tsx scripts/sync-agents-to-claude.ts && tsx scripts/sync-rules-to-claude.ts",
+    "onboarding:claude": "npm run onboarding && npm run sync:claude",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint \"scripts/**/*.ts\" \"tests/**/*.ts\" --max-warnings=0",
     "test": "vitest",
