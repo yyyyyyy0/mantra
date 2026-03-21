@@ -95,14 +95,25 @@ jobs:
               return;
             }
 
-            // Glob matching: escape regex metacharacters first, then expand glob tokens
+            // Glob matching: character-by-character parser
             function matchesGlob(file, pattern) {
-              const regex = pattern
-                .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // escape regex metacharacters
-                .replace(/\\\*\\\*/g, '{{GLOBSTAR}}')    // preserve ** (now escaped as \*\*)
-                .replace(/\\\*/g, '[^/]*')               // * -> [^/]*
-                .replace(/\{\{GLOBSTAR\}\}/g, '.*')      // ** -> .*
-                .replace(/\\\?/g, '.');                   // ? -> .
+              let regex = '';
+              for (let i = 0; i < pattern.length; i++) {
+                const c = pattern[i];
+                if (c === '*' && pattern[i + 1] === '*') {
+                  regex += '.*';
+                  i += 1; // skip second *
+                  if (pattern[i + 1] === '/') i += 1; // skip trailing /
+                } else if (c === '*') {
+                  regex += '[^/]*';
+                } else if (c === '?') {
+                  regex += '.';
+                } else if ('.+^${}()|[]\\'.includes(c)) {
+                  regex += '\\' + c;
+                } else {
+                  regex += c;
+                }
+              }
               return new RegExp(`^${regex}$`).test(file);
             }
 
