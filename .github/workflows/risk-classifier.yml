@@ -138,10 +138,27 @@ jobs:
             const allLowRiskPaths = Object.values(config.lowRiskOnlyPaths).flat();
             const allFilesLowRisk = files.every(f => matchesAny(f, allLowRiskPaths));
 
-            if (allFilesLowRisk || hasLowRiskLabel) {
+            if (allFilesLowRisk) {
               core.setOutput('risk-level', 'low');
-              core.info('Risk: LOW - docs/tests/generated/deps only');
+              core.info('Risk: LOW - all files match low-risk-only paths');
               return;
+            }
+
+            // Dependency labels only qualify as low-risk when all files are lock/config files
+            if (hasLowRiskLabel) {
+              const depSafePaths = [
+                'package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
+                'Gemfile', 'Gemfile.lock', 'go.mod', 'go.sum',
+                'Cargo.toml', 'Cargo.lock', 'requirements.txt', 'poetry.lock',
+                'composer.json', 'composer.lock'
+              ];
+              const allFilesDep = files.every(f => depSafePaths.includes(f) || matchesAny(f, allLowRiskPaths));
+              if (allFilesDep) {
+                core.setOutput('risk-level', 'low');
+                core.info('Risk: LOW - dependency update with safe file changes only');
+                return;
+              }
+              core.info('Dependency label present but files extend beyond safe paths, not auto-classifying as low');
             }
 
             // Default: medium

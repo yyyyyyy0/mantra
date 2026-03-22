@@ -8,8 +8,11 @@ on:
   # Trigger when review status changes
   pull_request_review:
     types: [submitted]
-  # Trigger when status checks complete
+  # Trigger when commit statuses complete (ai-review/critical-findings)
   status: {}
+  # Trigger when GitHub Actions check runs complete (validate job etc.)
+  check_suite:
+    types: [completed]
 
 permissions:
   pull-requests: write
@@ -25,11 +28,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVENT_NAME: ${{ github.event_name }}
           PR_NUMBER_EVENT: ${{ github.event.pull_request.number }}
-          COMMIT_SHA: ${{ github.event.commit.sha }}
+          COMMIT_SHA_STATUS: ${{ github.event.commit.sha }}
+          COMMIT_SHA_CHECK: ${{ github.event.check_suite.head_sha }}
         run: |
-          if [ "$EVENT_NAME" = "status" ]; then
+          if [ "$EVENT_NAME" = "status" ] || [ "$EVENT_NAME" = "check_suite" ]; then
             # Find PRs associated with this commit
-            PR_NUMBER=$(gh api "repos/${{ github.repository }}/commits/${COMMIT_SHA}/pulls" \
+            SHA="${COMMIT_SHA_STATUS:-$COMMIT_SHA_CHECK}"
+            PR_NUMBER=$(gh api "repos/${{ github.repository }}/commits/${SHA}/pulls" \
               --jq '.[0].number' 2>/dev/null || echo "")
           else
             PR_NUMBER="$PR_NUMBER_EVENT"
