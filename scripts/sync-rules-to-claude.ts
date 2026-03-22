@@ -126,7 +126,7 @@ function main(): void {
         seenNames.add(input.name)
 
         if (preview) {
-          writeInfo(json, `~ preview ${input.name}`)
+          writeInfo(json, `~ preview ${input.name}\n${input.generated.claude}`)
           writeJsonLine(json, {
             type: 'preview_base',
             command: 'sync:claude:rules',

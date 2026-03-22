@@ -189,7 +189,11 @@ function main(): void {
         seenNames.add(input.name)
 
         if (preview) {
-          writeInfo(json, `~ preview ${input.name}`)
+          const previewContent = buildAgentContent(
+            { name: input.name, description: input.description, tools: input.tools, model: input.model },
+            input.generated.claude,
+          )
+          writeInfo(json, `~ preview ${input.name}\n${previewContent}`)
           writeJsonLine(json, {
             type: 'preview_base',
             command: 'sync:claude:agents',

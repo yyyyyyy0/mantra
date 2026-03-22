@@ -41,12 +41,11 @@ const RULE_TRIGGER_MAP: Record<string, string> = {
 }
 
 export function buildRuleDescription(name: string, content: string): string {
-  if (RULE_TRIGGER_MAP[name]) {
-    return RULE_TRIGGER_MAP[name]
-  }
   const h1 = extractH1(content)
-  const base = h1 ?? humanizeName(name)
-  return `Apply ${base.toLowerCase()} rules when relevant to the current task`
+  if (h1) {
+    return `Apply ${h1.toLowerCase()} rules when relevant to the current task`
+  }
+  return RULE_TRIGGER_MAP[name] ?? `Apply ${humanizeName(name).toLowerCase()} rules when relevant to the current task`
 }
 
 export function parseRuleFile(content: string, filename: string): ParsedRule {
