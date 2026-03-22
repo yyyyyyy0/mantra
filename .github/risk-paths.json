@@ -9,16 +9,16 @@
     "**/billing/**",
     "**/payment/**",
     "**/infra/**",
-    "Dockerfile",
-    "docker-compose*.yml",
-    "*.tf",
-    "*.tfvars",
+    "**/Dockerfile",
+    "**/docker-compose*.yml",
+    "**/*.tf",
+    "**/*.tfvars",
     "**/security/**",
     "**/.env*",
     "**/secrets/**"
   ],
   "lowRiskOnlyPaths": {
-    "docs": ["*.md", "docs/**", "LICENSE", "CHANGELOG*"],
+    "docs": ["**/*.md", "docs/**", "LICENSE", "CHANGELOG*"],
     "tests": ["tests/**", "**/*.test.*", "**/*.spec.*", "__tests__/**"],
     "generated": ["**/generated/**", "**/*.gen.*", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"]
   },
