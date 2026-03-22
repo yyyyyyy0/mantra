@@ -74,6 +74,18 @@ In those cases:
 See [docs/harness-engineering.md](../docs/harness-engineering.md) and
 [templates/repo-agents-pointer.md](../templates/repo-agents-pointer.md).
 
+## フェーズ別補足ガイダンス（P0-P4 ラダーの補完）
+
+P0-P4 は「いつエスカレーションするか」を定める。本セクションはフェーズ固有の経路判断を補足する。
+
+### 調査フェーズの経路選択
+- コードの所有境界・実行フローが不明: `planner` → `architect` の順で経路確認してから実装に入る
+- API/外部仕様の確認が必要: `planner` + `architect` を並行で起動し、仕様と設計を同時に収集する（mob session 外の調査フェーズに限る）
+
+### クリーンアップの分離原則
+- リファクタリングは機能実装のコミット完了後に分離して実施する
+- `refactor-cleaner` を使用し、機能変更のdiffと混在させない
+
 ## Parallel Task Execution
 
 ALWAYS use parallel Task execution for independent operations:
