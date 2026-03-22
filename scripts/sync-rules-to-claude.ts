@@ -76,7 +76,7 @@ function main(): void {
   const json = hasJsonFlag(process.argv)
   const preview = process.argv.includes('--preview')
   const startedAt = Date.now()
-  const outputBase = path.join(os.homedir(), '.claude', 'skills', 'mantra-rules')
+  const outputBase = path.join(os.homedir(), '.claude', 'rules')
   let userSourceCount = 0
 
   try {
@@ -149,7 +149,7 @@ function main(): void {
           return { success: true, name: input.name, previewed: true }
         }
 
-        const destPath = path.join(outputBase, input.name, 'SKILL.md')
+        const destPath = path.join(outputBase, `${input.name}.md`)
         writeAtomic(destPath, input.generated.claude, outputBase)
 
         writeInfo(json, `✓ ${input.name} → ${destPath}`)
