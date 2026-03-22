@@ -15,12 +15,15 @@ on:
     types: [completed]
 
 permissions:
+  contents: write
   pull-requests: write
   statuses: read
 
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
+    env:
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Get PR number
         id: pr

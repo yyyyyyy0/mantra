@@ -1,11 +1,12 @@
 name: Risk Classification
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened, labeled, unlabeled]
     branches: [main]
 
 permissions:
+  issues: write
   pull-requests: write
   contents: read
 
@@ -101,13 +102,19 @@ jobs:
               for (let i = 0; i < pattern.length; i++) {
                 const c = pattern[i];
                 if (c === '*' && pattern[i + 1] === '*') {
-                  regex += '.*';
                   i += 1; // skip second *
-                  if (pattern[i + 1] === '/') i += 1; // skip trailing /
+                  if (pattern[i + 1] === '/') {
+                    i += 1; // skip trailing /
+                    // **/ matches zero or more directory segments
+                    regex += '(?:.+/)?';
+                  } else {
+                    // ** at end matches everything
+                    regex += '.*';
+                  }
                 } else if (c === '*') {
                   regex += '[^/]*';
                 } else if (c === '?') {
-                  regex += '.';
+                  regex += '[^/]';
                 } else if ('.+^${}()|[]\\'.includes(c)) {
                   regex += '\\' + c;
                 } else {
