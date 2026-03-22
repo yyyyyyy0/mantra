@@ -5,6 +5,7 @@
 `autonomous-improvement-loop` を中心に、薄いハーネス契約（thin AGENTS.md / canonical verify / hook / handoff）を既存 repo へ導入し、1 round = 1 issue の安全な改善サイクルを回す。
 
 セットアップは `npm run onboarding` を実行するだけで完了する。
+Codex 同期まで含める場合は `npm run onboarding:full`、Claude Code 同期まで含める場合は `npm run onboarding:claude` を使用する。
 
 ---
 
@@ -98,7 +99,7 @@ npm run setup -- --force
 | レイヤー / Layer | 定義 / Definition | 実行パス / Execution path |
 |---|---|---|
 | **Core** | 構成と検証の最小保証。`agents` / `rules` と symlink 作成。 | `npm run onboarding`（通常運用） |
-| **Optional** | Core を増強する追加体験。Codex 同期や拡張実行。 | `npm run onboarding:full`（任意） |
+| **Optional** | Core を増強する追加体験。Codex / Claude Code 同期や拡張実行。 | `npm run onboarding:full` / `npm run onboarding:claude`（任意） |
 | **Experimental** | 複数視点・高リスク時の協調判断。常時有効ではない。 | `mob-*` 系（必要時のみ） |
 
 ### コア経路 / Core Path
@@ -113,6 +114,9 @@ Quick onboarding (default): setup + validate
 ```text
 Codex sync 追加: setup + validate + sync
 `npm run onboarding:full`
+
+Claude Code sync 追加: setup + validate + claude sync
+`npm run onboarding:claude`
 ```
 
 ### 実験的経路 / Experimental Path
@@ -189,8 +193,10 @@ mantra/
 ├── scripts/
 │   ├── lib/                  # 共通ヘルパー（schema/path/meta/parser）
 │   ├── setup.ts              # シムリンク作成スクリプト
-│   ├── sync-agents-to-codex.ts  # agents を Codex へ同期
-│   ├── sync-rules-to-codex.ts   # rules を Codex へ同期
+│   ├── sync-agents-to-codex.ts   # agents を Codex へ同期
+│   ├── sync-rules-to-codex.ts    # rules を Codex へ同期
+│   ├── sync-agents-to-claude.ts  # agents を Claude Code へ同期
+│   ├── sync-rules-to-claude.ts   # rules を Claude Code へ同期
 │   ├── validate-agents.ts    # agents 検証
 │   ├── validate-rules.ts     # rules 検証
 │   └── validate-drift.ts     # family drift guard 検証
@@ -247,6 +253,7 @@ mantra は specialist agents を同梱しています。primary workflow は `au
 | `npm run setup` | シムリンクを作成（初回セットアップ） |
 | `npm run onboarding` | セットアップ + 検証を一括実行（core） |
 | `npm run onboarding:full` | セットアップ + 検証 + Codex 同期を一括実行（optional） |
+| `npm run onboarding:claude` | セットアップ + 検証 + Claude Code 同期を一括実行（optional） |
 | `npm run onboarding:json` | onboarding を JSON 出力モードで実行 |
 | `npm run onboarding:full:json` | onboarding:full を JSON 出力モードで実行 |
 | `npm run metrics:report -- --days 7` | 直近メトリクスをローカル集計（`--json` 対応） |
@@ -259,6 +266,11 @@ mantra は specialist agents を同梱しています。primary workflow は `au
 | `npm run sync:codex:examples` | examples のみ Codex へ同期 |
 | `npm run sync:codex:preview` | 書き込みなしで effective content を表示 |
 | `npm run sync:codex:preview:json` | preview を JSON 出力モードで実行 |
+| `npm run sync:claude` | agents/rules を Claude Code へ同期 |
+| `npm run sync:claude:json` | sync を JSON 出力モードで実行 |
+| `npm run sync:claude:agents` | agents のみ Claude Code へ同期 |
+| `npm run sync:claude:rules` | rules のみ Claude Code へ同期 |
+| `npm run sync:claude:preview` | 書き込みなしで effective content を表示 |
 | `npm run validate` | agents/rules + family drift guard を検証 |
 | `npm run validate:json` | validate を JSON 出力モードで実行 |
 | `npm run validate:agents` | agents 定義のみ検証 |
@@ -270,6 +282,8 @@ mantra は specialist agents を同梱しています。primary workflow は `au
 | `npm run test:unit` | ユニット + 契約テストの実行 |
 | `npm run test:coverage` | ユニット + 契約テストを coverage gate（80%）付きで実行 |
 | `npm run smoke:onboarding` | onboarding フローのスモークテスト |
+
+Claude sync (`sync:claude*`) は、`~/.claude/agents` / `~/.claude/rules` のシムリンクを壊さないよう、`~/.claude/skills/mantra*/SKILL.md` 配下に書き込みます。
 
 ## Harness Engineering / MVH
 

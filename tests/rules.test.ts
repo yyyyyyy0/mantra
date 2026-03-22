@@ -51,6 +51,6 @@ describe('Rule Definitions', () => {
     const parsed = parseRuleFile(content, 'sample-rule.md')
 
     expect(parsed.metadata.name).toBe('sample-rule')
-    expect(parsed.metadata.description).toBe('Sample Rule')
+    expect(parsed.metadata.description).toBe('Apply sample rule rules when relevant to the current task')
   })
 })
