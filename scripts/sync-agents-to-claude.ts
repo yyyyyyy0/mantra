@@ -139,7 +139,7 @@ function main(): void {
   const json = hasJsonFlag(process.argv)
   const preview = process.argv.includes('--preview')
   const startedAt = Date.now()
-  const outputBase = path.join(os.homedir(), '.claude', 'agents')
+  const outputBase = path.join(os.homedir(), '.claude', 'skills', 'mantra')
   let userSourceCount = 0
 
   try {
@@ -216,7 +216,7 @@ function main(): void {
           { name: input.name, description: input.description, tools: input.tools, model: input.model },
           input.generated.claude,
         )
-        const destPath = path.join(outputBase, `${input.name}.md`)
+        const destPath = path.join(outputBase, input.name, 'SKILL.md')
         writeAtomic(destPath, agentContent, outputBase)
 
         writeInfo(json, `✓ ${input.name} → ${destPath}`)
