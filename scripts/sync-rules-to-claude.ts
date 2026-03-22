@@ -17,7 +17,7 @@ import { listContentEntries, type ContentEntry } from './lib/content-entries'
 import { countUserSources, resolveContentSources } from './lib/content-sources'
 import { writeAtomic } from './lib/fs-utils'
 import { composeSkillFamily } from './lib/skill-family'
-import { parseRuleFile, type ParsedRule } from './lib/rule-parser'
+import { parseRuleFile } from './lib/rule-parser'
 
 type GenerationTarget = 'claude' | 'codex' | 'generic'
 
