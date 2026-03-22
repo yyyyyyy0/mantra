@@ -1,5 +1,13 @@
 # Agent Orchestration
 
+> Primary workflow は `autonomous-improvement-loop`（既存 repo の bounded 継続改善）。
+> Repo 導入の詳細は [docs/harness-engineering.md](../docs/harness-engineering.md) を参照。
+
+<!-- Decision record (Issue #27):
+  P0-P4 ラダーとエージェントテーブルは Claude Code runtime の運用ガイダンスとして維持する。
+  narrative 上の位置づけ（flagship workflow, adoption path）は README と docs が担う。
+  このファイルは operational guidance に徹し、marketing messaging を持たない。 -->
+
 ## Available Agents
 
 Located in `~/.claude/agents/`:

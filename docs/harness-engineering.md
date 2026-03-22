@@ -1,9 +1,23 @@
 # Harness Engineering MVH
 
+> **このドキュメントは repo 導入パスの正本です。**
+> README からリンクされており、既存 repo に mantra のハーネスを導入する際の canonical reference として位置づけられています。
+
 このドキュメントは、この Mac 上の複数 repo に共通で入れる最小実行可能ハーネス
 （MVH: Minimum Viable Harness）の正本です。
 
 目標は「深い repo ごとの差異を残したまま、毎回迷わず同じ入口で始められる薄い共通層」を作ることです。
+
+## TL;DR: Adoption Path
+
+既存 repo に MVH を導入する 4 ステップ：
+
+1. **Thin AGENTS.md** — [テンプレート](../templates/repo-agents-pointer.md) をベースにポインタ型 AGENTS.md を置く
+2. **Canonical verify** — repo で 1 本の検証コマンドを定め、AGENTS.md に明記する
+3. **Hook contract** — [repo pre-push テンプレート](../templates/repo-pre-push.example.sh) で canonical verify を毎 push で呼ぶ
+4. **Session continuity** — `maw handover/takeover` と [Obsidian ledger テンプレート](../templates/repo-obsidian-ledger.md) でセッション引き継ぎ
+
+具体的な walkthrough は [examples/ail-repo-improvement-loop.md](../examples/ail-repo-improvement-loop.md) を参照。
 
 ## 1. Thin AGENTS Contract
 

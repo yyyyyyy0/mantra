@@ -1,5 +1,7 @@
 # Authoring Guide for mantra
 
+> repo へのハーネス導入については [docs/harness-engineering.md](./harness-engineering.md) を参照してください。本ガイドは mantra 自体へのエージェント・ルール追加を扱います。
+
 このガイドは、mantra リポジトリに新しいエージェントやルールを追加する際のベストプラクティスをまとめたものです。
 
 ---

@@ -1,7 +1,7 @@
 # Agent Operations (<repo>)
 
 ## Purpose
-- このファイルは運用入口のみを定義する。
+- このファイルは bounded repo improvement の運用入口のみを定義する。
 - 仕様や背景は SSOT に寄せ、このファイルへ再掲しない。
 
 ## Canonical Verify
