@@ -17,10 +17,11 @@ import {
 } from './lib/cli-telemetry'
 import { listContentEntries, type ContentEntry } from './lib/content-entries'
 import { countUserSources, resolveContentSources } from './lib/content-sources'
-import { buildSkillContent, type CodexFrontmatter } from './lib/codex-utils'
+import { YAML_DUMP_OPTIONS } from './lib/codex-utils'
 import { writeAtomic } from './lib/fs-utils'
-import { getProjectMeta } from './lib/project-meta'
 import { composeSkillFamily } from './lib/skill-family'
+
+const CLAUDE_AGENT_NAME_RE = /^[a-z0-9-]+$/
 
 type AgentFrontmatter = typeof ClaudeAgentFrontmatter._output
 type GenerationTarget = 'claude' | 'codex' | 'generic'
@@ -35,26 +36,6 @@ interface AgentSyncInput {
   baseContent: string
   generated: Record<GenerationTarget, string>
   sourceKind: 'legacy' | 'family'
-}
-
-const CATEGORY_MAP: Record<string, string> = {
-  planner: 'planning',
-  replan: 'planning',
-  architect: 'architecture',
-  'tdd-guide': 'testing',
-  'code-reviewer': 'review',
-  'security-reviewer': 'security',
-  'build-error-resolver': 'build',
-  'e2e-runner': 'testing',
-  'mob-navigator': 'planning',
-  'mob-critic': 'review',
-  'mob-scribe': 'documentation',
-  'refactor-cleaner': 'refactoring',
-  'doc-updater': 'documentation',
-}
-
-function inferCategory(name: string): string {
-  return CATEGORY_MAP[name] ?? 'development'
 }
 
 interface ParsedAgent {
@@ -83,24 +64,31 @@ function parseAgentFile(content: string): ParsedAgent {
   return { frontmatter, body }
 }
 
-function convertFrontmatter(
+function buildAgentContent(
   src: Pick<AgentFrontmatter, 'name' | 'description' | 'tools' | 'model'>,
-  metadataVersion: string,
-  metadataLicense: string,
-): CodexFrontmatter {
-  return {
+  body: string,
+): string {
+  const fm: Record<string, unknown> = {
     name: src.name,
     description: src.description,
-    license: metadataLicense,
-    compatibility: 'Works with any codebase',
-    ...(src.tools && src.tools.length > 0 ? { allowed_tools: src.tools } : {}),
-    ...(src.model != null ? { model: src.model } : {}),
-    metadata: {
-      author: 'mantra-project',
-      version: metadataVersion,
-      category: inferCategory(src.name),
-      tags: ['claude-code', src.name],
-    },
+  }
+  if (src.tools && src.tools.length > 0) {
+    fm.tools = src.tools
+  }
+  if (src.model != null) {
+    fm.model = src.model
+  }
+  const frontmatterYaml = yaml.dump(fm, YAML_DUMP_OPTIONS).trimEnd()
+  return `---\n${frontmatterYaml}\n---\n\n${body}`
+}
+
+function validateAgentName(name: string): void {
+  if (!CLAUDE_AGENT_NAME_RE.test(name)) {
+    throw new CliError(
+      `agent name が Claude の命名規則に違反しています（小文字・数字・ハイフンのみ）: ${name}`,
+      'E_INPUT_INVALID',
+      false,
+    )
   }
 }
 
@@ -151,7 +139,7 @@ function main(): void {
   const json = hasJsonFlag(process.argv)
   const preview = process.argv.includes('--preview')
   const startedAt = Date.now()
-  const outputBase = path.join(os.homedir(), '.claude', 'skills')
+  const outputBase = path.join(os.homedir(), '.claude', 'agents')
   let userSourceCount = 0
 
   try {
@@ -170,7 +158,6 @@ function main(): void {
       ensureWritableParent(path.join(outputBase, '.touch'), 'sync destination')
     }
 
-    const projectMeta = getProjectMeta()
     const listed = listContentEntries('agents', { target: 'claude' })
     const entries = listed.entries
     if (entries.length === 0) {
@@ -189,6 +176,8 @@ function main(): void {
     const results: Result[] = entries.map(entry => {
       try {
         const input = entryToSyncInput(entry)
+
+        validateAgentName(input.name)
 
         if (seenNames.has(input.name)) {
           throw new CliError(
@@ -223,14 +212,12 @@ function main(): void {
           return { success: true, name: input.name, previewed: true }
         }
 
-        const codexFm = convertFrontmatter(
+        const agentContent = buildAgentContent(
           { name: input.name, description: input.description, tools: input.tools, model: input.model },
-          projectMeta.version,
-          projectMeta.license,
+          input.generated.claude,
         )
-        const skillContent = buildSkillContent(codexFm, input.generated.claude)
-        const destPath = path.join(outputBase, input.name, 'SKILL.md')
-        writeAtomic(destPath, skillContent, outputBase)
+        const destPath = path.join(outputBase, `${input.name}.md`)
+        writeAtomic(destPath, agentContent, outputBase)
 
         writeInfo(json, `✓ ${input.name} → ${destPath}`)
         writeJsonLine(json, {

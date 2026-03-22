@@ -15,56 +15,30 @@ import {
 } from './lib/cli-telemetry'
 import { listContentEntries, type ContentEntry } from './lib/content-entries'
 import { countUserSources, resolveContentSources } from './lib/content-sources'
-import { buildSkillContent, type CodexFrontmatter } from './lib/codex-utils'
 import { writeAtomic } from './lib/fs-utils'
-import { getProjectMeta } from './lib/project-meta'
 import { composeSkillFamily } from './lib/skill-family'
-import { buildRuleDescription, parseRuleFile, type ParsedRule } from './lib/rule-parser'
+import { parseRuleFile, type ParsedRule } from './lib/rule-parser'
 
-type RuleMetadataType = ParsedRule['metadata']
 type GenerationTarget = 'claude' | 'codex' | 'generic'
 
 const GENERATION_TARGETS: GenerationTarget[] = ['claude', 'codex', 'generic']
 
+const CLAUDE_RULE_NAME_RE = /^[a-z0-9-]+$/
+
 interface RuleSyncInput {
   name: string
-  description: string
   baseContent: string
   generated: Record<GenerationTarget, string>
   sourceKind: 'legacy' | 'family'
 }
 
-const CATEGORY_MAP: Record<string, string> = {
-  'coding-style': 'style',
-  'git-workflow': 'workflow',
-  testing: 'testing',
-  performance: 'performance',
-  patterns: 'patterns',
-  hooks: 'tooling',
-  agents: 'orchestration',
-  security: 'security',
-}
-
-function inferCategory(name: string): string {
-  return CATEGORY_MAP[name] ?? 'development'
-}
-
-function convertToCodexFrontmatter(
-  src: RuleMetadataType,
-  metadataVersion: string,
-  metadataLicense: string,
-): CodexFrontmatter {
-  return {
-    name: src.name,
-    description: src.description,
-    license: metadataLicense,
-    compatibility: 'Works with any codebase',
-    metadata: {
-      author: 'mantra-project',
-      version: metadataVersion,
-      category: inferCategory(src.name),
-      tags: ['claude-code', src.name],
-    },
+function validateRuleName(name: string): void {
+  if (!CLAUDE_RULE_NAME_RE.test(name)) {
+    throw new CliError(
+      `rule name が Claude の命名規則に違反しています（小文字・数字・ハイフンのみ）: ${name}`,
+      'E_INPUT_INVALID',
+      false,
+    )
   }
 }
 
@@ -74,7 +48,6 @@ function entryToSyncInput(entry: ContentEntry): RuleSyncInput {
     const { metadata, body } = parseRuleFile(raw, entry.relativeName)
     return {
       name: metadata.name,
-      description: metadata.description,
       baseContent: body,
       generated: {
         claude: body,
@@ -86,12 +59,9 @@ function entryToSyncInput(entry: ContentEntry): RuleSyncInput {
   }
 
   const family = entry.family
-  const name = family.outputName
-  const description = family.description ?? buildRuleDescription(name, family.baseContent)
 
   return {
-    name,
-    description,
+    name: family.outputName,
     baseContent: family.baseContent,
     generated: {
       claude: composeSkillFamily(family, 'claude').content,
@@ -106,7 +76,7 @@ function main(): void {
   const json = hasJsonFlag(process.argv)
   const preview = process.argv.includes('--preview')
   const startedAt = Date.now()
-  const outputBase = path.join(os.homedir(), '.claude', 'skills')
+  const outputBase = path.join(os.homedir(), '.claude', 'rules')
   let userSourceCount = 0
 
   try {
@@ -125,7 +95,6 @@ function main(): void {
       ensureWritableParent(path.join(outputBase, '.touch'), 'sync destination')
     }
 
-    const projectMeta = getProjectMeta()
     const listed = listContentEntries('rules', { target: 'claude' })
     const entries = listed.entries
     if (entries.length === 0) {
@@ -144,6 +113,8 @@ function main(): void {
     const results: Result[] = entries.map(entry => {
       try {
         const input = entryToSyncInput(entry)
+
+        validateRuleName(input.name)
 
         if (seenNames.has(input.name)) {
           throw new CliError(
@@ -178,14 +149,8 @@ function main(): void {
           return { success: true, name: input.name, previewed: true }
         }
 
-        const codexFm = convertToCodexFrontmatter(
-          { name: input.name, description: input.description },
-          projectMeta.version,
-          projectMeta.license,
-        )
-        const skillContent = buildSkillContent(codexFm, input.generated.claude)
-        const destPath = path.join(outputBase, input.name, 'SKILL.md')
-        writeAtomic(destPath, skillContent, outputBase)
+        const destPath = path.join(outputBase, `${input.name}.md`)
+        writeAtomic(destPath, input.generated.claude, outputBase)
 
         writeInfo(json, `✓ ${input.name} → ${destPath}`)
         writeJsonLine(json, {
