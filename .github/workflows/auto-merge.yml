@@ -65,14 +65,16 @@ jobs:
 
           # Check for no-auto-merge escape hatch
           if echo "$LABELS" | grep -qx "no-auto-merge"; then
-            echo "PR has no-auto-merge label, skipping"
+            echo "PR has no-auto-merge label, disabling auto-merge"
+            gh pr merge "$PR_NUMBER" --disable-auto 2>/dev/null || true
             echo "eligible=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           # Check for risk:low label
           if ! echo "$LABELS" | grep -qx "risk:low"; then
-            echo "PR is not risk:low, skipping auto-merge"
+            echo "PR is not risk:low, disabling auto-merge"
+            gh pr merge "$PR_NUMBER" --disable-auto 2>/dev/null || true
             echo "eligible=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi

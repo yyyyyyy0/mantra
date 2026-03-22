@@ -76,7 +76,6 @@ Required reviews:
   - 1 approval (risk:medium, risk:high のみ — GitHub の CODEOWNERS や ruleset で制御)
 
 Auto-merge: enabled
-Merge queue: enabled (optional)
 ```
 
 ## Security Considerations
