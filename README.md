@@ -234,6 +234,8 @@ mantra/
 | `npm run test:coverage` | ユニット + 契約テストを coverage gate（80%）付きで実行 |
 | `npm run smoke:onboarding` | onboarding フローのスモークテスト |
 
+Claude sync (`sync:claude*`) は、`~/.claude/agents` / `~/.claude/rules` のシムリンクを壊さないよう、`~/.claude/skills/mantra*/SKILL.md` 配下に書き込みます。
+
 ## Harness Engineering / MVH
 
 repo 横断の最小実行可能ハーネス（MVH: Minimum Viable Harness）の正本は次を参照します。
