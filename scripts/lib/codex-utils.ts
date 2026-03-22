@@ -22,6 +22,11 @@ export const YAML_DUMP_OPTIONS = {
 } as const satisfies yaml.DumpOptions
 
 export function buildSkillContent(codexFm: CodexFrontmatter, body: string): string {
-  const frontmatterYaml = yaml.dump(codexFm, YAML_DUMP_OPTIONS).trimEnd()
+  const { allowed_tools, ...rest } = codexFm
+  const dumpTarget: Record<string, unknown> = { ...rest }
+  if (allowed_tools && allowed_tools.length > 0) {
+    dumpTarget['allowed-tools'] = allowed_tools
+  }
+  const frontmatterYaml = yaml.dump(dumpTarget, YAML_DUMP_OPTIONS).trimEnd()
   return `---\n${frontmatterYaml}\n---\n\n${body}`
 }

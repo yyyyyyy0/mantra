@@ -19,7 +19,7 @@ import { buildSkillContent, type CodexFrontmatter } from './lib/codex-utils'
 import { writeAtomic } from './lib/fs-utils'
 import { getProjectMeta } from './lib/project-meta'
 import { composeSkillFamily } from './lib/skill-family'
-import { extractH1, humanizeName, parseRuleFile, type ParsedRule } from './lib/rule-parser'
+import { buildRuleDescription, parseRuleFile, type ParsedRule } from './lib/rule-parser'
 
 type RuleMetadataType = ParsedRule['metadata']
 type GenerationTarget = 'claude' | 'codex' | 'generic'
@@ -87,7 +87,7 @@ function entryToSyncInput(entry: ContentEntry): RuleSyncInput {
 
   const family = entry.family
   const name = family.outputName
-  const description = family.description ?? extractH1(family.baseContent) ?? humanizeName(name)
+  const description = family.description ?? buildRuleDescription(name, family.baseContent)
 
   return {
     name,
@@ -106,7 +106,7 @@ function main(): void {
   const json = hasJsonFlag(process.argv)
   const preview = process.argv.includes('--preview')
   const startedAt = Date.now()
-  const outputBase = path.join(os.homedir(), '.claude', 'skills', 'mantra-rules')
+  const outputBase = path.join(os.homedir(), '.claude', 'skills')
   let userSourceCount = 0
 
   try {
