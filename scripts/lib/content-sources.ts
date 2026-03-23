@@ -17,8 +17,8 @@ const SourcesFileSchema = z.object({
 
 type SourcesFile = z.infer<typeof SourcesFileSchema>
 
-// 三状態キャッシュ: undefined = 未読, null = ファイル不在, SourcesFile = 読み込み済み
-let _sourcesFileCache: SourcesFile | null | undefined = undefined
+// パスキー付き三状態キャッシュ: HOME 変更時に自動無効化
+let _sourcesFileCache: { key: string; value: SourcesFile | null } | undefined = undefined
 
 /** テスト専用。プロセス内テストで sources.json の状態を変更した後に呼ぶこと。 */
 export function __resetSourcesFileCache(): void {
@@ -44,14 +44,14 @@ function expandHome(p: string): string {
 }
 
 function loadSourcesFile(): SourcesFile | null {
-  if (_sourcesFileCache !== undefined) {
-    return _sourcesFileCache
-  }
-
   const filePath = getSourcesJsonPath()
 
+  if (_sourcesFileCache !== undefined && _sourcesFileCache.key === filePath) {
+    return _sourcesFileCache.value
+  }
+
   if (!fs.existsSync(filePath)) {
-    _sourcesFileCache = null
+    _sourcesFileCache = { key: filePath, value: null }
     return null
   }
 
@@ -88,8 +88,8 @@ function loadSourcesFile(): SourcesFile | null {
     )
   }
 
-  _sourcesFileCache = result.data
-  return _sourcesFileCache
+  _sourcesFileCache = { key: filePath, value: result.data }
+  return result.data
 }
 
 function kindDirKey(kind: ContentKind): keyof SourcesFile {
