@@ -25,7 +25,7 @@ function readPackageJson(): Record<string, unknown> | null {
     return JSON.parse(raw) as Record<string, unknown>
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    warnOnce(`package.json could not be read (${message}). Using metadata fallbacks.`)
+    warnOnce(`package.json を読み込めませんでした (${message})。フォールバック値を使用します。`)
     return null
   }
 }
@@ -41,7 +41,7 @@ function readStringField(
 
   const value = pkg[key]
   if (typeof value !== 'string' || value.trim().length === 0) {
-    warnOnce(`package.json ${key} is missing. Using fallback: ${fallback}`)
+    warnOnce(`package.json に ${key} がありません。フォールバック値を使用します: ${fallback}`)
     return fallback
   }
 
