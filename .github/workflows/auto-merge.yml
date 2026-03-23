@@ -3,7 +3,7 @@ name: Auto Merge
 on:
   # Trigger when labels change
   pull_request:
-    types: [labeled]
+    types: [labeled, unlabeled]
     branches: [main]
   # Trigger when review status changes
   pull_request_review:
@@ -79,11 +79,11 @@ jobs:
             exit 0
           fi
 
-          # Check for blocking reviews (CHANGES_REQUESTED)
+          # Check for blocking reviews (latest state per reviewer)
           CHANGES_REQUESTED=$(gh pr view "$PR_NUMBER" --json reviews \
-            --jq '[.reviews[] | select(.state == "CHANGES_REQUESTED")] | length')
+            --jq '[.reviews | group_by(.author.login) | .[] | sort_by(.submittedAt) | last | select(.state == "CHANGES_REQUESTED")] | length')
           if [ "$CHANGES_REQUESTED" != "0" ]; then
-            echo "PR has changes-requested reviews, blocking auto-merge"
+            echo "PR has unresolved changes-requested reviews, blocking auto-merge"
             echo "eligible=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
