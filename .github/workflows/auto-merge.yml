@@ -160,6 +160,14 @@ jobs:
             echo "PR was manually merged by ${MERGED_BY}, skipping audit label"
             exit 0
           fi
+
+          # Only label PRs that were risk:low (our auto-merge path), not manually
+          # enqueued medium/high-risk PRs that also merge as github-merge-queue[bot]
+          LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')
+          if ! echo "$LABELS" | grep -qx "risk:low"; then
+            echo "PR was not risk:low, skipping audit label (likely manually enqueued)"
+            exit 0
+          fi
           gh label create "auto-merged" --force --color "6f42c1" \
             --description "PR was automatically merged" 2>/dev/null || true
           gh pr edit "$PR_NUMBER" --add-label "auto-merged"
