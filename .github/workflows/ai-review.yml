@@ -1,0 +1,29 @@
+name: AI Review (local-first)
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  statuses: write
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pending:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set pending status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh api "repos/${{ github.repository }}/statuses/${HEAD_SHA}" \
+            -X POST \
+            -f state="pending" \
+            -f context="ai-review/critical-findings" \
+            -f description="Waiting for local review (npm run review:pr -- ${PR_NUMBER})"

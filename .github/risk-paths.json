@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "High-risk path patterns for PR risk classification. Customize per project.",
+  "highRiskPaths": [
+    "**/auth/**",
+    "**/session/**",
+    "**/migrations/**",
+    ".github/**",
+    "**/billing/**",
+    "**/payment/**",
+    "**/infra/**",
+    "**/Dockerfile",
+    "**/docker-compose*.yml",
+    "**/*.tf",
+    "**/*.tfvars",
+    "**/security/**",
+    "**/.env*",
+    "**/secrets/**"
+  ],
+  "lowRiskOnlyPaths": {
+    "docs": ["**/*.md", "docs/**", "LICENSE", "CHANGELOG*"],
+    "tests": ["tests/**", "**/*.test.*", "**/*.spec.*", "__tests__/**"],
+    "generated": ["**/generated/**", "**/*.gen.*", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"]
+  },
+  "lowRiskLabels": [
+    "dependencies",
+    "dependabot",
+    "renovate"
+  ]
+}

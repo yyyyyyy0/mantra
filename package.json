@@ -37,6 +37,7 @@
     "validate:rules": "tsx scripts/validate-rules.ts",
     "validate:json": "npm run validate:agents -- --json && npm run validate:rules -- --json && npm run validate:drift -- --json",
     "validate": "npm run validate:agents && npm run validate:rules && npm run validate:drift",
+    "review:pr": "bash scripts/pr-review.sh",
     "prepare": "husky"
   },
   "lint-staged": {
