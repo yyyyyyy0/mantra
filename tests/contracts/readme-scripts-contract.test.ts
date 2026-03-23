@@ -19,7 +19,7 @@ function loadReadmeScriptCommands(): string[] {
   const readmeRaw = fs.readFileSync(readmePath, 'utf8')
   const lines = readmeRaw.split('\n')
 
-  const scriptsHeaderIndex = lines.findIndex(line => line.trim() === '## スクリプト')
+  const scriptsHeaderIndex = lines.findIndex(line => line.trim() === '## Scripts')
   if (scriptsHeaderIndex < 0) {
     throw new Error('README scripts section not found')
   }

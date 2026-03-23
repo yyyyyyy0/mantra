@@ -1,62 +1,62 @@
 # Plan-Mob Template
 
-## Objective / 目的
-_（タスクの範囲と目的を記載）_
+## Objective
+_(Describe the scope and purpose of the task)_
 
-## Constraints / 制約
-_（ハード制約・技術的制約を記載）_
+## Constraints
+_(List hard constraints and technical constraints)_
 
-## Decision Points / 決定事項
-_（主要な判断ポイントを列挙）_
+## Decision Points
+_(List the main judgment points)_
 
-## Participants / 参加者
-_（使用するエージェント名を記載）_
+## Participants
+_(List the agent names to be used)_
 
 ---
 
-## Observations / 観察
-_（確立された事実：コード、ログ、テスト結果、要件など）_
+## Observations
+_(Established facts: code, logs, test results, requirements, etc.)_
 
-## Decisions / 決定
+## Decisions
 
-### Accepted / 採択
+### Accepted
 -
 -
 
-### Rejected / 却下
-- _（却下理由を含む）_
+### Rejected
+- _(Include reason for rejection)_
 -
 
-### Deferred / 先送り
-- _（先送り理由を含む）_
+### Deferred
+- _(Include reason for deferral)_
 -
 
-## Risks / リスク
+## Risks
 
-| 優先度 | 内容 | 緩和策 |
-|--------|------|--------|
+| Priority | Description | Mitigation |
+|----------|-------------|------------|
 | HIGH | | |
 | MEDIUM | | |
 | LOW | | |
 
-## Action Plan / アクション計画
+## Action Plan
 1. _
 2. _
 3. _
 4. _
 5. _
 
-## Open Questions / 未解決事項
-_（人間の入力が必要な項目）_
+## Open Questions
+_(Items requiring human input)_
 
 ---
 
-## Acceptance Criteria / 受入条件
+## Acceptance Criteria
 - [ ] _
 - [ ] _
 - [ ] _
 
-## Verification Strategy / 検証戦略
+## Verification Strategy
 - **Unit Tests**: _
 - **Integration Tests**: _
 - **E2E Tests**: _

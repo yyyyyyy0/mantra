@@ -203,13 +203,13 @@ drift_guard:
 
 ## セクション1: 具体的なガイドライン
 
-### 良い例 / CORRECT
+### 良い例
 
 \```typescript
 // 実装例
 \```
 
-### 悪い例 / WRONG
+### 悪い例
 
 \```typescript
 // 避けるべき例

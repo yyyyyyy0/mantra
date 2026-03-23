@@ -2,95 +2,95 @@
 
 ## Overview
 
-PR のリスク分類に基づき、低リスク PR は自動 merge、中〜高リスクは人間ゲートを維持する。
+Based on PR risk classification, low-risk PRs are auto-merged while medium-to-high risk PRs maintain a human gate.
 
 ## Risk Levels
 
 | Level | Conditions | Action |
 |-------|-----------|--------|
 | `risk:low` | docs only / deps patch (Dependabot/Renovate) / generated files / tests only | Auto-merge after CI + AI review green |
-| `risk:medium` | Above以外、高リスクパスなし | AI review comment + human approve required |
+| `risk:medium` | Anything other than the above, with no high-risk paths | AI review comment + human approve required |
 | `risk:high` | auth, migrations, CI config, billing, infra, security paths | Human review required + security check |
 
 ## Workflows
 
-- **`risk-classifier.yml`**: PR の diff パスを解析し `risk:low/medium/high` ラベルを付与
-- **`ai-review.yml`**: PR 作成時に `pending` status を投稿。ローカルレビュー待ちを示す
-- **`auto-merge.yml`**: `risk:low` + 全 check green + AI critical なし → `gh pr merge --auto --squash`
+- **`risk-classifier.yml`**: Analyzes the PR diff paths and assigns `risk:low/medium/high` labels
+- **`ai-review.yml`**: Posts a `pending` status when a PR is created, indicating it is awaiting local review
+- **`auto-merge.yml`**: `risk:low` + all checks green + no AI critical findings → `gh pr merge --auto --squash`
 
 ## Local AI Review
 
-AI review は GitHub Actions 内ではなく、ローカルの Claude Code CLI で実行する。
+AI review is run using the local Claude Code CLI, not inside GitHub Actions.
 
-### 自動実行（PostToolUse hook）
+### Automatic Execution (PostToolUse hook)
 
-Claude Code で `gh pr create` を実行すると、PostToolUse hook がバックグラウンドで `scripts/pr-review.sh` を起動する。レビュー結果は PR コメント + commit status として GitHub に投稿される。
+When `gh pr create` is run in Claude Code, the PostToolUse hook launches `scripts/pr-review.sh` in the background. The review result is posted to GitHub as a PR comment and a commit status.
 
-### 手動実行
+### Manual Execution
 
 ```bash
-npm run review:pr -- <PR番号>
+npm run review:pr -- <PR number>
 ```
 
-Claude Code 外で PR を作成した場合や、再レビューが必要な場合に使用する。
+Use this when a PR was created outside Claude Code or when a re-review is needed.
 
-### 処理フロー
+### Processing Flow
 
 ```
-gh pr create → PostToolUse hook 発火 → scripts/pr-review.sh (background)
-  1. gh pr diff で diff 取得（100KB で truncate）
-  2. claude -p --model sonnet で AI review 実行
-  3. gh pr comment でレビュー結果を PR コメントに投稿
-  4. gh api statuses/ で commit status 設定
-     → success: critical なし → auto-merge 候補
-     → failure: critical あり → auto-merge ブロック
+gh pr create → PostToolUse hook fires → scripts/pr-review.sh (background)
+  1. Fetch diff via gh pr diff (truncated at 100KB)
+  2. Run AI review via claude -p --model sonnet
+  3. Post review result as PR comment via gh pr comment
+  4. Set commit status via gh api statuses/
+     → success: no critical findings → auto-merge candidate
+     → failure: critical findings present → auto-merge blocked
 ```
 
 ## Escape Hatches
 
-- **`no-auto-merge` ラベル**: 手動で付与すると `risk:low` でも自動 merge を抑制
-- **`auto-merged` ラベル**: 自動 merge された PR に付与（監査用）
+- **`no-auto-merge` label**: Applying this manually suppresses auto-merge even for `risk:low` PRs
+- **`auto-merged` label**: Applied to PRs that were auto-merged (for audit purposes)
 
 ## Configuration
 
-高リスクパス定義は `.github/risk-paths.json` でプロジェクトごとにカスタマイズ可能。
+High-risk path definitions can be customized per project in `.github/risk-paths.json`.
 
 ## Prerequisites
 
-- `claude` CLI がインストール済みで OAuth 認証済み（`claude --version` で確認）
-- `gh` CLI が認証済み（`gh auth status` で確認）
-- `jq` がインストール済み（`jq --version` で確認。PR メタデータのパースに使用）
+- `claude` CLI installed and OAuth authenticated (verify with `claude --version`)
+- `gh` CLI authenticated (verify with `gh auth status`)
+- `jq` installed (verify with `jq --version`; used for parsing PR metadata)
 
 ## Branch Protection Settings
 
-`main` ブランチに以下を設定:
+Configure the following on the `main` branch:
 
 ```
 Required status checks:
   - validate
-  - typecheck / lint / test:coverage (validate job 内)
+  - typecheck / lint / test:coverage (inside the validate job)
   - classify (risk-classifier)
-  - ai-review/critical-findings (commit status — ローカルスクリプトが投稿)
+  - ai-review/critical-findings (commit status — posted by the local script)
 
 Required reviews:
-  - 1 approval (risk:medium, risk:high のみ — GitHub の CODEOWNERS や ruleset で制御)
+  - 1 approval (risk:medium and risk:high only — controlled via GitHub CODEOWNERS or rulesets)
 
 Auto-merge: enabled
 ```
 
 ## Security Considerations
 
-- **Expression injection 防止**: PR title, body, diff はすべて env 変数経由またはファイル経由で渡す
-- **Config tamper 防止**: `risk-paths.json` は base branch (`main`) から checkout する
-- **AI review gate**: commit status (`ai-review/critical-findings`) で判定する。PR コメントは参考情報のみ
-- **Fail-closed**: Claude CLI 失敗時・レスポンス異常時は `failure` status を投稿し、自動 merge をブロック
-- **Prompt injection 緩和**: reviewer 指示はプロンプト先頭に配置。diff 内の指示は無視するよう明記
-- **Pending = blocked**: レビュー未実行時は `pending` のまま残り、auto-merge はブロックされる
-- **Action pinning**: GitHub Actions は commit SHA でピン留め
+- **Expression injection prevention**: PR title, body, and diff are all passed via environment variables or files
+- **Config tamper prevention**: `risk-paths.json` is checked out from the base branch (`main`)
+- **AI review gate**: Determined by commit status (`ai-review/critical-findings`). PR comments are for reference only
+- **Fail-closed**: On Claude CLI failure or abnormal response, a `failure` status is posted and auto-merge is blocked
+- **Prompt injection mitigation**: Reviewer instructions are placed at the top of the prompt; the prompt explicitly states that instructions inside the diff should be ignored
+- **Pending = blocked**: When review has not been run, the status remains `pending` and auto-merge is blocked
+- **Action pinning**: GitHub Actions are pinned by commit SHA
 
 ## Rollout
 
-1. mantra で先行導入して動作確認
-2. テンプレート (`~/.claude/templates/pr-automation/`) を他プロジェクトにコピー
-3. 各プロジェクトの `.github/risk-paths.json` をカスタマイズ
-4. 将来的に reusable workflow (`workflow_call`) として共通リポジトリに集約
+1. Pilot in mantra first to verify behavior
+2. Copy the template (`~/.claude/templates/pr-automation/`) to other projects
+3. Customize `.github/risk-paths.json` for each project
+4. In the future, consolidate as a reusable workflow (`workflow_call`) in a shared repository

@@ -1,9 +1,9 @@
 # Review-Mob Template
 
-## Scope Reviewed / レビュー範囲
-_（対象のファイル・モジュール・機能）_
+## Scope Reviewed
+_(Target files, modules, features)_
 
-## Inputs / 入力
+## Inputs
 - **Diff**: _
 - **Files Changed**: _
 - **Test Results**: _
@@ -11,41 +11,41 @@ _（対象のファイル・モジュール・機能）_
 
 ---
 
-## Findings / 所見
+## Findings
 
-### Blockers / ブロッカー
-_（マージ前に解決が必要）_
+### Blockers
+_(Must be resolved before merge)_
 -
 
-### Warnings / 警告
-_（推奨対応）_
+### Warnings
+_(Recommended to address)_
 -
 
-### Suggestions / 提案
-_（改善提案）_
+### Suggestions
+_(Improvement proposals)_
 -
 
 ## Security / Compatibility Notes
 
-### Security / セキュリティ
-_（必要時記載）_
+### Security
+_(Document when applicable)_
 
-### Compatibility / 互換性
-_（必要時記載）_
+### Compatibility
+_(Document when applicable)_
 
 ---
 
-## Residual Risks / 残存リスク
-_（未解決のリスクがある場合記載）_
+## Residual Risks
+_(Document if unresolved risks remain)_
 
-## Recommended Next Actions / 推奨アクション
+## Recommended Next Actions
 1. _
 2. _
 3. _
 
 ---
 
-## Merge Readiness / マージ準備状況
+## Merge Readiness
 
 **Status**: [ ] Ready / [ ] Conditionally Ready / [ ] Not Ready
 

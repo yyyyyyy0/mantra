@@ -1,31 +1,33 @@
 # mantra
 
-既存リポジトリを bounded に継続改善する repo-ops ハーネス。
+日本語版は [README.ja.md](./README.ja.md) をご覧ください。
 
-`autonomous-improvement-loop` を中心に、薄いハーネス契約（thin AGENTS.md / canonical verify / hook / handoff）を既存 repo へ導入し、1 round = 1 issue の安全な改善サイクルを回す。
+A repo-ops harness for bounded, continuous improvement of existing repositories.
 
-セットアップは `npm run onboarding` を実行するだけで完了する。
-Codex 同期まで含める場合は `npm run onboarding:full`、Claude Code 同期まで含める場合は `npm run onboarding:claude` を使用する。
+Built around `autonomous-improvement-loop`, mantra introduces a thin harness contract (thin AGENTS.md / canonical verify / hook / handoff) into existing repos, running a safe improvement cycle of 1 round = 1 issue.
+
+Setup is as simple as running `npm run onboarding`.
+Use `npm run onboarding:full` to include Codex sync, or `npm run onboarding:claude` for Claude Code sync.
 
 ---
 
 ## What mantra is
 
-mantra は 3 つの柱で既存 repo の継続改善を支える：
+mantra supports continuous improvement of existing repos on three pillars:
 
-| 柱 | 概要 |
+| Pillar | Summary |
 |---|---|
-| **autonomous-improvement-loop (AIL)** | 1 round = 1 issue で段階的に改善。bounded な変更予算（max 3 files / 200 lines）で安全に進む |
-| **Harness Engineering** | thin AGENTS.md / canonical verify / hook contract で、どの repo にも同じ入口を作る |
-| **Session Continuity** | handoff summary と ledger で、セッションをまたぐ作業を途切れなくつなぐ |
+| **autonomous-improvement-loop (AIL)** | Incremental improvement at 1 round = 1 issue. Advances safely within a bounded change budget (max 3 files / 200 lines). |
+| **Harness Engineering** | thin AGENTS.md / canonical verify / hook contract creates a consistent entry point for any repo. |
+| **Session Continuity** | handoff summaries and ledgers keep work unbroken across sessions. |
 
-mantra は汎用 agent pack ではない。既存 repo を安全に少しずつ良くするための運用ハーネスである。
+mantra is not a general-purpose agent pack. It is an operational harness for making existing repos incrementally better, safely.
 
 ---
 
 ## Primary workflow: autonomous-improvement-loop
 
-`autonomous-improvement-loop` は mantra の flagship workflow。既存 repo の段階的改善に使い、greenfield 設計には使わない。
+`autonomous-improvement-loop` is mantra's flagship workflow. Use it for incremental improvement of existing repos — not for greenfield design.
 
 ```text
 issue queue → select 1 issue → bounded fix → verify → handoff
@@ -33,58 +35,58 @@ issue queue → select 1 issue → bounded fix → verify → handoff
                                     └────── next round ───┘
 ```
 
-- **1 round = 1 issue**: 固定 round cap なし。1 round で 1 つの issue を選び、bounded に修正する
-- **変更予算**: max 3 changed files / 200 changed lines per round
-- **安全境界**: 新しい user steer が来たら、current atomic step の後 safe boundary で停止
-- **QA-only mode**: dirty worktree や不安定な baseline では、編集せず証拠収集と推奨のみ
-- **構造化出力**: 毎 round で `[AIL][rNN]` summary block を出し、停止時は final handoff summary を残す
+- **1 round = 1 issue**: No fixed round cap. Each round selects one issue and fixes it in a bounded way.
+- **Change budget**: max 3 changed files / 200 changed lines per round
+- **Safe boundary**: When a new user steer arrives, stop at a safe boundary after the current atomic step.
+- **QA-only mode**: With a dirty worktree or unstable baseline, collect evidence and make recommendations only — no edits.
+- **Structured output**: Emit an `[AIL][rNN]` summary block every round; leave a final handoff summary on stop.
 
-source of truth は [`agents/autonomous-improvement-loop.family`](./agents/autonomous-improvement-loop.family/) です。
+The source of truth is [`agents/autonomous-improvement-loop.family`](./agents/autonomous-improvement-loop.family/).
 
-実運用の walkthrough は [examples/ail-repo-improvement-loop.md](./examples/ail-repo-improvement-loop.md) を参照。
+For a walkthrough of real-world usage, see [examples/ail-repo-improvement-loop.md](./examples/ail-repo-improvement-loop.md).
 
 ---
 
 ## Repo adoption path
 
-既存 repo に mantra のハーネスを導入する最短手順：
+The shortest path to introducing mantra's harness into an existing repo:
 
-1. **Thin AGENTS.md を置く** — [テンプレート](./templates/repo-agents-pointer.md) をベースに、Purpose / Canonical verify / Session continuity を記入
-2. **Canonical verify を決める** — repo で 1 本の検証コマンドを定め、AGENTS.md に明記する（例: `npm run verify`）
-3. **Hook contract を設定** — [repo pre-push テンプレート](./templates/repo-pre-push.example.sh) で canonical verify を毎 push で呼ぶ
-4. **Continuity を運用する** — `maw handover/takeover` と [Obsidian ledger テンプレート](./templates/repo-obsidian-ledger.md) でセッション引き継ぎ
+1. **Place a thin AGENTS.md** — start from the [template](./templates/repo-agents-pointer.md), fill in Purpose / Canonical verify / Session continuity.
+2. **Define a canonical verify** — pick one verification command for the repo and document it in AGENTS.md (e.g. `npm run verify`).
+3. **Set up the hook contract** — use the [repo pre-push template](./templates/repo-pre-push.example.sh) to call canonical verify on every push.
+4. **Run continuity** — use `maw handover/takeover` and the [Obsidian ledger template](./templates/repo-obsidian-ledger.md) for session handoff.
 
-詳細は [docs/harness-engineering.md](./docs/harness-engineering.md)（adoption path 正本）を参照。
-
----
-
-## Start here / はじめに
-
-1. `npm ci` — 依存関係のインストール
-2. `npm run onboarding` — セットアップ + 検証（core）
-3. `npm run onboarding:full` — セットアップ + 検証 + Codex 同期（optional）
-4. `npm run smoke:onboarding` — 最短導線のスモーク検証（任意）
+For full details, see [docs/harness-engineering.md](./docs/harness-engineering.md) (the canonical adoption path reference).
 
 ---
 
-## クイックスタート
+## Start here
+
+1. `npm ci` — install dependencies
+2. `npm run onboarding` — setup + validation (core)
+3. `npm run onboarding:full` — setup + validation + Codex sync (optional)
+4. `npm run smoke:onboarding` — smoke-test the onboarding path (optional)
+
+---
+
+## Quickstart
 
 ```bash
-# 1. クローン
+# 1. Clone
 git clone https://github.com/yyyyyyy0/mantra ~/.mantra
 cd ~/.mantra
 
-# 2. 依存インストール
+# 2. Install dependencies
 npm ci
 
-# 3. セットアップ+検証（最短導線）
+# 3. Setup + validate (shortest path)
 npm run onboarding
 
-# 4. Codex 同期まで実行する場合（任意）
+# 4. Also run Codex sync (optional)
 npm run onboarding:full
 ```
 
-既存のシムリンク/ディレクトリを再作成する場合（実ディレクトリはバックアップ退避）:
+To recreate existing symlinks/directories (real directories are backed up):
 
 ```bash
 npm run setup -- --force
@@ -92,349 +94,345 @@ npm run setup -- --force
 
 ---
 
-## Operating model / 運用モデル
+## Operating model
 
-このリポジトリは以下の3層で使い分けます。
+This repository operates across three layers:
 
-| レイヤー / Layer | 定義 / Definition | 実行パス / Execution path |
+| Layer | Definition | Execution path |
 |---|---|---|
-| **Core** | 構成と検証の最小保証。`agents` / `rules` と symlink 作成。 | `npm run onboarding`（通常運用） |
-| **Optional** | Core を増強する追加体験。Codex / Claude Code 同期や拡張実行。 | `npm run onboarding:full` / `npm run onboarding:claude`（任意） |
-| **Experimental** | 複数視点・高リスク時の協調判断。常時有効ではない。 | `mob-*` 系（必要時のみ） |
+| **Core** | Minimum guarantee for configuration and validation. Creates `agents` / `rules` symlinks. | `npm run onboarding` (normal operation) |
+| **Optional** | Additional experiences that augment Core. Codex / Claude Code sync and extended runs. | `npm run onboarding:full` / `npm run onboarding:claude` (opt-in) |
+| **Experimental** | Coordinated judgment for multi-perspective or high-risk situations. Not always active. | `mob-*` agents (on demand only) |
 
-### コア経路 / Core Path
+### Core path
 
 ```text
 Quick onboarding (default): setup + validate
 `npm run onboarding`
 ```
 
-### 拡張経路 / Optional Path
+### Optional path
 
 ```text
-Codex sync 追加: setup + validate + sync
+Add Codex sync: setup + validate + sync
 `npm run onboarding:full`
 
-Claude Code sync 追加: setup + validate + claude sync
+Add Claude Code sync: setup + validate + claude sync
 `npm run onboarding:claude`
 ```
 
-### 実験的経路 / Experimental Path
+### Experimental path
 
 ```text
-複数視点判断が必要な高リスク作業
-`mob-navigator/mob-critic/mob-scribe` を条件付きで使用
+High-risk work requiring multi-perspective judgment
+Use `mob-navigator/mob-critic/mob-scribe` conditionally
 ```
 
-### Specialist 利用判断（Single-agent優先） / Specialist Invocation
+### Specialist invocation (single-agent first)
 
-まず `single-agent` で進めます。条件を満たす場合のみ specialist を呼びます。
+Start with the `single-agent` path. Invoke a specialist only when a condition below is met.
 
-| 条件 / Condition | 推奨 / Recommended |
+| Condition | Recommended |
 |---|---|
-| 1ファイル / 明確な修正 / 小変更 | single-agent first |
-| 既存 repo の段階的改善、欠陥削減、post-change hardening | `autonomous-improvement-loop` 検討 |
-| 3+実装ステップ、または2+ファイル、または設計トレードオフがある | `planner` 検討 |
-| 実装前レビューで High/Medium の未解決リスクが残る | `replan` で再計画（条件付き） |
-| 実装後にコード品質の確認が必要 | `code-reviewer`（必要時） |
-| 要件が曖昧、失敗コストが高い、複数利害がある | `mob` 系を検討（`mob-navigator`→`mob-critic`→`mob-scribe`） |
+| 1 file / clear fix / small change | single-agent first |
+| Incremental improvement, defect reduction, post-change hardening on an existing repo | Consider `autonomous-improvement-loop` |
+| 3+ implementation steps, or 2+ files, or design tradeoffs | Consider `planner` |
+| Unresolved High/Medium risks remain after pre-implementation review | `replan` to re-plan (conditional) |
+| Code quality check needed after implementation | `code-reviewer` (when needed) |
+| Ambiguous requirements, high failure cost, multiple stakeholders | Consider `mob` agents (`mob-navigator` → `mob-critic` → `mob-scribe`) |
 
-**`planner` と `replan` の使い分け**
-- `planner`: 初回の実装計画を作る
-- `replan`: レビュー結果を受けて、実装前に再計画する（`High + Medium > 0` の場合のみ）
-- 同一ラウンドで同時起動しない（`planner` 出力を `replan` に引き継ぐ）
+**Choosing between `planner` and `replan`**
+- `planner`: Creates the initial implementation plan.
+- `replan`: Re-plans before implementation based on review results (only when `High + Medium > 0`).
+- Do not launch both in the same round (hand off `planner` output to `replan`).
 
 ---
 
-## セットアップ検証 / Setup Verification
+## Setup verification
 
-以下のコマンドでセットアップが正しく完了しているか検証できます：
+Verify that setup completed correctly with these commands:
 
 ```bash
-# 依存関係の検証
+# Verify dependencies
 npm ci
-# 期待される出力: エラーなく完了
+# Expected: completes without errors
 
-# agents/rules 定義の検証
+# Verify agents/rules definitions
 npm run validate
-# 期待される出力例:
-# - ✓ <N> 件のエージェント定義が有効です
-# - ✓ <N> 件のルール定義が有効です
+# Expected output example:
+# - ✓ <N> agent definitions valid
+# - ✓ <N> rule definitions valid
 # - ✓ drift validation passed (<checked> families checked / <seen> families seen)
 
-# TypeScript 型検査
+# TypeScript type check
 npm run typecheck
-# 期待される出力: エラーなく完了
+# Expected: completes without errors
 
-# Lint（warning を含めて失敗扱い）
+# Lint (warnings also treated as failures)
 npm run lint
-# 期待される出力: エラーなく完了
+# Expected: completes without errors
 
-# シムリンクの検証
-ls -la ~/.claude/agents  # → ~/.mantra/generated/agents（user定義 or family 構成時は merge 経由）
-ls -la ~/.claude/rules   # → mantra/rules へのシムリンク（family がなければ core 直リンク）
+# Verify symlinks
+ls -la ~/.claude/agents  # → ~/.mantra/generated/agents (merged when user-defined or family config exists)
+ls -la ~/.claude/rules   # → symlink to mantra/rules (direct core link when no family)
 ```
 
-**一般的なトラブルシューティング:**
-- `npm ci` が失敗する場合: Node.js v20+ がインストールされているか確認
-- `npm run validate` が失敗する場合: agents/rules の .md / `*.family` 構成、出力名重複、`drift_guard` 設定を確認
-- シムリンクが作成されない場合: `npm run setup -- --force` を試す（既存のディレクトリはバックアップされます）
-- `npm run setup` 成功後の案内: Core next step は `npm run validate`、Optional next step は `npm run sync:codex`
-- `error_code` 単位の詳細対処: [docs/troubleshooting.md](./docs/troubleshooting.md)
+**Common troubleshooting:**
+- `npm ci` fails: verify Node.js v20+ is installed
+- `npm run validate` fails: check agents/rules `.md` / `*.family` structure, duplicate output names, `drift_guard` settings
+- Symlinks not created: try `npm run setup -- --force` (existing directories are backed up)
+- After `npm run setup` succeeds: Core next step is `npm run validate`, Optional next step is `npm run sync:codex`
+- Per-`error_code` remediation: [docs/troubleshooting.md](./docs/troubleshooting.md)
 
 ---
 
-## ディレクトリ構造
+## Directory structure
 
 ```
 mantra/
-├── agents/          # Claude Code エージェント定義（legacy .md / *.family）
-├── rules/           # Claude Code ルール定義（.md）
+├── agents/          # Claude Code agent definitions (legacy .md / *.family)
+├── rules/           # Claude Code rule definitions (.md)
 ├── scripts/
-│   ├── lib/                  # 共通ヘルパー（schema/path/meta/parser）
-│   ├── setup.ts              # シムリンク作成スクリプト
-│   ├── sync-agents-to-codex.ts   # agents を Codex へ同期
-│   ├── sync-rules-to-codex.ts    # rules を Codex へ同期
-│   ├── sync-agents-to-claude.ts  # agents を Claude Code へ同期
-│   ├── sync-rules-to-claude.ts   # rules を Claude Code へ同期
-│   ├── validate-agents.ts    # agents 検証
-│   ├── validate-rules.ts     # rules 検証
-│   └── validate-drift.ts     # family drift guard 検証
+│   ├── lib/                  # Shared helpers (schema/path/meta/parser)
+│   ├── setup.ts              # Symlink creation script
+│   ├── sync-agents-to-codex.ts   # Sync agents to Codex
+│   ├── sync-rules-to-codex.ts    # Sync rules to Codex
+│   ├── sync-agents-to-claude.ts  # Sync agents to Claude Code
+│   ├── sync-rules-to-claude.ts   # Sync rules to Claude Code
+│   ├── validate-agents.ts    # Agent validation
+│   ├── validate-rules.ts     # Rule validation
+│   └── validate-drift.ts     # Family drift guard validation
 └── package.json
 ```
 
 ---
 
-## エージェント一覧
+## Agent list
 
-mantra は specialist agents を同梱しています。primary workflow は `autonomous-improvement-loop`、他のエージェントは計画・レビュー・オーケストレーションを支援します。
+mantra ships with specialist agents. The primary workflow is `autonomous-improvement-loop`; other agents support planning, review, and orchestration.
 
-| エージェント | 用途 |
+| Agent | Purpose |
 |---|---|
-| `autonomous-improvement-loop` | 既存リポジトリの継続的改善。1 round = 1 issue で進み、safe boundary で停止・handoff する |
-| `architect` | システム設計・アーキテクチャ判断 |
-| `build-error-resolver` | ビルドエラー・型エラーの修正 |
-| `code-reviewer` | コードレビュー（品質・セキュリティ・保守性） |
-| `doc-updater` | ドキュメント・コードマップの更新 |
-| `e2e-runner` | E2E テスト（Playwright） |
-| `mob-critic` | Mob プログラミング：仮定への挑戦・リスク発見 |
-| `mob-navigator` | Mob プログラミング：意思決定フローの調整 |
-| `mob-scribe` | Mob プログラミング：出力の正規化・要約 |
-| `planner` | 機能実装・リファクタリングの計画 |
-| `replan` | レビュー反映の実装前再計画（条件付き） |
-| `refactor-cleaner` | 不要コードの削除・整理 |
-| `security-reviewer` | セキュリティ脆弱性の検出・修正 |
-| `tdd-guide` | テスト駆動開発（テストファースト） |
+| `autonomous-improvement-loop` | Continuous improvement of existing repositories. Advances 1 round = 1 issue, stops and hands off at safe boundaries. |
+| `architect` | System design and architecture decisions |
+| `build-error-resolver` | Fix build errors and type errors |
+| `code-reviewer` | Code review (quality, security, maintainability) |
+| `doc-updater` | Update documentation and code maps |
+| `e2e-runner` | E2E testing (Playwright) |
+| `mob-critic` | Mob programming: challenge assumptions, find risks |
+| `mob-navigator` | Mob programming: orchestrate decision flow |
+| `mob-scribe` | Mob programming: normalize and summarize outputs |
+| `planner` | Plan feature implementation and refactoring |
+| `replan` | Re-plan before implementation based on review results (conditional) |
+| `refactor-cleaner` | Remove and clean up dead code |
+| `security-reviewer` | Detect and fix security vulnerabilities |
+| `tdd-guide` | Test-driven development (test-first) |
 
 ---
 
-## ルール一覧
+## Rule list
 
-`rules/` 配下のルールが `~/.claude/rules/` にシムリンクされ、すべてのプロジェクトに自動適用される。
+Rules under `rules/` are symlinked to `~/.claude/rules/` and applied automatically to all projects.
 
-| ルール | 内容 |
+| Rule | Content |
 |---|---|
-| `agents.md` | エージェントオーケストレーション・並列実行 |
-| `coding-style.md` | イミュータビリティ・ファイル構成・エラー処理 |
-| `git-workflow.md` | コミットメッセージ・PR ワークフロー |
-| `hooks.md` | Claude Code hooks の設定と利用 |
-| `mob-programming.md` | Mob プログラミング：マルチエージェント協調・意思決定プロトコル |
-| `patterns.md` | API レスポンス形式・カスタムフック・リポジトリパターン |
-| `performance.md` | モデル選択・コンテキスト管理・Ultrathink |
-| `security.md` | セキュリティチェックリスト・シークレット管理 |
-| `testing.md` | テストカバレッジ要件・TDD ワークフロー |
+| `agents.md` | Agent orchestration and parallel execution |
+| `coding-style.md` | Immutability, file organization, error handling |
+| `git-workflow.md` | Commit messages and PR workflow |
+| `hooks.md` | Claude Code hooks configuration and usage |
+| `mob-programming.md` | Mob programming: multi-agent collaboration and decision protocol |
+| `patterns.md` | API response format, custom hooks, repository pattern |
+| `performance.md` | Model selection, context management, Ultrathink |
+| `security.md` | Security checklist and secret management |
+| `testing.md` | Test coverage requirements and TDD workflow |
 
 ---
 
-## スクリプト
+## Scripts
 
-| コマンド | 説明 |
+| Command | Description |
 |---|---|
-| `npm run setup` | シムリンクを作成（初回セットアップ） |
-| `npm run onboarding` | セットアップ + 検証を一括実行（core） |
-| `npm run onboarding:full` | セットアップ + 検証 + Codex 同期を一括実行（optional） |
-| `npm run onboarding:claude` | セットアップ + 検証 + Claude Code 同期を一括実行（optional） |
-| `npm run onboarding:json` | onboarding を JSON 出力モードで実行 |
-| `npm run onboarding:full:json` | onboarding:full を JSON 出力モードで実行 |
-| `npm run metrics:report -- --days 7` | 直近メトリクスをローカル集計（`--json` 対応） |
-| `npm run setup -- --force` | 既存の実ディレクトリ/ファイルを `.bak-YYYYMMDDHHmmss` に退避して再作成 |
-| `npm run sync:codex` | agents/rules/templates/examples を Codex へ同期 |
-| `npm run sync:codex:json` | sync を JSON 出力モードで実行 |
-| `npm run sync:codex:agents` | agents のみ Codex へ同期 |
-| `npm run sync:codex:rules` | rules のみ Codex へ同期 |
-| `npm run sync:codex:templates` | templates のみ Codex へ同期 |
-| `npm run sync:codex:examples` | examples のみ Codex へ同期 |
-| `npm run sync:codex:preview` | 書き込みなしで effective content を表示 |
-| `npm run sync:codex:preview:json` | preview を JSON 出力モードで実行 |
-| `npm run sync:claude` | agents/rules を Claude Code へ同期 |
-| `npm run sync:claude:json` | sync を JSON 出力モードで実行 |
-| `npm run sync:claude:agents` | agents のみ Claude Code へ同期 |
-| `npm run sync:claude:rules` | rules のみ Claude Code へ同期 |
-| `npm run sync:claude:preview` | 書き込みなしで effective content を表示 |
-| `npm run validate` | agents/rules + family drift guard を検証 |
-| `npm run validate:json` | validate を JSON 出力モードで実行 |
-| `npm run validate:agents` | agents 定義のみ検証 |
-| `npm run validate:rules` | rules 定義のみ検証 |
-| `npm run validate:drift` | `drift_guard.enabled: true` の family drift を検証 |
-| `npm run typecheck` | scripts/tests の TypeScript 型検査 |
-| `npm run lint` | scripts/tests の ESLint チェック（warning も fail） |
-| `npm run verify` | canonical verify（validate + typecheck + lint + unit/contract） |
-| `npm run test:unit` | ユニット + 契約テストの実行 |
-| `npm run test:coverage` | ユニット + 契約テストを coverage gate（80%）付きで実行 |
-| `npm run smoke:onboarding` | onboarding フローのスモークテスト |
+| `npm run setup` | Create symlinks (initial setup) |
+| `npm run onboarding` | Run setup + validation in one step (core) |
+| `npm run onboarding:full` | Run setup + validation + Codex sync in one step (optional) |
+| `npm run onboarding:claude` | Run setup + validation + Claude Code sync in one step (optional) |
+| `npm run onboarding:json` | Run onboarding in JSON output mode |
+| `npm run onboarding:full:json` | Run onboarding:full in JSON output mode |
+| `npm run metrics:report -- --days 7` | Aggregate recent metrics locally (`--json` supported) |
+| `npm run setup -- --force` | Back up existing real directories/files to `.bak-YYYYMMDDHHmmss` and recreate |
+| `npm run sync:codex` | Sync agents/rules/templates/examples to Codex |
+| `npm run sync:codex:json` | Run sync in JSON output mode |
+| `npm run sync:codex:agents` | Sync agents only to Codex |
+| `npm run sync:codex:rules` | Sync rules only to Codex |
+| `npm run sync:codex:templates` | Sync templates only to Codex |
+| `npm run sync:codex:examples` | Sync examples only to Codex |
+| `npm run sync:codex:preview` | Show effective content without writing |
+| `npm run sync:codex:preview:json` | Run preview in JSON output mode |
+| `npm run sync:claude` | Sync agents/rules to Claude Code |
+| `npm run sync:claude:json` | Run sync in JSON output mode |
+| `npm run sync:claude:agents` | Sync agents only to Claude Code |
+| `npm run sync:claude:rules` | Sync rules only to Claude Code |
+| `npm run sync:claude:preview` | Show effective content without writing |
+| `npm run validate` | Validate agents/rules + family drift guard |
+| `npm run validate:json` | Run validate in JSON output mode |
+| `npm run validate:agents` | Validate agent definitions only |
+| `npm run validate:rules` | Validate rule definitions only |
+| `npm run validate:drift` | Validate family drift for `drift_guard.enabled: true` families |
+| `npm run typecheck` | TypeScript type check for scripts/tests |
+| `npm run lint` | ESLint check for scripts/tests (warnings also fail) |
+| `npm run verify` | Canonical verify (validate + typecheck + lint + unit/contract) |
+| `npm run test:unit` | Run unit + contract tests |
+| `npm run test:coverage` | Run unit + contract tests with coverage gate (80%) |
+| `npm run smoke:onboarding` | Smoke test the onboarding flow |
 
-Claude sync (`sync:claude*`) は、`~/.claude/agents` / `~/.claude/rules` のシムリンクを壊さないよう、`~/.claude/skills/mantra*/SKILL.md` 配下に書き込みます。
+Claude sync (`sync:claude*`) writes to `~/.claude/skills/mantra*/SKILL.md` to avoid breaking the `~/.claude/agents` / `~/.claude/rules` symlinks.
 
 ## Harness Engineering / MVH
 
-repo 横断の最小実行可能ハーネス（MVH: Minimum Viable Harness）の正本は [docs/harness-engineering.md](./docs/harness-engineering.md) です。
+The canonical reference for the Minimum Viable Harness (MVH) across repos is [docs/harness-engineering.md](./docs/harness-engineering.md).
 
-関連テンプレート：
+Related templates:
 
-- [templates/repo-agents-pointer.md](./templates/repo-agents-pointer.md) — thin AGENTS.md テンプレート
-- [templates/repo-pre-push.example.sh](./templates/repo-pre-push.example.sh) — repo pre-push hook テンプレート
-- [templates/repo-obsidian-ledger.md](./templates/repo-obsidian-ledger.md) — session continuity ledger テンプレート
+- [templates/repo-agents-pointer.md](./templates/repo-agents-pointer.md) — thin AGENTS.md template
+- [templates/repo-pre-push.example.sh](./templates/repo-pre-push.example.sh) — repo pre-push hook template
+- [templates/repo-obsidian-ledger.md](./templates/repo-obsidian-ledger.md) — session continuity ledger template
 
-このセットで定義する内容:
+This set defines:
 
-- 1画面で読めるポインタ型 `AGENTS.md`
-- repo ごとに 1 本へ寄せる canonical verify command
-- unit / visual / acceptance の test ladder
-- PreToolUse / PostToolUse / Stop と repo hook の役割分担
-- `maw handover/takeover` と Obsidian ledger を使う継続契約
+- A pointer-style `AGENTS.md` readable on one screen
+- A single canonical verify command per repo
+- A test ladder: unit / visual / acceptance
+- Division of responsibility between PreToolUse / PostToolUse / Stop and repo hooks
+- The continuity contract using `maw handover/takeover` and the Obsidian ledger
 
 ---
 
-## User-Defined Content（追加定義の受け入れ）
+## User-Defined Content
 
-外部（`mantra/` 配下外）のユーザー定義 `agents/rules/templates/examples` を、core 定義と一緒に扱えます。
-この機能は **Stable** として運用します。
+User-defined `agents/rules/templates/examples` outside `mantra/` can be handled alongside core definitions.
+This feature is operated as **Stable**.
 
-主設定（推奨）:
+Primary configuration (recommended):
 - `~/.config/mantra/sources.json`
   - `roots`, `agentsDirs`, `rulesDirs`, `templatesDirs`, `examplesDirs`
 
-互換 fallback（既存）:
+Compatible fallback (existing):
 - `MANTRA_USER_CONTENT_ROOTS`
-  - 例: `/Users/nil/my-mantra-extra,/Users/nil/team-mantra`
-  - 各ルート配下の `agents/`, `rules/`, `templates/`, `examples/` を読み込む
+  - Example: `/Users/nil/my-mantra-extra,/Users/nil/team-mantra`
+  - Loads `agents/`, `rules/`, `templates/`, `examples/` under each root
 - `MANTRA_USER_AGENTS_DIRS`, `MANTRA_USER_RULES_DIRS`, `MANTRA_USER_TEMPLATES_DIRS`, `MANTRA_USER_EXAMPLES_DIRS`
-  - 種別ごとの直接指定（カンマ区切り）
+  - Direct per-type specification (comma-separated)
 
-補足:
-- 同名ファイルは「後から読まれたソース」が優先されます
-- 衝突ポリシーは filename 衝突のみで、`W_SOURCE_CONFLICT_FILENAME` warning を出してユーザー定義を優先します
-- family は `*.family/{family.yml,base.md,overlays/*}` 形式で定義します
-- `family.yml.targets` は overlay 名（例: `codex`）を指定し、`overlays/<name>.md` を解決します
-- `family.yml.drift_guard`（opt-in）で drift 契約を強制できます（`enabled`, `max_overlay_ratio`）
-- lock marker 構文は `<!-- mantra-lock:<id>:start -->` / `<!-- mantra-lock:<id>:end -->`
-- 継続的な運用契約や構造化出力は `base.md` に置き、overlay は target ごとの差分だけに薄く保ちます
-- family の合成結果は `npm run sync:codex:preview` / `npm run sync:codex:preview:json` で確認できます
-- 同一 source で legacy と family が同名出力になる場合は family を優先し、warning を出します
-- agent/rule の name 重複（legacy + family）は warning ではなく、`validate:agents|validate:rules` で `E_INPUT_INVALID` として失敗します
-- drift_guard 違反は `validate:drift` で `E_FAMILY_DRIFT` として失敗します
-- ユーザー定義または family 構成がある種別では、`setup` は `~/.mantra/generated/*` にマージして `~/.claude/agents|rules` へリンクします
+Notes:
+- When filenames conflict, the source loaded later takes precedence.
+- Conflict policy covers filename collisions only; emits `W_SOURCE_CONFLICT_FILENAME` warning and prefers the user-defined file.
+- Families are defined as `*.family/{family.yml,base.md,overlays/*}`.
+- `family.yml.targets` specifies overlay names (e.g. `codex`); resolves `overlays/<name>.md`.
+- `family.yml.drift_guard` (opt-in) enforces the drift contract (`enabled`, `max_overlay_ratio`).
+- Lock marker syntax: `<!-- mantra-lock:<id>:start -->` / `<!-- mantra-lock:<id>:end -->`.
+- Ongoing operational contracts and structured outputs belong in `base.md`; overlays stay thin, containing only per-target diffs.
+- Inspect family composition results with `npm run sync:codex:preview` / `npm run sync:codex:preview:json`.
+- When a legacy file and a family within the same source produce the same output name, the family takes precedence and a warning is emitted.
+- Duplicate agent/rule names (legacy + family) cause `E_INPUT_INVALID` failure in `validate:agents|validate:rules`, not a warning.
+- `drift_guard` violations fail as `E_FAMILY_DRIFT` in `validate:drift`.
+- For types that have user-defined or family configuration, `setup` merges into `~/.mantra/generated/*` and links to `~/.claude/agents|rules`.
 
-ロードマップ上の位置づけ:
-- Phase 2/3（運用性・一貫性）で作った基盤を使って、Phase 4（ユーザー価値）を回収する代表施策です。
+Roadmap position:
+- This is the flagship Phase 4 (user value) initiative, built on the foundation established in Phases 2/3 (operability and consistency).
 
 ---
 
 ## CI / CD
 
-このリポジトリでは GitHub Actions を使用して、以下のタイミングで自動検証を実行しています：
+This repository uses GitHub Actions to run automated validation:
 
-- **Pull Request の作成・更新時**
-- **main ブランチへの push 時**
+- **On pull request create/update**
+- **On push to main branch**
 
-**検証内容:**
-1. 依存関係のインストール (`npm ci`)
-2. agents/rules 定義の検証 (`npm run validate`)
-3. TypeScript 型検査 (`npm run typecheck`)
+**Validation steps:**
+1. Install dependencies (`npm ci`)
+2. Validate agents/rules definitions (`npm run validate`)
+3. TypeScript type check (`npm run typecheck`)
 4. ESLint (`npm run lint`)
-5. ユニット/契約テスト + coverage gate の実行 (`npm run test:coverage`)
-6. onboarding スモークテストの実行 (`npm run smoke:onboarding`)
+5. Unit/contract tests + coverage gate (`npm run test:coverage`)
+6. Onboarding smoke test (`npm run smoke:onboarding`)
 
-**Node.js バージョン:**
-- CI 環境: Node.js v20
-- 推奨ローカル環境: Node.js v20+
+**Node.js version:**
+- CI environment: Node.js v20
+- Recommended local environment: Node.js v20+
 
-ワークフロー定義: `.github/workflows/validate.yml`
+Workflow definition: `.github/workflows/validate.yml`
 
 ---
 
-## Mob Programming（実験的）/ Mob Programming (Experimental)
+## Mob Programming (Experimental)
 
-複雑なタスク向けのオプション機能として、**mob プログラミングオーケストレーション**用のエージェントとルールを含んでいます。
+As an optional feature for complex tasks, mantra includes agents and rules for **mob programming orchestration**.
 
-Optional feature for complex tasks: includes **mob programming orchestration** agents and rules.
-
-### なぜモブプログラミングか？/ Why Mob Programming?
-
-モブプログラミングは、以下の状況で意思決定の質と実装の安全性を向上させます：
+### Why mob programming?
 
 Mob programming improves decision quality and implementation safety in these situations:
 
-- **3+ 実装ステップ**を伴う変更 / Changes spanning **3+ implementation steps**
-- **複数ファイル・レイヤー**に影響する変更 / Changes touching **multiple files/layers**
-- **アーキテクチャ上のトレードオフ** / Architectural or API tradeoffs
-- **高リスクドメイン**（認証・セキュリティ・課金・移行）/ **High-risk domains** (auth, security, billing, migrations)
+- Changes spanning **3+ implementation steps**
+- Changes touching **multiple files/layers**
+- **Architectural or API tradeoffs**
+- **High-risk domains** (auth, security, billing, migrations)
 
-### いつ使用すべきでないか / When NOT to Use
+### When NOT to use
 
-- タイプ修正、自明なフォーマット変更 / Typo fixes, trivial formatting
-- 1ファイルの小変更 / Small one-file edits with obvious implementation
-- 振る舞いの変更がないテストスナップショット / Test snapshots without behavior changes
+- Typo fixes, trivial formatting changes
+- Small one-file edits with obvious implementation
+- Test snapshots without behavior changes
 
-### 含まれる mob 役割 / Included Mob Roles
+### Included mob roles
 
-| 役割 / Role | 説明 / Description |
-|-------------|--------------------|
-| `mob-navigator` | 意思決定フローの調整、専門家の順序決定 / Orchestrates decision flow, sequences specialists |
-| `mob-critic` | 仮定への挑戦、リスク発見、失敗モードの特定 / Challenges assumptions, finds risks, identifies failure modes |
-| `mob-scribe` | マルチエージェント出力の正規化・要約 / Normalizes multi-agent outputs into structured summary |
+| Role | Description |
+|------|-------------|
+| `mob-navigator` | Orchestrates decision flow and sequences which specialists to call |
+| `mob-critic` | Challenges assumptions, finds risks, identifies failure modes |
+| `mob-scribe` | Normalizes and summarizes multi-agent outputs |
 
-### 推奨モード / Recommended Modes
+### Recommended modes
 
-| モード / Mode | 使用タイミング / When to Use | 参加者例 / Typical Participants |
-|---------------|----------------------------|-------------------------------|
-| **flash-mob** | 実装前のクイックリスクスキャン / Preflight risk scanning | planner, architect, mob-critic, mob-navigator |
-| **plan-mob** | 計画・受入条件の確定 / Lock plan and acceptance criteria | planner, architect, tdd-guide, mob-critic, mob-scribe (`replan` is a follow-up step, not same-round parallel) |
-| **review-mob** | マージ準備レビュー / Merge readiness review | code-reviewer, security-reviewer, mob-critic, mob-scribe |
+| Mode | When to use | Typical participants |
+|------|-------------|---------------------|
+| **flash-mob** | Preflight risk scanning before implementation | planner, architect, mob-critic, mob-navigator |
+| **plan-mob** | Lock plan and acceptance criteria | planner, architect, tdd-guide, mob-critic, mob-scribe |
+| **review-mob** | Merge readiness review | code-reviewer, security-reviewer, mob-critic, mob-scribe |
 
-### クイックスタート / Quickstart
+### Quickstart
 
 ```bash
-# 5分で始める / Get started in 5 minutes
+# Get started in 5 minutes
 cat MOB_QUICKSTART.md
 
-# 実行例を確認 / See examples
+# See examples
 ls examples/mob-*-example.md
 
-# 詳細ルール / Detailed rules
+# Detailed rules
 cat rules/mob-programming.md
 ```
 
-### 関連ドキュメント / Related Docs
+### Related docs
 
-- `MOB_QUICKSTART.md` — 5分で始めるガイド / Get started in 5 minutes
-- `rules/mob-programming.md` — 完全なプロトコルとアンチパターン / Complete protocol and anti-patterns
-- `examples/` — flash-mob、plan-mob、review-mob の実行例 / Execution examples
-- `docs/mob-role-boundaries.md` — 役割の境界と選択ガイド / Role boundaries and selection guide
-- `templates/mob-*.md` — 二言語テンプレート（plan/review/decision-log）/ Bilingual templates
+- `MOB_QUICKSTART.md` — Get started in 5 minutes
+- `rules/mob-programming.md` — Complete protocol and anti-patterns
+- `examples/` — Execution examples for flash-mob, plan-mob, review-mob
+- `docs/mob-role-boundaries.md` — Role boundaries and selection guide
+- `templates/mob-*.md` — Templates (plan/review/decision-log)
 
 ---
 
-## ドキュメント / Documentation
+## Documentation
 
-| ドキュメント | 説明 |
-|-------------|------|
-| [Harness Engineering](./docs/harness-engineering.md) | Repo 導入パスの正本（adoption path / MVH） |
-| [Authoring Guide](./docs/authoring.md) | エージェント・ルールの作成ガイド |
-| [CLI Contract](./docs/cli-contract.md) | `--json` 出力・error_code・終了コードの契約 |
-| [Ops Metrics](./docs/ops-metrics.md) | KPI 定義、計測イベント、`metrics:report` の集計粒度 |
-| [Troubleshooting](./docs/troubleshooting.md) | `error_code` ごとの復旧手順 |
-| [Mob Programming](#mob-programming実験的-mob-programming-experimental) | 複雑タスク向けオーケストレーション |
+| Document | Description |
+|----------|-------------|
+| [Harness Engineering](./docs/harness-engineering.md) | Canonical repo adoption path (adoption path / MVH) |
+| [Authoring Guide](./docs/authoring.md) | Guide to authoring agents and rules |
+| [CLI Contract](./docs/cli-contract.md) | `--json` output, error_code, and exit code contract |
+| [Ops Metrics](./docs/ops-metrics.md) | KPI definitions, measurement events, `metrics:report` aggregation granularity |
+| [Troubleshooting](./docs/troubleshooting.md) | Recovery procedures per `error_code` |
+| [Mob Programming](#mob-programming-experimental) | Orchestration for complex tasks |
 
 ---
 

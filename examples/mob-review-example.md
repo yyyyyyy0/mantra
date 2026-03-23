@@ -1,23 +1,21 @@
-# Review-Mob Example / Review-Mob 実行例
+# Review-Mob Example
 
-## Context / 文脈
-
-セキュリティ関連の変更（認証 JWT の署名アルゴリズムを HS256 から RS256 へ変更）が実装され、マージ準備レビューを実施する。
+## Context
 
 Security-related change implemented: migrating JWT signature algorithm from HS256 to RS256. Conducting merge readiness review.
 
 ---
 
-## Participants / 参加者
+## Participants
 
-- `code-reviewer` — コード品質レビュー / Code quality review
-- `security-reviewer` — セキュリティレビュー / Security review
-- `mob-critic` — 挑戦的レビュー / Adversarial review
-- `mob-scribe` — 正規化・要約 / Normalization and summary
+- `code-reviewer` — Code quality review
+- `security-reviewer` — Security review
+- `mob-critic` — Adversarial review
+- `mob-scribe` — Normalization and summary
 
 ---
 
-## Discussion Transcript / 議論トランスクリプト（簡略化）
+## Discussion Transcript (abbreviated)
 
 ### code-reviewer
 
@@ -61,86 +59,50 @@ Security-related change implemented: migrating JWT signature algorithm from HS25
 
 ---
 
-## Normalized Summary / 正規化されたサマリー（mob-scribe 出力）
+## Normalized Summary (mob-scribe output)
 
-### Objective / 目的
-セキュリティ変更（RS256 移行）のマージ準備レビューを実施し、ブロッカー、警告、提案、残余リスクを要約する。
-
+### Objective
 Conduct merge readiness review for security change (RS256 migration) and summarize blockers, warnings, suggestions, and residual risks.
 
-### Constraints / 制約
-- セキュリティ変更: 承認前に CRITICAL/HIGH の問題を解決する必要あり
-
+### Constraints
 - Security change: CRITICAL/HIGH issues must be resolved before approval
 
-### Observations / 観察
-- RSA 鍵生成ロジックにテストなし
-- 秘密鍵が環境変数に平文保存されている
-- 鍵ローテーション戦略がない
-- 2048-bit 鍵サイズ（3072-bit+ 推奨）
-
+### Observations
 - No tests for RSA key generation logic
 - Private key stored in plain text environment variable
 - No key rotation strategy
 - 2048-bit key size (3072-bit+ recommended)
 
-### Blockers / ブロッカー（必須修正）
+### Blockers (required fixes)
 
-| 優先度 | 内容 | 推奨アクション |
-|--------|------|----------------|
-| CRITICAL | 鍵生成ロジックにテストなし | ユニットテスト追加（最小限のカバレッジ） |
-| CRITICAL | 秘密鍵が環境変数に平文 | シークレット管理サービスへ移行 |
-| HIGH | 鍵ローテーション戦略なし | ローテーションエンドポイント実装 |
-| HIGH | デュアルライト期間未実装 | HS256/RS256 並行稼動期間追加 |
-| MEDIUM | デプロイ時のアクティブユーザー切断 | グレースフル移行パス実装 |
-
-| Priority | Content | Recommended Action |
-|----------|---------|-------------------|
+| Priority | Description | Recommended Action |
+|----------|-------------|-------------------|
 | CRITICAL | No tests for key generation | Add unit tests (minimum coverage) |
 | CRITICAL | Private key in plain text env var | Migrate to secret management service |
 | HIGH | No key rotation strategy | Implement rotation endpoint |
 | HIGH | No dual-write period | Add HS256/RS256 parallel operation period |
 | MEDIUM | Active users disconnected during deployment | Implement graceful migration path |
 
-### Warnings / 警告（推奨修正）
-
-- `generateKeyPair()` が 150 行超。サブ関数抽出を推奨
-- JWT 検証のエラーハンドリングが汎用的。ログにデバッグ情報漏洩のリスク
-- トークン有効期限 24 時間。RS256 のオーバーヘッドを考慮し短縮検討
+### Warnings (recommended fixes)
 
 - `generateKeyPair()` exceeds 150 lines. Recommend sub-function extraction
 - JWT verification error handling is generic. Risk of debug info leak in logs
 - Token expiration 24 hours. Consider shortening for RS256 overhead
 
-### Suggestions / 提案（改善推奨）
-
-- 鍵生成ロジックを別モジュールに抽出（テスト可能性向上）
-- サーバー再起動なしの鍵ローテーションエンドポイント追加
-- 非同期鍵初期化でサーバー起動ブロック回避
+### Suggestions (improvement proposals)
 
 - Extract key generation logic to separate module (better testability)
 - Add key rotation endpoint without server restart
 - Async key initialization to avoid server startup block
 
-### Residual Risks / 残余リスク（承認後の監視推奨）
+### Residual Risks (recommended monitoring after approval)
 
-| 優先度 | 内容 | 緩和策 |
-|--------|------|--------|
-| MEDIUM | 鍵ローテーションの動作検証不足 | カナリアリリースで検証 |
-| LOW | 2048-bit 鍵サイズ | 次回メンテで 3072-bit にアップグレード |
-
-| Priority | Content | Mitigation |
-|----------|---------|-----------|
+| Priority | Description | Mitigation |
+|----------|-------------|------------|
 | MEDIUM | Key rotation behavior unverified | Verify with canary release |
 | LOW | 2048-bit key size | Upgrade to 3072-bit in next maintenance |
 
-### Recommended Next Actions / 推奨次のステップ
-
-1. **BLOCK**: マージをブロック。CRITICAL/HIGH 問題を解決後、再レビュー
-2. **ACTION**: 鍵生成ロジックのユニットテストを追加
-3. **ACTION**: 秘密鍵をシークレット管理サービスへ移行
-4. **ACTION**: デュアルライト期間と鍵ローテーション戦略を実装
-5. **REVIEW**: 上記修正後、review-mob を再実行
+### Recommended Next Actions
 
 1. **BLOCK**: Do not merge. Re-review after resolving CRITICAL/HIGH issues
 2. **ACTION**: Add unit tests for key generation logic
@@ -150,20 +112,13 @@ Conduct merge readiness review for security change (RS256 migration) and summari
 
 ---
 
-## Key Takeaways / 重要ポイント
-
-1. **review-mob の価値**: セキュリティ変更における CRITICAL/HIGH ブロッカーを特定
-2. **security-reviewer の貢献**: 鍵管理、ローテーション、鍵サイズの問題を発見
-3. **mob-critic の貢献**: デプロイ時の影響（アクティブユーザー切断）を指摘
-4. **決定**: マージをブロックし、必要な修正後に再レビュー
+## Key Takeaways
 
 1. **Value of review-mob**: Identified CRITICAL/HIGH blockers for security change
 2. **security-reviewer contribution**: Discovered key management, rotation, key size issues
 3. **mob-critic contribution**: Pointed out deployment impact (active user disconnection)
 4. **Decision**: Block merge, re-review after necessary fixes
 
-## Merge Recommendation / マージ推奨
-
-**DO NOT MERGE** — ブロッカー解決後に再レビューが必要
+## Merge Recommendation
 
 **DO NOT MERGE** — Re-review required after blockers are resolved

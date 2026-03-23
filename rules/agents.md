@@ -1,12 +1,12 @@
 # Agent Orchestration
 
-> Primary workflow は `autonomous-improvement-loop`（既存 repo の bounded 継続改善）。
-> Repo 導入の詳細は [docs/harness-engineering.md](../docs/harness-engineering.md) を参照。
+> The primary workflow is `autonomous-improvement-loop` (bounded continuous improvement for existing repos).
+> See [docs/harness-engineering.md](../docs/harness-engineering.md) for details on repo setup.
 
 <!-- Decision record (Issue #27):
-  P0-P4 ラダーとエージェントテーブルは Claude Code runtime の運用ガイダンスとして維持する。
-  narrative 上の位置づけ（flagship workflow, adoption path）は README と docs が担う。
-  このファイルは operational guidance に徹し、marketing messaging を持たない。 -->
+  The P0-P4 ladder and agent table are maintained as operational guidance for the Claude Code runtime.
+  Narrative positioning (flagship workflow, adoption path) is handled by README and docs.
+  This file is strictly operational guidance and carries no marketing messaging. -->
 
 ## Available Agents
 
@@ -34,31 +34,31 @@ No user prompt is needed to follow the default ladder, but there is no default a
 
 Use this sequence:
 
-- **P0 (Default single-agent path)**  
-  - Typo / formatting / docs-only small fixes  
-  - One-file obvious edits  
+- **P0 (Default single-agent path)**
+  - Typo / formatting / docs-only small fixes
+  - One-file obvious edits
   - No architectural decision needed
 
-- **P1 (planner condition)**  
-  - 3+ implementation steps  
-  - 2+ files  
-  - Ambiguous requirements or non-trivial behavior choices  
+- **P1 (planner condition)**
+  - 3+ implementation steps
+  - 2+ files
+  - Ambiguous requirements or non-trivial behavior choices
   - If any condition applies, invoke **planner**
 
-- **P2 (replan condition)**  
+- **P2 (replan condition)**
   - Run only after `planner` or design review outputs exist
   - Review shows unresolved High/Medium risks (`High + Medium > 0`)
   - Use **replan** to rebuild execution plan before implementation
   - Do not use for trivial one-file or obvious edits
   - Do not run `planner` and `replan` in the same round
 
-- **P3 (mob condition)**  
-  - High-risk scope (security, auth, billing, migrations, data integrity)  
-  - Repeated unresolved decision points after `planner` / `replan`  
+- **P3 (mob condition)**
+  - High-risk scope (security, auth, billing, migrations, data integrity)
+  - Repeated unresolved decision points after `planner` / `replan`
   - Escalate to `mob-*` only when multi-perspective value is clear
 
-- **P4 (code-reviewer condition)**  
-  - Non-trivial code changes  
+- **P4 (code-reviewer condition)**
+  - Non-trivial code changes
   - Invoke **code-reviewer** after writing code, not before obvious docs-only edits
 
 Suggested escalation:
@@ -82,17 +82,17 @@ In those cases:
 See [docs/harness-engineering.md](../docs/harness-engineering.md) and
 [templates/repo-agents-pointer.md](../templates/repo-agents-pointer.md).
 
-## フェーズ別補足ガイダンス（P0-P4 ラダーの補完）
+## Phase-Specific Supplemental Guidance (Complement to the P0-P4 Ladder)
 
-P0-P4 は「いつエスカレーションするか」を定める。本セクションはフェーズ固有の経路判断を補足する。
+P0-P4 defines when to escalate. This section supplements with phase-specific routing decisions.
 
-### 調査フェーズの経路選択
-- コードの所有境界・実行フローが不明: `planner` → `architect` の順で経路確認してから実装に入る
-- API/外部仕様の確認が必要: `planner` + `architect` を並行で起動し、仕様と設計を同時に収集する（mob session 外の調査フェーズに限る）
+### Routing Choices for the Investigation Phase
+- Code ownership boundaries or execution flow are unclear: confirm the path via `planner` → `architect` in that order before starting implementation
+- API/external spec verification is needed: spawn `planner` + `architect` in parallel to gather spec and design simultaneously (only during investigation phases outside mob sessions)
 
-### クリーンアップの分離原則
-- リファクタリングは機能実装のコミット完了後に分離して実施する
-- `refactor-cleaner` を使用し、機能変更のdiffと混在させない
+### Cleanup Separation Principle
+- Perform refactoring separately, after feature implementation commits are complete
+- Use `refactor-cleaner` and do not mix it with feature change diffs
 
 ## Parallel Task Execution
 

@@ -1,22 +1,22 @@
-# Mob Decision Log / 意思決定ログ
+# Mob Decision Log
 
-## Decision ID / 決定ID
-`YYYY-MM-DD-NN` （例: 2026-02-25-01）
+## Decision ID
+`YYYY-MM-DD-NN` (e.g., 2026-02-25-01)
 
 ---
 
-## Date / Context / 日付・文脈
+## Date / Context
 **Date**: _
-**Context**: _（決定時の背景・状況）_
+**Context**: _(Background and situation at the time of decision)_
 
 ---
 
-## Decision / 決定内容
-_（決定された事項を簡潔に記載）_
+## Decision
+_(Concise description of what was decided)_
 
 ---
 
-## Options Considered / 検討选项
+## Options Considered
 
 | Option | Description | Pros | Cons |
 |--------|-------------|------|------|
@@ -28,31 +28,31 @@ _（決定された事項を簡潔に記載）_
 
 ## Accepted / Rejected Options
 
-### Accepted / 採択案
+### Accepted Option
 **Option**: _
 **Reason**: _
 
-### Rejected / 却下案
+### Rejected Options
 **Option**: _ — **Reason**: _
 
 ---
 
-## Rationale / 根拠
-_（決定に至った理由・根拠）_
+## Rationale
+_(Reasoning and basis for the decision)_
 
 ---
 
-## Risks / Tradeoffs / リスク・トレードオフ
-_（決定に伴うリスクとトレードオフ）_
+## Risks / Tradeoffs
+_(Risks and tradeoffs associated with this decision)_
 
 ---
 
-## Follow-up Actions / フォローアップ
-_（必要なアクション）_
+## Follow-up Actions
+_(Required actions)_
 - [ ] _
 - [ ] _
 
 ---
 
-## Revisit Trigger / 再検討条件
-_（どの場合にこの決定を再検討するか）_
+## Revisit Trigger
+_(Under what circumstances should this decision be reconsidered)_
