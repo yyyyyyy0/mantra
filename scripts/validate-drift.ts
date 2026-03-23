@@ -52,7 +52,7 @@ function main(): void {
 
         familiesChecked += 1
         if (drift.violations.length === 0) {
-          writeInfo(json, `✓ drift ${kind}/${entry.family.outputName}`)
+          writeInfo(json, `✓ drift 検証通過: ${kind}/${entry.family.outputName}`)
           writeJsonLine(json, {
             type: 'drift_checked',
             command: 'validate:drift',
@@ -102,7 +102,7 @@ function main(): void {
         startedAt,
         success: false,
         error: new CliError(
-          `${familiesFailed} family drift violation(s) found`,
+          `${familiesFailed} 件の family drift 違反が見つかりました`,
           summaryErrorCode,
           false,
         ),
@@ -119,7 +119,7 @@ function main(): void {
 
     writeInfo(
       json,
-      `✓ drift validation passed (${familiesChecked} families checked / ${familiesSeen} families seen)`,
+      `✓ drift 検証通過 (${familiesChecked} families 検証済み / ${familiesSeen} families 検出)`,
     )
     finishCommand({
       command: 'validate:drift',

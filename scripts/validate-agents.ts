@@ -26,7 +26,7 @@ function parseAgentFrontmatter(content: string): ParsedAgent {
   const endIndex = lines.indexOf('---', 1)
 
   if (startIndex !== 0 || endIndex === -1) {
-    throw new CliError('Invalid frontmatter format', 'E_SCHEMA_FRONTMATTER', false)
+    throw new CliError('frontmatter の形式が不正です', 'E_SCHEMA_FRONTMATTER', false)
   }
 
   const rawYaml = lines.slice(1, endIndex).join('\n')
