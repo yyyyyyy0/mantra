@@ -378,8 +378,8 @@ issue 固有の closeout/checklist 文書を `docs/` に残す場合は、active
 
 - **検証スクリプト:** `scripts/validate-agents.ts`, `scripts/validate-rules.ts`
 - **同期スクリプト:** `scripts/sync-agents-to-codex.ts`, `scripts/sync-rules-to-codex.ts`, `scripts/sync-templates-to-codex.ts`, `scripts/sync-examples-to-codex.ts`
-- **CLI 契約:** `docs/cli-contract.md`
-- **メトリクス仕様:** `docs/ops-metrics.md`
-- **トラブルシュート:** `docs/troubleshooting.md`
+- **CLI 契約:** `docs/ja/cli-contract.md`
+- **メトリクス仕様:** `docs/ja/ops-metrics.md`
+- **トラブルシュート:** `docs/ja/troubleshooting.md`
 - **スキーマ定義:** `scripts/lib/agent-schema.ts`, `scripts/lib/rule-schema.ts`, `scripts/lib/skill-family-schema.ts`
 - **drift 検証:** `scripts/lib/skill-family-drift.ts`, `scripts/validate-drift.ts`

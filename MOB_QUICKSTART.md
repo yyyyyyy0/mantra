@@ -79,7 +79,7 @@ Claude: code-reviewer + security-reviewer + mob-critic + mob-scribe を起動し
 - **エージェント詳細**: `agents/mob-*.md`
 - **実行例**: `examples/mob-*-example.md`
 - **テンプレート**: `templates/mob-*.md`
-- **役割境界**: `docs/mob-role-boundaries.md`
+- **役割境界**: `docs/ja/mob-role-boundaries.md`
 
 ---
 
