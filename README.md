@@ -2,7 +2,7 @@
 
 **Dotfiles manager for Claude Code — agents, rules, and harness config as code.**
 
-Managing Claude Code's agents, rules, and hooks across machines is tedious and error-prone. mantra treats them as versionable dotfiles: one `npm run onboarding` sets up symlinks, validates definitions, and optionally syncs to Codex or Claude Code. Add your own agents and rules, share them across teams, and keep everything in CI.
+Managing Claude Code's agents, rules, and hooks across machines is tedious and error-prone. mantra treats them as versionable dotfiles: `npm run onboarding` sets up symlinks and validates definitions, while `npm run onboarding:full` (Codex sync) or `npm run onboarding:claude` (Claude Code sync) extend the flow with optional syncing. Add your own agents and rules, share them across teams, and keep everything in CI.
 
 ---
 
