@@ -130,7 +130,9 @@ fi
 printf '%s' "$REVIEW_TEXT" > "${TMPDIR_REVIEW}/review-output.txt"
 
 # --- 5. Parse has_critical (fail-closed: default true) ---
-HAS_CRITICAL=$(printf '%s' "$REVIEW_TEXT" | jq -r '.has_critical // true' 2>/dev/null || echo "true")
+# Strip markdown code fences if Claude wraps the JSON in ```json ... ```
+REVIEW_JSON=$(printf '%s' "$REVIEW_TEXT" | sed -n '/^{/,/^}/p')
+HAS_CRITICAL=$(printf '%s' "$REVIEW_JSON" | jq -r '.has_critical // true' 2>/dev/null || echo "true")
 
 # --- 6. Post PR comment ---
 echo "[pr-review] Posting review comment..."
