@@ -79,6 +79,15 @@ jobs:
             exit 0
           fi
 
+          # Check for blocking reviews (CHANGES_REQUESTED)
+          CHANGES_REQUESTED=$(gh pr view "$PR_NUMBER" --json reviews \
+            --jq '[.reviews[] | select(.state == "CHANGES_REQUESTED")] | length')
+          if [ "$CHANGES_REQUESTED" != "0" ]; then
+            echo "PR has changes-requested reviews, blocking auto-merge"
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           # Check all status checks passed
           CHECKS_PENDING=$(gh pr checks "$PR_NUMBER" --json name,state \
             --jq '[.[] | select(.state != "SUCCESS" and .state != "SKIPPED")] | length')
