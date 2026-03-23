@@ -140,8 +140,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           MERGED_BY: ${{ github.event.pull_request.merged_by.login }}
         run: |
-          # auto-merge merges as github-actions[bot]
-          if [ "$MERGED_BY" != "github-actions[bot]" ]; then
+          # auto-merge merges as github-actions[bot]; merge-queue as github-merge-queue[bot]
+          if [ "$MERGED_BY" != "github-actions[bot]" ] && [ "$MERGED_BY" != "github-merge-queue[bot]" ]; then
             echo "PR was manually merged by ${MERGED_BY}, skipping audit label"
             exit 0
           fi

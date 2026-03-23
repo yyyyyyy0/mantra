@@ -6,7 +6,7 @@
 
 ## 前提: thin AGENTS.md を設置する
 
-[templates/repo-agents-pointer.md](../templates/repo-agents-pointer.md) をベースに、repo のルートに `AGENTS.md` を置く。
+[repo-agents-pointer.md](https://github.com/yyyyyyy0/mantra/blob/main/templates/repo-agents-pointer.md) をベースに、repo のルートに `AGENTS.md` を置く。
 
 ```markdown
 # Agent Operations (my-project)
