@@ -1,15 +1,94 @@
 # mantra
 
-**Dotfiles manager for Claude Code — agents, rules, and harness config as code.**
+既存リポジトリを bounded に継続改善する repo-ops ハーネス。
 
-Managing Claude Code's agents, rules, and hooks across machines is tedious and error-prone. mantra treats them as versionable dotfiles: one `npm run onboarding` sets up symlinks, validates definitions, and optionally syncs to Codex or Claude Code. Add your own agents and rules, share them across teams, and keep everything in CI.
+`autonomous-improvement-loop` を中心に、薄いハーネス契約（thin AGENTS.md / canonical verify / hook / handoff）を既存 repo へ導入し、1 round = 1 issue の安全な改善サイクルを回す。
+
+セットアップは `npm run onboarding` を実行するだけで完了する。
+Codex 同期まで含める場合は `npm run onboarding:full`、Claude Code 同期まで含める場合は `npm run onboarding:claude` を使用する。
 
 ---
 
-Claude Code の設定（agents・rules）を dotfiles として管理するリポジトリ。
+## What mantra is
 
-新しいマシンやユーザーが `npm run onboarding` を実行するだけで、シムリンク作成と検証まで完了する。
-Codex 同期まで含める場合は `npm run onboarding:full`、Claude Code 同期まで含める場合は `npm run onboarding:claude` を使用する。
+mantra は 3 つの柱で既存 repo の継続改善を支える：
+
+| 柱 | 概要 |
+|---|---|
+| **autonomous-improvement-loop (AIL)** | 1 round = 1 issue で段階的に改善。bounded な変更予算（max 3 files / 200 lines）で安全に進む |
+| **Harness Engineering** | thin AGENTS.md / canonical verify / hook contract で、どの repo にも同じ入口を作る |
+| **Session Continuity** | handoff summary と ledger で、セッションをまたぐ作業を途切れなくつなぐ |
+
+mantra は汎用 agent pack ではない。既存 repo を安全に少しずつ良くするための運用ハーネスである。
+
+---
+
+## Primary workflow: autonomous-improvement-loop
+
+`autonomous-improvement-loop` は mantra の flagship workflow。既存 repo の段階的改善に使い、greenfield 設計には使わない。
+
+```text
+issue queue → select 1 issue → bounded fix → verify → handoff
+                                    ↑                    │
+                                    └────── next round ───┘
+```
+
+- **1 round = 1 issue**: 固定 round cap なし。1 round で 1 つの issue を選び、bounded に修正する
+- **変更予算**: max 3 changed files / 200 changed lines per round
+- **安全境界**: 新しい user steer が来たら、current atomic step の後 safe boundary で停止
+- **QA-only mode**: dirty worktree や不安定な baseline では、編集せず証拠収集と推奨のみ
+- **構造化出力**: 毎 round で `[AIL][rNN]` summary block を出し、停止時は final handoff summary を残す
+
+source of truth は [`agents/autonomous-improvement-loop.family`](./agents/autonomous-improvement-loop.family/) です。
+
+実運用の walkthrough は [examples/ail-repo-improvement-loop.md](./examples/ail-repo-improvement-loop.md) を参照。
+
+---
+
+## Repo adoption path
+
+既存 repo に mantra のハーネスを導入する最短手順：
+
+1. **Thin AGENTS.md を置く** — [テンプレート](./templates/repo-agents-pointer.md) をベースに、Purpose / Canonical verify / Session continuity を記入
+2. **Canonical verify を決める** — repo で 1 本の検証コマンドを定め、AGENTS.md に明記する（例: `npm run verify`）
+3. **Hook contract を設定** — [repo pre-push テンプレート](./templates/repo-pre-push.example.sh) で canonical verify を毎 push で呼ぶ
+4. **Continuity を運用する** — `maw handover/takeover` と [Obsidian ledger テンプレート](./templates/repo-obsidian-ledger.md) でセッション引き継ぎ
+
+詳細は [docs/harness-engineering.md](./docs/harness-engineering.md)（adoption path 正本）を参照。
+
+---
+
+## Start here / はじめに
+
+1. `npm ci` — 依存関係のインストール
+2. `npm run onboarding` — セットアップ + 検証（core）
+3. `npm run onboarding:full` — セットアップ + 検証 + Codex 同期（optional）
+4. `npm run smoke:onboarding` — 最短導線のスモーク検証（任意）
+
+---
+
+## クイックスタート
+
+```bash
+# 1. クローン
+git clone https://github.com/yyyyyyy0/mantra ~/.mantra
+cd ~/.mantra
+
+# 2. 依存インストール
+npm ci
+
+# 3. セットアップ+検証（最短導線）
+npm run onboarding
+
+# 4. Codex 同期まで実行する場合（任意）
+npm run onboarding:full
+```
+
+既存のシムリンク/ディレクトリを再作成する場合（実ディレクトリはバックアップ退避）:
+
+```bash
+npm run setup -- --force
+```
 
 ---
 
@@ -64,42 +143,6 @@ Claude Code sync 追加: setup + validate + claude sync
 - `planner`: 初回の実装計画を作る
 - `replan`: レビュー結果を受けて、実装前に再計画する（`High + Medium > 0` の場合のみ）
 - 同一ラウンドで同時起動しない（`planner` 出力を `replan` に引き継ぐ）
-
----
-
-## Start here — 最初にやるべきこと / First steps
-
-1. `npm ci` — 依存関係のインストール
-2. `npm run onboarding` — セットアップ + 検証（core）
-3. `npm run onboarding:full` — セットアップ + 検証 + Codex 同期（optional）
-4. `npm run smoke:onboarding` — 最短導線のスモーク検証（任意）
-
-↓ 詳細は以下のクイックスタートへ
-
----
-
-## クイックスタート
-
-```bash
-# 1. クローン
-git clone https://github.com/yyyyyyy0/mantra ~/.mantra
-cd ~/.mantra
-
-# 2. 依存インストール
-npm ci
-
-# 3. セットアップ+検証（最短導線）
-npm run onboarding
-
-# 4. Codex 同期まで実行する場合（任意）
-npm run onboarding:full
-```
-
-既存のシムリンク/ディレクトリを再作成する場合（実ディレクトリはバックアップ退避）:
-
-```bash
-npm run setup -- --force
-```
 
 ---
 
@@ -164,12 +207,12 @@ mantra/
 
 ## エージェント一覧
 
-`agents/` 配下のエージェントが `~/.claude/agents/` にシムリンクされる。
+mantra は specialist agents を同梱しています。primary workflow は `autonomous-improvement-loop`、他のエージェントは計画・レビュー・オーケストレーションを支援します。
 
 | エージェント | 用途 |
 |---|---|
-| `architect` | システム設計・アーキテクチャ判断 |
 | `autonomous-improvement-loop` | 既存リポジトリの継続的改善。1 round = 1 issue で進み、safe boundary で停止・handoff する |
+| `architect` | システム設計・アーキテクチャ判断 |
 | `build-error-resolver` | ビルドエラー・型エラーの修正 |
 | `code-reviewer` | コードレビュー（品質・セキュリティ・保守性） |
 | `doc-updater` | ドキュメント・コードマップの更新 |
@@ -244,12 +287,13 @@ Claude sync (`sync:claude*`) は、`~/.claude/agents` / `~/.claude/rules` のシ
 
 ## Harness Engineering / MVH
 
-repo 横断の最小実行可能ハーネス（MVH: Minimum Viable Harness）の正本は次を参照します。
+repo 横断の最小実行可能ハーネス（MVH: Minimum Viable Harness）の正本は [docs/harness-engineering.md](./docs/harness-engineering.md) です。
 
-- [docs/harness-engineering.md](./docs/harness-engineering.md)
-- [templates/repo-agents-pointer.md](./templates/repo-agents-pointer.md)
-- [templates/repo-pre-push.example.sh](./templates/repo-pre-push.example.sh)
-- [templates/repo-obsidian-ledger.md](./templates/repo-obsidian-ledger.md)
+関連テンプレート：
+
+- [templates/repo-agents-pointer.md](./templates/repo-agents-pointer.md) — thin AGENTS.md テンプレート
+- [templates/repo-pre-push.example.sh](./templates/repo-pre-push.example.sh) — repo pre-push hook テンプレート
+- [templates/repo-obsidian-ledger.md](./templates/repo-obsidian-ledger.md) — session continuity ledger テンプレート
 
 このセットで定義する内容:
 
@@ -259,29 +303,11 @@ repo 横断の最小実行可能ハーネス（MVH: Minimum Viable Harness）の
 - PreToolUse / PostToolUse / Stop と repo hook の役割分担
 - `maw handover/takeover` と Obsidian ledger を使う継続契約
 
-### 導線ガイド / Execution guidance
-
-- 単純修正や明確な 1 ファイル修正は `single-agent` で完了する
-- 既存 repo の段階的改善や hardening は `autonomous-improvement-loop` を優先する
-- 複数判断が必要な作業は `planner` で初回計画を作る
-- 実装前レビューで高/中リスクが未解決なら `replan` で再計画する
-- 変更後のコードレビューは `code-reviewer`、高リスク判断が必要な時のみ `mob`
-
-### `autonomous-improvement-loop` の使いどころ / When to use
-
-- 呼び出し名はこれまでどおり `autonomous-improvement-loop` を使います
-- source of truth は [`agents/autonomous-improvement-loop.family`](./agents/autonomous-improvement-loop.family/) です
-- 既存 repo の段階的改善に使い、新規機能の greenfield 設計には使いません
-- 固定 round cap はなく、**1 round = 1 selected issue** で継続します
-- 新しい user steer が来たら current atomic step の後、safe boundary で止まります
-- 毎 round で `[AIL][rNN]` summary block を出し、停止時は final handoff summary を残します
-- worktree が dirty か baseline が不安定な場合は `QA-only mode` に切り替えます
-
 ---
 
 ## User-Defined Content（追加定義の受け入れ）
 
-外部（`mantra/` 配下外）のユーザー定義 `agents/rules/templates/examples` を、core 定義と一緒に扱えます。  
+外部（`mantra/` 配下外）のユーザー定義 `agents/rules/templates/examples` を、core 定義と一緒に扱えます。
 この機能は **Stable** として運用します。
 
 主設定（推奨）:
@@ -289,7 +315,7 @@ repo 横断の最小実行可能ハーネス（MVH: Minimum Viable Harness）の
   - `roots`, `agentsDirs`, `rulesDirs`, `templatesDirs`, `examplesDirs`
 
 互換 fallback（既存）:
-- `MANTRA_USER_CONTENT_ROOTS`  
+- `MANTRA_USER_CONTENT_ROOTS`
   - 例: `/Users/nil/my-mantra-extra,/Users/nil/team-mantra`
   - 各ルート配下の `agents/`, `rules/`, `templates/`, `examples/` を読み込む
 - `MANTRA_USER_AGENTS_DIRS`, `MANTRA_USER_RULES_DIRS`, `MANTRA_USER_TEMPLATES_DIRS`, `MANTRA_USER_EXAMPLES_DIRS`
@@ -403,6 +429,7 @@ cat rules/mob-programming.md
 
 | ドキュメント | 説明 |
 |-------------|------|
+| [Harness Engineering](./docs/harness-engineering.md) | Repo 導入パスの正本（adoption path / MVH） |
 | [Authoring Guide](./docs/authoring.md) | エージェント・ルールの作成ガイド |
 | [CLI Contract](./docs/cli-contract.md) | `--json` 出力・error_code・終了コードの契約 |
 | [Ops Metrics](./docs/ops-metrics.md) | KPI 定義、計測イベント、`metrics:report` の集計粒度 |

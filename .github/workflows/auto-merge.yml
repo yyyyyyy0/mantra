@@ -5,6 +5,10 @@ on:
   pull_request:
     types: [labeled, unlabeled]
     branches: [main]
+  # Trigger on PR close for audit labeling (pull_request_target has write token for forks)
+  pull_request_target:
+    types: [closed]
+    branches: [main]
   # Trigger when review status changes
   pull_request_review:
     types: [submitted]
@@ -24,6 +28,7 @@ permissions:
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
     env:
       GH_REPO: ${{ github.repository }}
     steps:
@@ -121,10 +126,49 @@ jobs:
         run: |
           # Enable auto-merge with squash strategy
           gh pr merge "$PR_NUMBER" --auto --squash
+          echo "Auto-merge enabled for PR #${PR_NUMBER}"
 
-          # Add auto-merged label for audit trail
+          # If merge was immediate (all checks already green), add audit label now
+          # because GITHUB_TOKEN-triggered close events don't start new workflow runs
+          sleep 2
+          PR_STATE=$(gh pr view "$PR_NUMBER" --json state --jq '.state')
+          if [ "$PR_STATE" = "MERGED" ]; then
+            echo "PR was immediately merged, adding audit label in-band"
+            gh label create "auto-merged" --force --color "6f42c1" \
+              --description "PR was automatically merged" 2>/dev/null || true
+            gh pr edit "$PR_NUMBER" --add-label "auto-merged"
+          fi
+
+  # Add audit label only after PR is actually merged via auto-merge
+  audit-label:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true
+    env:
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Check if auto-merged and add label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MERGED_BY: ${{ github.event.pull_request.merged_by.login }}
+        run: |
+          # auto-merge merges as github-actions[bot]; merge-queue as github-merge-queue[bot]
+          if [ "$MERGED_BY" != "github-actions[bot]" ] && [ "$MERGED_BY" != "github-merge-queue[bot]" ]; then
+            echo "PR was manually merged by ${MERGED_BY}, skipping audit label"
+            exit 0
+          fi
+
+          # Only label PRs that were risk:low (our auto-merge path), not manually
+          # enqueued medium/high-risk PRs that also merge as github-merge-queue[bot]
+          LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')
+          if ! echo "$LABELS" | grep -qx "risk:low"; then
+            echo "PR was not risk:low, skipping audit label (likely manually enqueued)"
+            exit 0
+          fi
           gh label create "auto-merged" --force --color "6f42c1" \
             --description "PR was automatically merged" 2>/dev/null || true
           gh pr edit "$PR_NUMBER" --add-label "auto-merged"
-
-          echo "Auto-merge enabled for PR #${PR_NUMBER}"
+          echo "Added auto-merged label to PR #${PR_NUMBER}"
