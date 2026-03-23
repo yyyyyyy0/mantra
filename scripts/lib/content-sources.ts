@@ -17,6 +17,14 @@ const SourcesFileSchema = z.object({
 
 type SourcesFile = z.infer<typeof SourcesFileSchema>
 
+// 三状態キャッシュ: undefined = 未読, null = ファイル不在, SourcesFile = 読み込み済み
+let _sourcesFileCache: SourcesFile | null | undefined = undefined
+
+/** テスト専用。プロセス内テストで sources.json の状態を変更した後に呼ぶこと。 */
+export function __resetSourcesFileCache(): void {
+  _sourcesFileCache = undefined
+}
+
 function getSourcesJsonPath(): string {
   return path.join(os.homedir(), '.config', 'mantra', 'sources.json')
 }
@@ -36,9 +44,14 @@ function expandHome(p: string): string {
 }
 
 function loadSourcesFile(): SourcesFile | null {
+  if (_sourcesFileCache !== undefined) {
+    return _sourcesFileCache
+  }
+
   const filePath = getSourcesJsonPath()
 
   if (!fs.existsSync(filePath)) {
+    _sourcesFileCache = null
     return null
   }
 
@@ -75,7 +88,8 @@ function loadSourcesFile(): SourcesFile | null {
     )
   }
 
-  return result.data
+  _sourcesFileCache = result.data
+  return _sourcesFileCache
 }
 
 function kindDirKey(kind: ContentKind): keyof SourcesFile {
@@ -191,38 +205,6 @@ export function resolveContentSources(kind: ContentKind): ContentSource[] {
   }
 
   return sources
-}
-
-export interface ContentFile {
-  source: ContentSource
-  fullPath: string
-  relativeName: string
-}
-
-export function listContentFiles(kind: ContentKind): ContentFile[] {
-  const results: ContentFile[] = []
-  for (const source of resolveContentSources(kind)) {
-    const names = fs
-      .readdirSync(source.dir)
-      .slice()
-      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
-    for (const name of names) {
-      const fullPath = path.join(source.dir, name)
-      const stat = fs.statSync(fullPath)
-      if (!stat.isFile()) {
-        continue
-      }
-      if ((kind === 'agents' || kind === 'rules') && !name.endsWith('.md')) {
-        continue
-      }
-      results.push({
-        source,
-        fullPath,
-        relativeName: name,
-      })
-    }
-  }
-  return results
 }
 
 export function hasUserSources(kind: ContentKind): boolean {
