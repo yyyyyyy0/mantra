@@ -59,6 +59,7 @@ gh pr create → PostToolUse hook 発火 → scripts/pr-review.sh (background)
 
 - `claude` CLI がインストール済みで OAuth 認証済み（`claude --version` で確認）
 - `gh` CLI が認証済み（`gh auth status` で確認）
+- `jq` がインストール済み（`jq --version` で確認。PR メタデータのパースに使用）
 
 ## Branch Protection Settings
 
@@ -75,7 +76,6 @@ Required reviews:
   - 1 approval (risk:medium, risk:high のみ — GitHub の CODEOWNERS や ruleset で制御)
 
 Auto-merge: enabled
-Merge queue: enabled (optional)
 ```
 
 ## Security Considerations

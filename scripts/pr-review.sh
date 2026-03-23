@@ -28,10 +28,34 @@ trap 'rm -rf "$TMPDIR_REVIEW"' EXIT
 
 echo "[pr-review] Reviewing PR #${PR_NUMBER} in ${REPO}..."
 
-# --- 1. Get PR diff (truncate at 100KB) ---
+# --- 1. Pin HEAD SHA first to prevent race conditions ---
+gh pr view "$PR_NUMBER" --repo "$REPO" --json title,body,headRefOid > "${TMPDIR_REVIEW}/meta.json"
+PR_TITLE=$(jq -r '.title // "untitled"' "${TMPDIR_REVIEW}/meta.json")
+HEAD_SHA=$(jq -r '.headRefOid // ""' "${TMPDIR_REVIEW}/meta.json")
+
+if [ -z "$HEAD_SHA" ]; then
+  echo "[pr-review] Could not get head SHA for PR #${PR_NUMBER}" >&2
+  exit 1
+fi
+
+echo "[pr-review] Pinned HEAD SHA: ${HEAD_SHA}"
+
+# --- 2. Get PR diff (truncate at 100KB) ---
 DIFF=$(gh pr diff "$PR_NUMBER" --repo "$REPO" 2>/dev/null || true)
 if [ -z "$DIFF" ]; then
   echo "[pr-review] Could not get diff for PR #${PR_NUMBER}" >&2
+  exit 1
+fi
+
+# Verify SHA hasn't changed during diff fetch
+CURRENT_SHA=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq '.headRefOid' 2>/dev/null || echo "")
+if [ "$CURRENT_SHA" != "$HEAD_SHA" ]; then
+  echo "[pr-review] HEAD SHA changed during review (${HEAD_SHA} -> ${CURRENT_SHA}), aborting" >&2
+  gh api "repos/${REPO}/statuses/${HEAD_SHA}" \
+    -X POST \
+    -f state="failure" \
+    -f context="ai-review/critical-findings" \
+    -f description="Review aborted: HEAD changed during review" 2>/dev/null || true
   exit 1
 fi
 
@@ -43,16 +67,6 @@ if [ "$DIFF_SIZE" -gt 100000 ]; then
 [TRUNCATED - diff exceeds 100KB]"
 fi
 printf '%s' "$DIFF" > "${TMPDIR_REVIEW}/diff.txt"
-
-# --- 2. Get PR metadata ---
-gh pr view "$PR_NUMBER" --repo "$REPO" --json title,body,headRefOid > "${TMPDIR_REVIEW}/meta.json"
-PR_TITLE=$(jq -r '.title // "untitled"' "${TMPDIR_REVIEW}/meta.json")
-HEAD_SHA=$(jq -r '.headRefOid // ""' "${TMPDIR_REVIEW}/meta.json")
-
-if [ -z "$HEAD_SHA" ]; then
-  echo "[pr-review] Could not get head SHA for PR #${PR_NUMBER}" >&2
-  exit 1
-fi
 
 # Get file list
 gh pr diff "$PR_NUMBER" --repo "$REPO" --name-only > "${TMPDIR_REVIEW}/files.txt" 2>/dev/null || true

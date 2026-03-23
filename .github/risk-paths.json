@@ -18,7 +18,7 @@
     "**/secrets/**"
   ],
   "lowRiskOnlyPaths": {
-    "docs": ["*.md", "docs/**", "LICENSE", "CHANGELOG*"],
+    "docs": ["**/*.md", "docs/**", "LICENSE", "CHANGELOG*"],
     "tests": ["tests/**", "**/*.test.*", "**/*.spec.*", "__tests__/**"],
     "generated": ["**/generated/**", "**/*.gen.*", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"]
   },
