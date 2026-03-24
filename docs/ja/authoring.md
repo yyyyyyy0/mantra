@@ -374,6 +374,46 @@ issue 固有の closeout/checklist 文書を `docs/` に残す場合は、active
 
 ---
 
+## ドキュメントの言語ポリシー
+
+`docs/` 配下は言語ごとにディレクトリを分離して管理します。
+
+### ディレクトリ構成
+
+```text
+docs/
+├── ja/   # 日本語（正本）
+└── en/   # 英語（スタブまたは翻訳）
+```
+
+### 原則
+
+| ルール | 説明 |
+|--------|------|
+| **正本は `ja/`** | すべてのドキュメントはまず `docs/ja/` に日本語で作成する |
+| **英語スタブは高参照ファイルのみ** | 外部参照や英語話者の導線として必要なファイルだけ `docs/en/` にスタブを置く |
+| **スタブの形式** | H1 + 1行の英語サマリー + `> For the full document, see [docs/ja/...](../ja/...)` のリンク |
+| **パス参照は言語ディレクトリ込み** | `docs/ja/harness-engineering.md` のようにフルパスで参照する。`docs/harness-engineering.md` は使わない |
+
+### 新規ドキュメントの追加手順
+
+1. `docs/ja/` にファイルを作成する
+2. 他ファイルからの参照パスを `docs/ja/<filename>` で記述する
+3. 英語スタブが必要な場合は `docs/en/` に上記形式で作成する
+4. `grep -rn 'docs/[a-z]' --include='*.md' . | grep -v 'docs/ja/' | grep -v 'docs/en/'` で旧パスが残っていないことを確認する
+
+### 英語スタブの例
+
+```markdown
+# Harness Engineering
+
+The canonical reference for adopting mantra's Minimum Viable Harness (MVH) into a repository.
+
+> For the full document, see [docs/ja/harness-engineering.md](../ja/harness-engineering.md).
+```
+
+---
+
 ## 関連ファイル
 
 - **検証スクリプト:** `scripts/validate-agents.ts`, `scripts/validate-rules.ts`

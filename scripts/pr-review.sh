@@ -61,8 +61,7 @@ fi
 
 DIFF_SIZE=$(printf '%s' "$DIFF" | wc -c | tr -d ' ')
 if [ "$DIFF_SIZE" -gt 100000 ]; then
-  DIFF=$(printf '%s' "$DIFF" | head -c 100000)
-  DIFF="${DIFF}
+  DIFF="$(printf '%s' "$DIFF" | dd bs=1 count=100000 2>/dev/null)
 
 [TRUNCATED - diff exceeds 100KB]"
 fi

@@ -58,10 +58,9 @@ TeamCreate("feat-xxx")
 
 # Pattern B: Frontend + Backend in parallel
 TeamCreate("feat-xxx")
-  - lead: coordination
+  - lead: coordination + test creation
   - frontend (general-purpose, worktree): UI implementation
   - backend (general-purpose, worktree): API implementation
-  - tester (tdd-guide): test creation
 
 # Pattern C: Refactor + Tests in parallel
 TeamCreate("refactor-xxx")
