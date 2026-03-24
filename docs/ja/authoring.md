@@ -155,7 +155,7 @@ drift_guard:
 - `agents/rules` の出力名（legacy + family）は全体で一意である必要があります（重複時は `E_INPUT_INVALID`）
 - stop 条件、構造化 summary、handoff fields のような継続的な運用契約は `base.md` に置き、必要なら lock marker で保護します
 - overlay は target 固有の reporting style や narrative 補助に限定し、base 契約を上書きしない薄い差分に保ちます
-- 参照例として [`agents/autonomous-improvement-loop.family`](../agents/autonomous-improvement-loop.family/) は「base-heavy / overlay-thin」の family 構成になっています
+- 参照例として [`agents/autonomous-improvement-loop.family`](../../agents/autonomous-improvement-loop.family/) は「base-heavy / overlay-thin」の family 構成になっています
 
 ### 良い説明トリガーの例
 
@@ -203,13 +203,13 @@ drift_guard:
 
 ## セクション1: 具体的なガイドライン
 
-### 良い例 / CORRECT
+### 良い例
 
 \```typescript
 // 実装例
 \```
 
-### 悪い例 / WRONG
+### 悪い例
 
 \```typescript
 // 避けるべき例
@@ -378,8 +378,8 @@ issue 固有の closeout/checklist 文書を `docs/` に残す場合は、active
 
 - **検証スクリプト:** `scripts/validate-agents.ts`, `scripts/validate-rules.ts`
 - **同期スクリプト:** `scripts/sync-agents-to-codex.ts`, `scripts/sync-rules-to-codex.ts`, `scripts/sync-templates-to-codex.ts`, `scripts/sync-examples-to-codex.ts`
-- **CLI 契約:** `docs/cli-contract.md`
-- **メトリクス仕様:** `docs/ops-metrics.md`
-- **トラブルシュート:** `docs/troubleshooting.md`
+- **CLI 契約:** `docs/ja/cli-contract.md`
+- **メトリクス仕様:** `docs/ja/ops-metrics.md`
+- **トラブルシュート:** `docs/ja/troubleshooting.md`
 - **スキーマ定義:** `scripts/lib/agent-schema.ts`, `scripts/lib/rule-schema.ts`, `scripts/lib/skill-family-schema.ts`
 - **drift 検証:** `scripts/lib/skill-family-drift.ts`, `scripts/validate-drift.ts`

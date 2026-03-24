@@ -1,8 +1,8 @@
 # Agent Operations (<repo>)
 
 ## Purpose
-- このファイルは bounded repo improvement の運用入口のみを定義する。
-- 仕様や背景は SSOT に寄せ、このファイルへ再掲しない。
+- This file defines only the operational entry point for bounded repo improvement.
+- Specifications and background belong in the SSOT; do not reproduce them here.
 
 ## Canonical Verify
 - `<canonical verify command>`
@@ -13,8 +13,8 @@
 - `acceptance`: `<when to run acceptance or E2E>`
 
 ## Session Continuity
-- source of truth は `maw handover/takeover`
-- Obsidian ledger には `repo / branch_or_workspace / goal / blockers / next_step / evidence_refs` を残す
+- Source of truth is `maw handover/takeover`
+- Leave `repo / branch_or_workspace / goal / blockers / next_step / evidence_refs` in the Obsidian ledger
 
 ## Canonical Docs
 - `README.md`
@@ -22,6 +22,6 @@
 - `<repo runbook>`
 
 ## Non-Goals
-- 長い運用メモの再掲
-- 実装仕様の説明
-- 詳細 runbook の複製
+- Reproducing long operational notes
+- Explaining implementation specifications
+- Duplicating detailed runbooks

@@ -2,19 +2,19 @@
 
 ## Model Selection Strategy
 
-**Codex**（コード生成全般のデフォルト）:
-- 実装・ボイラープレート・scaffold・テスト生成・コードレビュー補助
-- Codex ツールが利用可能な場合は委譲（具体的なツール名はグローバルルール CLAUDE.md を参照）
+**Codex** (default for all code generation):
+- Implementation, boilerplate, scaffolding, test generation, code review assistance
+- Delegate to the Codex tool when available (see global rules CLAUDE.md for the specific tool name)
 
-**Sonnet 4.6**（コード以外のサブエージェント）:
-- 調査・検索・ドキュメント生成・非コード分析
-- Agent tool で spawn する際は `model: "sonnet"` を指定
+**Sonnet 4.6** (for non-code sub-agents):
+- Research, search, documentation generation, non-code analysis
+- Specify `model: "sonnet"` when spawning via the Agent tool
 
-**Opus 4.6**（重い思考が必要な場合のみ）:
-- 複雑なアーキテクチャ決定
-- plan-mob / flash-mob のオーケストレーター
-- 深い推論が必要な調査・分析
-- Agent tool で spawn する際は `model: "opus"` を明示指定
+**Opus 4.6** (only when heavy reasoning is required):
+- Complex architectural decisions
+- Orchestrator for plan-mob / flash-mob
+- Research and analysis requiring deep reasoning
+- Explicitly specify `model: "opus"` when spawning via the Agent tool
 
 ## Context Window Management
 

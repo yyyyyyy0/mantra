@@ -195,82 +195,82 @@ Use `mob-scribe` and produce this exact structure:
 
 ---
 
-## Anti-patterns to Avoid / 避けるべきアンチパターン
+## Anti-patterns to Avoid
 
-### 1. 決定目標なしのエージェント乱呼び / Calling Many Agents Without a Decision Target
+### 1. Calling Many Agents Without a Decision Target
 
-**Symptom / 症状**: 複数のエージェントを一度に起動するが、何を決めるべきか明確でない。
+**Symptom**: Multiple agents are launched at once, but what needs to be decided is not clear.
 
-**Problem / 問題**:
-- 無関係な視点が混在し、ノイズが増える
-- コスト増加につながらない対話が発生
-- 最終的な決定ができないままセッションが終了する
+**Problem**:
+- Unrelated perspectives mix together, increasing noise
+- Conversations occur that do not lead to any decision
+- The session ends without reaching a final decision
 
-**Fix / 修正**:
-- mob-navigator を使用して決定ポイントを最初に分解する
-- 各ラウンドで**一つの決定**に集中する
-- 参加者を「今、どの視点が必要か」に基づいて選択する
-
----
-
-### 2. 生トランスクリプトを最終成果物扱い / Treating Raw Transcripts as the Final Artifact
-
-**Symptom / 症状**: エージェント対話のログをそのまま成果物として扱う。
-
-**Problem / 問題**:
-- 決定・リスク・アクションが明確でない
-- 他のメンバーが理解・レビューできない
-- 後から参照する際に情報が見つけにくい
-
-**Fix / 修正**:
-- mob-scribe を使用して正規化されたサマリーを作成する
-- 決定/却下/先送りを明確に分類する
-- リスクには優先度と緩和策を添付する
+**Fix**:
+- Use mob-navigator to decompose decision points first
+- Focus on **one decision** per round
+- Select participants based on "which perspective is needed right now"
 
 ---
 
-### 3. リスク作業での挑発役スキップ / Skipping Challenge Roles on Risky Work
+### 2. Treating Raw Transcripts as the Final Artifact
 
-**Symptom / 症状**: セキュリティ、認証、課金、データ整合性などの変更で mob-critic を含めない。
+**Symptom**: Agent interaction logs are treated as-is as the deliverable.
 
-**Problem / 問題**:
-- 浅いコンセンサスで危険な変更が進む
-- リスクが検出されないまま本番にデプロイされる
-- 回復不能な障害が発生する可能性
+**Problem**:
+- Decisions, risks, and actions are not clearly identified
+- Other team members cannot understand or review the output
+- Information is hard to find when referenced later
 
-**Fix / 修正**:
-- リスクの高い変更には必ず mob-critic（または同等の挑発役）を含める
-- 失敗モード、エッジケース、カウンターエグザンプルを明示的に要求する
-- 「なぜ失敗するか」を問う対話を促進する
-
----
-
-### 4. 正規化プラン前の実装開始 / Starting Implementation Before a Normalized Plan Exists
-
-**Symptom / 症状**: 複雑なタスクで、検討なしに直接コードを書き始める。
-
-**Problem / 問題**:
-- アーキテクチャ上のトレードオフが考慮されない
-- 後からリファクタリングが必要になる（二重作業）
-- 受入条件が不明で、完了判定ができない
-
-**Fix / 修正**:
-- plan-mob を使用して実行順序、受入条件、検証戦略を確定する
-- 正規化されたサマリーを人間に承認してもらう
-- 承認後に実装を開始する
+**Fix**:
+- Use mob-scribe to produce a normalized summary
+- Clearly classify decisions as accepted / rejected / deferred
+- Attach priority and mitigation strategy to each risk
 
 ---
 
-### 5. 自明編集でのモブ使用 / Using Mob Orchestration for Trivial Edits
+### 3. Skipping Challenge Roles on Risky Work
 
-**Symptom / 症状**: タイプ修正、フォーマット変更、1ファイルの小変更でモブセッションを開く。
+**Symptom**: mob-critic is not included for changes involving security, authentication, billing, or data integrity.
 
-**Problem / 問題**:
-- コストの割りに価値が生まれない
-- オーバーヘッドがタスク時間を超える
-- モブプログラミングが「重い」という印象を与える
+**Problem**:
+- Dangerous changes proceed under shallow consensus
+- Risks go undetected and are deployed to production
+- The possibility of unrecoverable failures
 
-**Fix / 修正**:
-- 3ステップ未満、明らかな実装、単一ファイルの変更では直接修正する
-- モブ使用の条件を確認する（「When to Use Mob Orchestration」）
-- 不確実な場合は flash-mob を使用して迅速に判断する
+**Fix**:
+- Always include mob-critic (or an equivalent challenge role) for high-risk changes
+- Explicitly request failure modes, edge cases, and counterexamples
+- Encourage dialogue that asks "why would this fail"
+
+---
+
+### 4. Starting Implementation Before a Normalized Plan Exists
+
+**Symptom**: On a complex task, code is written directly without deliberation.
+
+**Problem**:
+- Architectural tradeoffs are not considered
+- Refactoring becomes necessary later (double work)
+- Acceptance criteria are unknown, making it impossible to judge completion
+
+**Fix**:
+- Use plan-mob to finalize execution order, acceptance criteria, and verification strategy
+- Get the normalized summary approved by a human
+- Begin implementation only after approval
+
+---
+
+### 5. Using Mob Orchestration for Trivial Edits
+
+**Symptom**: A mob session is opened for a typo fix, formatting change, or small single-file edit.
+
+**Problem**:
+- No value is created relative to the cost
+- Overhead exceeds the actual task time
+- Mob programming gains a reputation for being "heavy"
+
+**Fix**:
+- For changes under 3 steps, with obvious implementation, in a single file, edit directly
+- Verify the conditions for mob usage ("When to Use Mob Orchestration")
+- When uncertain, use flash-mob to make a quick judgment

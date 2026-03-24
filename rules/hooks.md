@@ -1,42 +1,42 @@
 # Hooks System
 
-hook は「便利機能」ではなく、薄いハーネスを常時効かせるための policy-as-code 層として扱います。
+Hooks are treated not as "convenience features" but as a policy-as-code layer that keeps a thin harness active at all times.
 
-詳細契約は [docs/harness-engineering.md](../docs/harness-engineering.md) を参照してください。
+See [docs/harness-engineering.md](../docs/ja/harness-engineering.md) for the detailed contract.
 
 ## Hook Types
 
-- `PreToolUse`: 実行前の危険操作ガードと隔離 workspace の強制
-- `PostToolUse`: 編集直後の軽量 verify と artifact 導線
-- `Stop`: verify / handover 漏れの検知
+- `PreToolUse`: Guards against dangerous operations before execution and enforces isolated workspaces
+- `PostToolUse`: Lightweight verification and artifact guidance immediately after edits
+- `Stop`: Detects missing verification or handover steps
 
 ## Required Behavior
 
 ### PreToolUse
 
-- `git reset --hard`, `rm -rf`, `sudo`, deploy 系などの高リスク操作をブロックまたは確認する
-- dirty tree での直接編集を避け、`maw` / worktree を促す
-- 3+ step、高リスク、public contract change は plan-first に戻す
+- Block or confirm high-risk operations such as `git reset --hard`, `rm -rf`, `sudo`, and deploy-related commands
+- Avoid direct edits on a dirty tree; prompt for `maw` / worktree instead
+- Return to plan-first for 3+ step, high-risk, or public contract changes
 
 ### PostToolUse
 
-- repo の canonical verify command か、その軽量部分集合を実行する
-- changed-file 単位で lint / typecheck を優先し、毎回のコストを抑える
-- visual / acceptance が必要な変更では runbook や artifact 置き場を示す
+- Run the repo's canonical verify command, or a lightweight subset of it
+- Prioritize lint / typecheck per changed file to keep per-run cost low
+- For changes requiring visual / acceptance review, indicate the runbook or artifact location
 
 ### Stop
 
-- 変更があるのに verify 記録が無い場合は警告する
-- `maw` workspace 作業なら `maw handover` 未実施を警告する
-- `next step` と `evidence refs` が無い継続状態を残さない
+- Warn when changes exist but no verification record is present
+- Warn if working in a `maw` workspace without completing `maw handover`
+- Do not leave a continuation state that lacks `next step` and `evidence refs`
 
 ## Repo Hook Pairing
 
-editor/tool hook が無い環境でも最低限の品質ゲートを通すため、repo 側には `pre-push` を置きます。
+To ensure a minimum quality gate even in environments without editor/tool hooks, place a `pre-push` hook on the repo side.
 
-- 1 repo 1 command の canonical verify を呼ぶ
-- visual / acceptance は手動 runbook に残す
-- ひな形は [templates/repo-pre-push.example.sh](../templates/repo-pre-push.example.sh)
+- Call the canonical verify command (1 repo, 1 command)
+- Leave visual / acceptance checks in the manual runbook
+- Template is at [templates/repo-pre-push.example.sh](../templates/repo-pre-push.example.sh)
 
 ## Auto-Accept Permissions
 

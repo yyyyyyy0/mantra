@@ -1,25 +1,23 @@
-# Plan-Mob Example / Plan-Mob 実行例
+# Plan-Mob Example
 
-## Context / 文脈
-
-E2E テスト基盤をプロジェクトに追加することを計画している。現在、単体テストはあるが、主要なユーザーフロー（ログイン、購入、パスワードリセット）をカバーする E2E テストがない。
+## Context
 
 Planning to add E2E testing infrastructure to the project. Currently have unit tests, but no E2E coverage for critical user flows (login, purchase, password reset).
 
 ---
 
-## Participants / 参加者
+## Participants
 
-- `mob-navigator` — 調整役 / Orchestrator
-- `planner` — 実装計画 / Implementation planning
-- `architect` — システム設計 / System design
-- `tdd-guide` — テスト戦略 / Test strategy
-- `mob-critic` — 挑発的レビュー / Adversarial review
-- `mob-scribe` — 正規化・要約 / Normalization and summary
+- `mob-navigator` — Orchestrator
+- `planner` — Implementation planning
+- `architect` — System design
+- `tdd-guide` — Test strategy
+- `mob-critic` — Adversarial review
+- `mob-scribe` — Normalization and summary
 
 ---
 
-## Discussion Transcript / 議論トランスクリプト（簡略化）
+## Discussion Transcript (abbreviated)
 
 ### mob-navigator
 
@@ -72,85 +70,60 @@ Planning to add E2E testing infrastructure to the project. Currently have unit t
 
 ---
 
-## Normalized Summary / 正規化されたサマリー（mob-scribe 出力）
+## Normalized Summary (mob-scribe output)
 
-### Objective / 目的
-E2E テスト基盤の実装計画、受入条件、検証戦略を確定する。
-
+### Objective
 Establish implementation plan, acceptance criteria, and verification strategy for E2E testing infrastructure.
 
-### Constraints / 制約
-- Next.js 14 / React 18 / TypeScript
-- デプロイ先: Vercel
-- 現在の CI: GitHub Actions（単体テストのみ）
-
+### Constraints
 - Next.js 14 / React 18 / TypeScript
 - Deployment target: Vercel
 - Current CI: GitHub Actions (unit tests only)
 
-### Observations / 観察
-- 単体テストカバレッジ約 65%
-- E2E テストなし
-- 主要ユーザーフロー: ログイン、購入、パスワードリセット
-
+### Observations
 - Unit test coverage ~65%
 - No E2E tests
 - Critical user flows: login, purchase, password reset
 
-### Decisions / 決定
+### Decisions
 
-**Accepted / 採用**
-- フレームワーク: Playwright（Next.js 統込み、TypeScript サポート）
-- パターン: Page Object Model
-- テストデータ: 専用テストデータベース + シードデータ
-- 最初のテスト: 「有効な認証情報でのログインが成功する」
-
+**Accepted**
 - Framework: Playwright (with Next.js integration, TypeScript support)
 - Pattern: Page Object Model
 - Test data: Dedicated test database with seeded data
 - First test: "Login with valid credentials succeeds"
 
-**Rejected / 却下**
-- 共有データベースの使用（フリキー性の原因）
-- CSS セレクタベースのロケーター（不安定）
-
+**Rejected**
 - Shared database (causes flakiness)
 - CSS selector-based locators (unstable)
 
-**Deferred / 先送り**
-- Visual Regression Testing の追加（基本フロー安定後）
-- パフォーマンステストの追加（機能テスト安定後）
+**Deferred**
+- Adding Visual Regression Testing (after core flows are stable)
+- Adding performance tests (after functional tests are stable)
 
-### Risks / リスク
+### Risks
 
-| 優先度 | 内容 | 緩和策 |
-|--------|------|--------|
-| MEDIUM | CI 実行時間の増加 | 並列実行構成 |
-| MEDIUM | フリキーテスト | 明示的待機、固定スリープを回避 |
-| LOW | テストデータ管理 | テスト専用 DB + 各テスト前にリセット |
+| Priority | Description | Mitigation |
+|----------|-------------|------------|
+| MEDIUM | Increased CI execution time | Parallel execution configuration |
+| MEDIUM | Flaky tests | Explicit waits, avoid fixed sleeps |
+| LOW | Test data management | Dedicated test DB + reset before each test |
 
-### Action Plan / アクション計画
-1. Playwright を開発環境にセットアップ
-2. GitHub Actions に E2E ジョブを追加（並列実行構成）
-3. Page Object Model 構造を作成
-4. ログインフローテストを実装（TDD: RED → GREEN → IMPROVE）
-5. 購入フローテストを追加
-6. パスワードリセットフローテストを追加
+### Action Plan
+1. Set up Playwright in the development environment
+2. Add E2E job to GitHub Actions (with parallel execution configuration)
+3. Create Page Object Model structure
+4. Implement login flow test (TDD: RED → GREEN → IMPROVE)
+5. Add purchase flow test
+6. Add password reset flow test
 
-### Open Questions / 未解決事項
-- CI ランナーのアップグレードが必要か？（実行後に評価）
-- テスト実行頻度: 各 PR か、夜間のみか？（人間に委譲）
+### Open Questions
+- Is a CI runner upgrade needed? (Evaluate after first run)
+- Test execution frequency: every PR or nightly only? (Defer to human)
 
 ---
 
-## Acceptance Criteria / 受入条件
-
-- [ ] Playwright がローカル環境で動作する
-- [ ] GitHub Actions で E2E テストが実行される
-- [ ] ログインフローのテストが通る
-- [ ] 購入フローのテストが通る
-- [ ] パスワードリセットフローのテストが通る
-- [ ] フリキーテストの割合が 5% 未満
+## Acceptance Criteria
 
 - [ ] Playwright runs in local environment
 - [ ] E2E tests execute on GitHub Actions
@@ -159,31 +132,26 @@ Establish implementation plan, acceptance criteria, and verification strategy fo
 - [ ] Password reset flow test passes
 - [ ] Flaky test rate < 5%
 
-## Verification Strategy / 検証戦略
+## Verification Strategy
 
-**Unit Tests / 単体テスト**
-- Page Object Model の各メソッド
-- テストヘルパー関数
+**Unit Tests**
+- Each method of the Page Object Model
+- Test helper functions
 
-**Integration Tests / 統合テスト**
-- GitHub Actions との統合
-- テストデータベースのシード機能
+**Integration Tests**
+- Integration with GitHub Actions
+- Test database seeding functionality
 
-**E2E Tests / E2E テスト**
-- 3つの主要ユーザーフロー
+**E2E Tests**
+- 3 critical user flows
 
-**Manual Verification / 手動検証**
-- ローカル環境での `npm run test:e2e` 実行
-- レポートファイルの視認性確認
+**Manual Verification**
+- Run `npm run test:e2e` in local environment
+- Confirm report file readability
 
 ---
 
-## Key Takeaways / 重要ポイント
-
-1. **plan-mob の価値**: 実装前にフレームワーク、パターン、リスク、受入条件が確定した
-2. **tdd-guide の貢献**: TDD アプローチと Page Object Model が明確になった
-3. **mob-critic の貢献**: フリキーテストのリスクと緩和策が議論された
-4. **次のステップ**: 人間による承認後、実装開始
+## Key Takeaways
 
 1. **Value of plan-mob**: Framework, pattern, risks, and acceptance criteria determined before implementation
 2. **tdd-guide contribution**: TDD approach and Page Object Model clarified
