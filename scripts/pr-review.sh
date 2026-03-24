@@ -137,14 +137,46 @@ HAS_CRITICAL=$(printf '%s' "$REVIEW_JSON" | jq -r 'if .has_critical == null then
 # --- 6. Post PR comment ---
 echo "[pr-review] Posting review comment..."
 
+# Format review as readable Markdown (not raw JSON)
 {
   echo '## AI Review'
   echo ''
+
+  # Summary
+  SUMMARY=$(printf '%s' "$REVIEW_JSON" | jq -r '.summary // "N/A"' 2>/dev/null || echo "N/A")
+  echo "**Summary:** ${SUMMARY}"
+  echo ''
+
+  # Recommendation badge
+  RECOMMENDATION=$(printf '%s' "$REVIEW_JSON" | jq -r '.recommendation // "comment"' 2>/dev/null || echo "comment")
+  case "$RECOMMENDATION" in
+    approve)          BADGE="![approve](https://img.shields.io/badge/recommendation-approve-brightgreen)" ;;
+    request-changes)  BADGE="![request-changes](https://img.shields.io/badge/recommendation-request--changes-red)" ;;
+    *)                BADGE="![comment](https://img.shields.io/badge/recommendation-comment-blue)" ;;
+  esac
+  echo "$BADGE"
+  echo ''
+
+  # Findings
+  FINDING_COUNT=$(printf '%s' "$REVIEW_JSON" | jq '.findings | length' 2>/dev/null || echo "0")
+  if [ "$FINDING_COUNT" -gt 0 ]; then
+    echo '### Findings'
+    echo ''
+    echo '| Severity | File | Line | Message |'
+    echo '|----------|------|------|---------|'
+    printf '%s' "$REVIEW_JSON" | jq -r '.findings[] | "| \(.severity) | `\(.file)` | \(.line) | \(.message) |"' 2>/dev/null || true
+    echo ''
+  else
+    echo 'No findings.'
+    echo ''
+  fi
+
+  # Raw JSON in collapsed details for debugging
   echo '<details>'
-  echo '<summary>Review Details</summary>'
+  echo '<summary>Raw JSON</summary>'
   echo ''
   echo '```json'
-  printf '%s\n' "$REVIEW_TEXT"
+  printf '%s\n' "$REVIEW_JSON" | jq '.' 2>/dev/null || printf '%s\n' "$REVIEW_TEXT"
   echo '```'
   echo ''
   echo '</details>'
