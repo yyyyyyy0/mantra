@@ -2,7 +2,8 @@
 node_modules/
 
 # Claude Code
-.claude/
+.claude/*
+!.claude/settings.json
 
 # Logs
 *.log
