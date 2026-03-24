@@ -8,6 +8,9 @@ import {
   loadSkillFamily,
   type LoadedSkillFamily,
 } from './skill-family'
+
+const LOCALE_SUBDIRS = new Set(['ja', 'en'])
+
 import { type SkillFamilyTarget } from './skill-family-schema'
 
 export type ContentEntryKind = 'legacy' | 'family'
@@ -51,7 +54,7 @@ export interface ListContentEntriesResult {
 }
 
 function shouldIncludeLegacyFile(kind: ContentKind, fileName: string): boolean {
-  if (kind === 'agents' || kind === 'rules') {
+  if (kind === 'agents' || kind === 'rules' || kind === 'examples') {
     return fileName.endsWith('.md')
   }
 
@@ -198,8 +201,21 @@ function listEntriesForSource(
       continue
     }
 
-    if (stat.isDirectory() && isSkillFamilyDirectoryName(name)) {
-      scanned.push(toFamilyEntry(source, fullPath, kind, target))
+    if (stat.isDirectory()) {
+      if (isSkillFamilyDirectoryName(name)) {
+        scanned.push(toFamilyEntry(source, fullPath, kind, target))
+      } else if (LOCALE_SUBDIRS.has(name)) {
+        for (const subName of sortedDirectoryNames(fullPath)) {
+          const subFullPath = path.join(fullPath, subName)
+          const subStat = fs.statSync(subFullPath)
+          if (subStat.isFile()) {
+            if (!shouldIncludeLegacyFile(kind, subName)) continue
+            scanned.push(toLegacyEntry(source, subFullPath, subName))
+          } else if (subStat.isDirectory() && isSkillFamilyDirectoryName(subName)) {
+            scanned.push(toFamilyEntry(source, subFullPath, kind, target))
+          }
+        }
+      }
     }
   }
 

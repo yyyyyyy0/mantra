@@ -152,4 +152,74 @@ describe('content entries', () => {
     expect(matching[0]?.source.dir).toBe(agentsDirA)
     expect(matching[1]?.source.dir).toBe(agentsDirB)
   })
+
+  it('scans locale subdirectory and returns entries with flat relativeName', () => {
+    const root = createTempDir('mantra-content-entries-locale-')
+    tempDirs.push(root)
+
+    const examplesDir = path.join(root, 'examples', 'ja')
+    fs.mkdirSync(examplesDir, { recursive: true })
+    fs.writeFileSync(path.join(examplesDir, 'sample.md'), '# Sample', 'utf8')
+
+    process.env.MANTRA_USER_CONTENT_ROOTS = root
+
+    const result = listContentEntries('examples')
+    const entry = result.entries.find(
+      item => item.source.dir === path.join(root, 'examples') && item.relativeName === 'sample.md',
+    )
+
+    expect(entry).toBeDefined()
+    expect(entry?.entryKind).toBe('legacy')
+  })
+
+  it('scans .family directories inside locale subdirectory', () => {
+    const root = createTempDir('mantra-content-entries-locale-family-')
+    tempDirs.push(root)
+
+    const examplesJa = path.join(root, 'examples', 'ja')
+    fs.mkdirSync(examplesJa, { recursive: true })
+
+    writeFamily({
+      dir: examplesJa,
+      name: 'locale-family',
+      familyYml: 'description: locale family\ntargets:\n  generic: generic.md\n',
+      baseContent: 'base',
+      overlays: { 'generic.md': 'overlay' },
+    })
+
+    process.env.MANTRA_USER_CONTENT_ROOTS = root
+
+    const result = listContentEntries('examples')
+    const entry = result.entries.find(
+      item => item.source.dir === path.join(root, 'examples') && item.relativeName === 'locale-family.md',
+    )
+
+    expect(entry).toBeDefined()
+    expect(entry?.entryKind).toBe('family')
+  })
+
+  it('returns both root-level and locale subdirectory entries', () => {
+    const root = createTempDir('mantra-content-entries-locale-compat-')
+    tempDirs.push(root)
+
+    const examplesDir = path.join(root, 'examples')
+    const examplesJa = path.join(examplesDir, 'ja')
+    fs.mkdirSync(examplesJa, { recursive: true })
+
+    fs.writeFileSync(path.join(examplesDir, 'root-level.md'), '# Root', 'utf8')
+    fs.writeFileSync(path.join(examplesJa, 'locale-level.md'), '# Locale', 'utf8')
+
+    process.env.MANTRA_USER_CONTENT_ROOTS = root
+
+    const result = listContentEntries('examples')
+    const rootEntry = result.entries.find(
+      item => item.source.dir === examplesDir && item.relativeName === 'root-level.md',
+    )
+    const localeEntry = result.entries.find(
+      item => item.source.dir === examplesDir && item.relativeName === 'locale-level.md',
+    )
+
+    expect(rootEntry).toBeDefined()
+    expect(localeEntry).toBeDefined()
+  })
 })
