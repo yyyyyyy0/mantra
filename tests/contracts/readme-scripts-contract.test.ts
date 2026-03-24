@@ -14,14 +14,14 @@ function loadPackageScripts(): Record<string, string> {
   return packageJson.scripts
 }
 
-function loadReadmeScriptCommands(): string[] {
-  const readmePath = path.join(process.cwd(), 'README.md')
+function loadReadmeScriptCommands(filename: string, sectionHeader: string): string[] {
+  const readmePath = path.join(process.cwd(), filename)
   const readmeRaw = fs.readFileSync(readmePath, 'utf8')
   const lines = readmeRaw.split('\n')
 
-  const scriptsHeaderIndex = lines.findIndex(line => line.trim() === '## Scripts')
+  const scriptsHeaderIndex = lines.findIndex(line => line.trim() === sectionHeader)
   if (scriptsHeaderIndex < 0) {
-    throw new Error('README scripts section not found')
+    throw new Error(`${filename} scripts section not found`)
   }
 
   const commands: string[] = []
@@ -59,18 +59,25 @@ function parseBaseScript(command: string): string {
 }
 
 describe('README scripts contract', () => {
-  it('documents only npm run scripts that exist in package.json', () => {
-    const scripts = loadPackageScripts()
-    const commands = loadReadmeScriptCommands()
+  const readmeVariants = [
+    { filename: 'README.md', sectionHeader: '## Scripts' },
+    { filename: 'README.ja.md', sectionHeader: '## スクリプト' },
+  ] as const
 
-    expect(commands.length).toBeGreaterThan(0)
+  for (const { filename, sectionHeader } of readmeVariants) {
+    it(`${filename} documents only npm run scripts that exist in package.json`, () => {
+      const scripts = loadPackageScripts()
+      const commands = loadReadmeScriptCommands(filename, sectionHeader)
 
-    for (const command of commands) {
-      const baseScript = parseBaseScript(command)
-      expect(
-        scripts[baseScript],
-        `README command "${command}" points to missing script "${baseScript}"`,
-      ).toBeDefined()
-    }
-  })
+      expect(commands.length).toBeGreaterThan(0)
+
+      for (const command of commands) {
+        const baseScript = parseBaseScript(command)
+        expect(
+          scripts[baseScript],
+          `${filename} command "${command}" points to missing script "${baseScript}"`,
+        ).toBeDefined()
+      }
+    })
+  }
 })

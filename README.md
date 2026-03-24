@@ -415,7 +415,7 @@ cat rules/mob-programming.md
 
 ### Related docs
 
-- `MOB_QUICKSTART.md` — Get started in 5 minutes
+- `MOB_QUICKSTART.md` — Get started in 5 minutes (Japanese; see `rules/mob-programming.md` for the English protocol)
 - `rules/mob-programming.md` — Complete protocol and anti-patterns
 - `examples/` — Execution examples for flash-mob, plan-mob, review-mob
 - `docs/mob-role-boundaries.md` — Role boundaries and selection guide
