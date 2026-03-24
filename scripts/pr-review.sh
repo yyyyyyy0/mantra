@@ -164,7 +164,7 @@ echo "[pr-review] Posting review comment..."
     echo ''
     echo '| Severity | File | Line | Message |'
     echo '|----------|------|------|---------|'
-    printf '%s' "$REVIEW_JSON" | jq -r '.findings[] | "| \(.severity) | `\(.file)` | \(.line) | \(.message) |"' 2>/dev/null || true
+    printf '%s' "$REVIEW_JSON" | jq -r '.findings[] | "| \(.severity) | `\(.file)` | \(.line) | \(.message | gsub("\\|"; "\\\\|")) |"' 2>/dev/null || true
     echo ''
   else
     echo 'No findings.'

@@ -8,10 +8,9 @@ import {
   loadSkillFamily,
   type LoadedSkillFamily,
 } from './skill-family'
+import { type SkillFamilyTarget } from './skill-family-schema'
 
 const LOCALE_SUBDIRS = new Set(['ja', 'en'])
-
-import { type SkillFamilyTarget } from './skill-family-schema'
 
 export type ContentEntryKind = 'legacy' | 'family'
 export type ContentTarget = SkillFamilyTarget
