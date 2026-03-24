@@ -155,7 +155,7 @@ drift_guard:
 - `agents/rules` の出力名（legacy + family）は全体で一意である必要があります（重複時は `E_INPUT_INVALID`）
 - stop 条件、構造化 summary、handoff fields のような継続的な運用契約は `base.md` に置き、必要なら lock marker で保護します
 - overlay は target 固有の reporting style や narrative 補助に限定し、base 契約を上書きしない薄い差分に保ちます
-- 参照例として [`agents/autonomous-improvement-loop.family`](../agents/autonomous-improvement-loop.family/) は「base-heavy / overlay-thin」の family 構成になっています
+- 参照例として [`agents/autonomous-improvement-loop.family`](../../agents/autonomous-improvement-loop.family/) は「base-heavy / overlay-thin」の family 構成になっています
 
 ### 良い説明トリガーの例
 
