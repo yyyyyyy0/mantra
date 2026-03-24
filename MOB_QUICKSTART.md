@@ -77,7 +77,7 @@ Claude: code-reviewer + security-reviewer + mob-critic + mob-scribe を起動し
 
 - **完全なプロトコル**: `rules/mob-programming.md`
 - **エージェント詳細**: `agents/mob-*.md`
-- **実行例**: `examples/mob-*-example.md`
+- **実行例**: `examples/ja/mob-*-example.md`
 - **テンプレート**: `templates/mob-*.md`
 - **役割境界**: `docs/ja/mob-role-boundaries.md`
 
@@ -98,6 +98,6 @@ Claude: code-reviewer + security-reviewer + mob-critic + mob-scribe を起動し
 
 ## 次のステップ
 
-1. 実行例を確認する: `examples/mob-flash-example.md`
+1. 実行例を確認する: `examples/ja/mob-flash-example.md`
 2. テンプレートを使う: `templates/mob-plan.md`
 3. 詳細ルールを読む: `rules/mob-programming.md`

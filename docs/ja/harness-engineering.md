@@ -17,7 +17,7 @@
 3. **Hook contract** — [repo pre-push テンプレート](../../templates/repo-pre-push.example.sh) で canonical verify を毎 push で呼ぶ
 4. **Session continuity** — `maw handover/takeover` と [Obsidian ledger テンプレート](../../templates/repo-obsidian-ledger.md) でセッション引き継ぎ
 
-具体的な walkthrough は [examples/ail-repo-improvement-loop.md](../../examples/ail-repo-improvement-loop.md) を参照。
+具体的な walkthrough は [examples/ja/ail-repo-improvement-loop.md](../../examples/ja/ail-repo-improvement-loop.md) を参照。
 
 ## 1. Thin AGENTS Contract
 

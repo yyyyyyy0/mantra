@@ -28,9 +28,9 @@ Mob Programming Orchestration 機能の最初の公式リリース。
 - `templates/mob-decision-log.md` — 決定ログテンプレート
 
 ### 実行例
-- `examples/mob-flash-example.md` — 認証システムリファクタリングの flash-mob 例
-- `examples/mob-plan-example.md` — E2E テスト基盤追加の plan-mob 例
-- `examples/mob-review-example.md` — セキュリティ変更レビューの review-mob 例
+- `examples/ja/mob-flash-example.md` — 認証システムリファクタリングの flash-mob 例
+- `examples/ja/mob-plan-example.md` — E2E テスト基盤追加の plan-mob 例
+- `examples/ja/mob-review-example.md` — セキュリティ変更レビューの review-mob 例
 
 ### ドキュメント
 - `MOB_QUICKSTART.md` — 5分で始めるガイド
