@@ -203,7 +203,7 @@ function listEntriesForSource(
     if (stat.isDirectory()) {
       if (isSkillFamilyDirectoryName(name)) {
         scanned.push(toFamilyEntry(source, fullPath, kind, target))
-      } else if (LOCALE_SUBDIRS.has(name)) {
+      } else if (kind === 'examples' && LOCALE_SUBDIRS.has(name)) {
         for (const subName of sortedDirectoryNames(fullPath)) {
           const subFullPath = path.join(fullPath, subName)
           const subStat = fs.statSync(subFullPath)
