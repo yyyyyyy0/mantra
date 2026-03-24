@@ -1,7 +1,7 @@
 # Agent Orchestration
 
 > The primary workflow is `autonomous-improvement-loop` (bounded continuous improvement for existing repos).
-> See [docs/harness-engineering.md](../docs/harness-engineering.md) for details on repo setup.
+> See [docs/harness-engineering.md](../docs/ja/harness-engineering.md) for details on repo setup.
 
 <!-- Decision record (Issue #27):
   The P0-P4 ladder and agent table are maintained as operational guidance for the Claude Code runtime.
@@ -79,7 +79,7 @@ In those cases:
 - keep `AGENTS.md` thin and point to SSOT docs instead of embedding long playbooks
 - expose one canonical verify command and one test ladder per repo
 
-See [docs/harness-engineering.md](../docs/harness-engineering.md) and
+See [docs/harness-engineering.md](../docs/ja/harness-engineering.md) and
 [templates/repo-agents-pointer.md](../templates/repo-agents-pointer.md).
 
 ## Phase-Specific Supplemental Guidance (Complement to the P0-P4 Ladder)

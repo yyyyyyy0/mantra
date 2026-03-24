@@ -12,12 +12,12 @@
 
 既存 repo に MVH を導入する 4 ステップ：
 
-1. **Thin AGENTS.md** — [テンプレート](../templates/repo-agents-pointer.md) をベースにポインタ型 AGENTS.md を置く
+1. **Thin AGENTS.md** — [テンプレート](../../templates/repo-agents-pointer.md) をベースにポインタ型 AGENTS.md を置く
 2. **Canonical verify** — repo で 1 本の検証コマンドを定め、AGENTS.md に明記する
-3. **Hook contract** — [repo pre-push テンプレート](../templates/repo-pre-push.example.sh) で canonical verify を毎 push で呼ぶ
-4. **Session continuity** — `maw handover/takeover` と [Obsidian ledger テンプレート](../templates/repo-obsidian-ledger.md) でセッション引き継ぎ
+3. **Hook contract** — [repo pre-push テンプレート](../../templates/repo-pre-push.example.sh) で canonical verify を毎 push で呼ぶ
+4. **Session continuity** — `maw handover/takeover` と [Obsidian ledger テンプレート](../../templates/repo-obsidian-ledger.md) でセッション引き継ぎ
 
-具体的な walkthrough は [examples/ail-repo-improvement-loop.md](../examples/ail-repo-improvement-loop.md) を参照。
+具体的な walkthrough は [examples/ail-repo-improvement-loop.md](../../examples/ail-repo-improvement-loop.md) を参照。
 
 ## 1. Thin AGENTS Contract
 
@@ -100,7 +100,7 @@ editor/tool hook が無い環境でも最低限効くように、repo 側には 
 - 追加で重い visual / acceptance は手動トリガに残す
 - 実行時間は「毎 push で耐えられる」範囲に抑える
 
-ひな形は [templates/repo-pre-push.example.sh](../templates/repo-pre-push.example.sh) を使います。
+ひな形は [templates/repo-pre-push.example.sh](../../templates/repo-pre-push.example.sh) を使います。
 
 ## 3. Plan / Execute Split
 
@@ -155,7 +155,7 @@ Obsidian は検索・俯瞰・一覧のための index として使い、handove
 - `evidence_refs`
 - `updated_at`
 
-Obsidian 用の雛形は [templates/repo-obsidian-ledger.md](../templates/repo-obsidian-ledger.md) を使います。
+Obsidian 用の雛形は [templates/repo-obsidian-ledger.md](../../templates/repo-obsidian-ledger.md) を使います。
 
 ## 6. Recommended Rollout
 

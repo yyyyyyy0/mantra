@@ -2,7 +2,7 @@
 
 Hooks are treated not as "convenience features" but as a policy-as-code layer that keeps a thin harness active at all times.
 
-See [docs/harness-engineering.md](../docs/harness-engineering.md) for the detailed contract.
+See [docs/harness-engineering.md](../docs/ja/harness-engineering.md) for the detailed contract.
 
 ## Hook Types
 

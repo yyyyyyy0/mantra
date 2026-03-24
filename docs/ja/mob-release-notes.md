@@ -34,7 +34,7 @@ Mob Programming Orchestration 機能の最初の公式リリース。
 
 ### ドキュメント
 - `MOB_QUICKSTART.md` — 5分で始めるガイド
-- `docs/mob-role-boundaries.md` — 役割の境界と選択ガイド
+- `docs/ja/mob-role-boundaries.md` — 役割の境界と選択ガイド
 - `rules/mob-programming.md` — 完全なプロトコルとアンチパターン
 
 ---

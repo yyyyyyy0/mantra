@@ -56,7 +56,7 @@ The shortest path to introducing mantra's harness into an existing repo:
 3. **Set up the hook contract** — use the [repo pre-push template](./templates/repo-pre-push.example.sh) to call canonical verify on every push.
 4. **Run continuity** — use `maw handover/takeover` and the [Obsidian ledger template](./templates/repo-obsidian-ledger.md) for session handoff.
 
-For full details, see [docs/harness-engineering.md](./docs/harness-engineering.md) (the canonical adoption path reference).
+For full details, see [docs/harness-engineering.md](./docs/ja/harness-engineering.md) (the canonical adoption path reference).
 
 ---
 
@@ -182,7 +182,7 @@ ls -la ~/.claude/rules   # → symlink to mantra/rules (direct core link when no
 - `npm run validate` fails: check agents/rules `.md` / `*.family` structure, duplicate output names, `drift_guard` settings
 - Symlinks not created: try `npm run setup -- --force` (existing directories are backed up)
 - After `npm run setup` succeeds: Core next step is `npm run validate`, Optional next step is `npm run sync:codex`
-- Per-`error_code` remediation: [docs/troubleshooting.md](./docs/troubleshooting.md)
+- Per-`error_code` remediation: [docs/troubleshooting.md](./docs/ja/troubleshooting.md)
 
 ---
 
@@ -289,7 +289,7 @@ Claude sync (`sync:claude*`) writes to `~/.claude/skills/mantra*/SKILL.md` to av
 
 ## Harness Engineering / MVH
 
-The canonical reference for the Minimum Viable Harness (MVH) across repos is [docs/harness-engineering.md](./docs/harness-engineering.md).
+The canonical reference for the Minimum Viable Harness (MVH) across repos is [docs/harness-engineering.md](./docs/ja/harness-engineering.md).
 
 Related templates:
 
@@ -418,7 +418,7 @@ cat rules/mob-programming.md
 - `MOB_QUICKSTART.md` — Get started in 5 minutes (Japanese; see `rules/mob-programming.md` for the English protocol)
 - `rules/mob-programming.md` — Complete protocol and anti-patterns
 - `examples/` — Execution examples for flash-mob, plan-mob, review-mob
-- `docs/mob-role-boundaries.md` — Role boundaries and selection guide
+- `docs/ja/mob-role-boundaries.md` — Role boundaries and selection guide
 - `templates/mob-*.md` — Templates (plan/review/decision-log)
 
 ---
@@ -427,11 +427,11 @@ cat rules/mob-programming.md
 
 | Document | Description |
 |----------|-------------|
-| [Harness Engineering](./docs/harness-engineering.md) | Canonical repo adoption path (adoption path / MVH) |
-| [Authoring Guide](./docs/authoring.md) | Guide to authoring agents and rules |
-| [CLI Contract](./docs/cli-contract.md) | `--json` output, error_code, and exit code contract |
-| [Ops Metrics](./docs/ops-metrics.md) | KPI definitions, measurement events, `metrics:report` aggregation granularity |
-| [Troubleshooting](./docs/troubleshooting.md) | Recovery procedures per `error_code` |
+| [Harness Engineering](./docs/ja/harness-engineering.md) | Canonical repo adoption path (adoption path / MVH) |
+| [Authoring Guide](./docs/ja/authoring.md) | Guide to authoring agents and rules |
+| [CLI Contract](./docs/ja/cli-contract.md) | `--json` output, error_code, and exit code contract |
+| [Ops Metrics](./docs/ja/ops-metrics.md) | KPI definitions, measurement events, `metrics:report` aggregation granularity |
+| [Troubleshooting](./docs/ja/troubleshooting.md) | Recovery procedures per `error_code` |
 | [Mob Programming](#mob-programming-experimental) | Orchestration for complex tasks |
 
 ---
