@@ -1,0 +1,62 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); cmd=$(echo \"$input\" | jq -r '.tool_input.command // \"\"'); output=$(echo \"$input\" | jq -r 'if (.tool_response | type) == \"string\" then .tool_response else (.tool_response | tostring) end'); if echo \"$cmd\" | grep -q 'gh pr create'; then url=$(echo \"$output\" | grep -o 'https://github.com[^ ]*' | head -1); [ -n \"$url\" ] && echo \"{\\\"userMessage\\\": \\\"PR作成完了: $url\\\"}\"; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); cmd=$(echo \"$input\" | jq -r '.tool_input.command // \"\"'); output=$(echo \"$input\" | jq -r 'if (.tool_response | type) == \"string\" then .tool_response else (.tool_response | tostring) end'); if echo \"$cmd\" | grep -q 'gh pr create'; then cwd=$(echo \"$input\" | jq -r '.cwd // \".\"'); pr_num=$(echo \"$output\" | grep -oE '/pull/[0-9]+' | grep -oE '[0-9]+' | head -1); if [ -n \"$pr_num\" ] && [ -f \"$cwd/scripts/pr-review.sh\" ]; then bash \"$cwd/scripts/pr-review.sh\" \"$pr_num\" > \"/tmp/pr-review-$pr_num.log\" 2>&1; echo \"{\\\"userMessage\\\": \\\"AI review completed for #$pr_num\\\"}\"; fi; fi",
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); cmd=$(echo \"$input\" | jq -r '.tool_input.command // \"\"'); output=$(echo \"$input\" | jq -r 'if (.tool_response | type) == \"string\" then .tool_response else (.tool_response | tostring) end'); if echo \"$cmd\" | grep -qE '^git push' && ! echo \"$output\" | grep -qiE '(rejected|error|fatal)'; then cwd=$(echo \"$input\" | jq -r '.cwd // \".\"'); pr_num=$(cd \"$cwd\" && gh pr view --json number -q .number 2>/dev/null); if [ -n \"$pr_num\" ] && [ -f \"$cwd/scripts/pr-review.sh\" ]; then bash \"$cwd/scripts/pr-review.sh\" \"$pr_num\" > \"/tmp/pr-review-$pr_num.log\" 2>&1; echo \"{\\\"userMessage\\\": \\\"AI review completed for #$pr_num\\\"}\"; fi; fi",
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); path=$(echo \"$input\" | jq -r '.tool_input.file_path // \"\"'); if echo \"$path\" | grep -qE '\\.(js|jsx|ts|tsx|json|css|scss)$'; then prettier --write \"$path\" 2>/dev/null || true; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); path=$(echo \"$input\" | jq -r '.tool_input.file_path // \"\"'); if echo \"$path\" | grep -qE '\\.(ts|tsx)$'; then dir=$(dirname \"$path\"); while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/tsconfig.json\" ]; do dir=$(dirname \"$dir\"); done; if [ -f \"$dir/tsconfig.json\" ]; then result=$(npx tsc --project \"$dir/tsconfig.json\" --noEmit 2>&1 | head -5); [ -n \"$result\" ] && echo \"{\\\"userMessage\\\": \\\"TypeScript エラー:\\n$result\\\"}\"; fi; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); path=$(echo \"$input\" | jq -r '.tool_input.file_path // \"\"'); if [ -f \"$path\" ] && grep -q 'console\\.log' \"$path\"; then count=$(grep -c 'console\\.log' \"$path\"); echo \"{\\\"userMessage\\\": \\\"⚠️  console.log が ${count}箇所あります: $(basename $path)\\\"}\"; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

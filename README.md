@@ -43,7 +43,7 @@ issue queue → select 1 issue → bounded fix → verify → handoff
 
 The source of truth is [`agents/autonomous-improvement-loop.family`](./agents/autonomous-improvement-loop.family/).
 
-For a walkthrough of real-world usage, see [examples/ail-repo-improvement-loop.md](./examples/ail-repo-improvement-loop.md).
+For a walkthrough of real-world usage, see [examples/ja/ail-repo-improvement-loop.md](./examples/ja/ail-repo-improvement-loop.md).
 
 ---
 
@@ -407,7 +407,7 @@ Mob programming improves decision quality and implementation safety in these sit
 cat MOB_QUICKSTART.md
 
 # See examples
-ls examples/mob-*-example.md
+ls examples/ja/mob-*-example.md
 
 # Detailed rules
 cat rules/mob-programming.md

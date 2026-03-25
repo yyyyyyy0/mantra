@@ -41,7 +41,7 @@ issue queue → select 1 issue → bounded fix → verify → handoff
 
 source of truth は [`agents/autonomous-improvement-loop.family`](./agents/autonomous-improvement-loop.family/) です。
 
-実運用の walkthrough は [examples/ail-repo-improvement-loop.md](./examples/ail-repo-improvement-loop.md) を参照。
+実運用の walkthrough は [examples/ja/ail-repo-improvement-loop.md](./examples/ja/ail-repo-improvement-loop.md) を参照。
 
 ---
 
@@ -405,7 +405,7 @@ repo 横断の最小実行可能ハーネス（MVH: Minimum Viable Harness）の
 cat MOB_QUICKSTART.md
 
 # 実行例を確認
-ls examples/mob-*-example.md
+ls examples/ja/mob-*-example.md
 
 # 詳細ルール
 cat rules/mob-programming.md
