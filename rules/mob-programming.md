@@ -195,6 +195,15 @@ Use `mob-scribe` and produce this exact structure:
 
 ---
 
+## Named Failure Modes
+
+- **FM-AGENT-TARGET**: エージェント起動前に決定対象を定義する。目的なき起動はノイズを生む。
+- **FM-AGENT-CRITIC**: セキュリティ・認証・課金・マイグレーション変更では必ず `mob-critic` を含める。
+- **FM-READ**: エージェント観察結果は検証済み事実ではない。ツール実行で確認する。
+- **FM-SUMMARY**: モブ議事録は検証済み計画ではない。`mob-scribe` で正規化してから行動する。
+
+---
+
 ## Anti-patterns to Avoid
 
 ### 1. Calling Many Agents Without a Decision Target

@@ -34,3 +34,9 @@ If security issue found:
 3. Fix CRITICAL issues before continuing
 4. Rotate any exposed secrets
 5. Review entire codebase for similar issues
+
+## Named Failure Modes
+
+- **FM-SEC-INTERNAL**: 内部サービスからの入力も安全とは限らない。全境界で検証する。
+- **FM-SEC-SILENCE**: 「エラーなし」は「安全」を意味しない。セキュリティ特性を能動的に検証する。
+- **FM-READ**: セキュリティ設定を読んだだけでは検証にならない。実際の動作をテストする。

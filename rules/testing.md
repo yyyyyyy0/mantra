@@ -37,3 +37,10 @@
 
 - **tdd-guide** - Use PROACTIVELY for new features, enforces write-tests-first
 - **e2e-runner** - Playwright E2E testing specialist
+
+## Named Failure Modes
+
+- **FM-TEST-PASS**: ユニットテスト通過はフロー全体の証明ではない。integration/E2E が使えるなら実行する。
+- **FM-TEST-FIX**: テスト期待値ではなく実装を直す。壊れた動作に合わせてテストを変えない。
+- **FM-PLAUSIBLE**: もっともらしい修正は確認済みの修正ではない。テストを実行してから完了とする。
+- **FM-SKIP-CHECK**: 検証ステップが存在するなら実行する。「動くはず」は根拠にならない。

@@ -38,6 +38,7 @@ const RULE_TRIGGER_MAP: Record<string, string> = {
   security: 'Apply security rules (secrets, input validation, OWASP) when writing or reviewing security-sensitive code',
   'pr-automation': 'Apply PR automation rules (risk classification, auto-merge, AI review) when configuring CI/CD',
   'mob-programming': 'Apply mob programming rules (flash-mob, plan-mob, review-mob) when running multi-agent collaboration',
+  'failure-modes': 'Apply named failure mode prohibitions (verification shortcuts, scope creep, test manipulation) to prevent known LLM failure patterns',
 }
 
 export function buildRuleDescription(name: string, content: string): string {

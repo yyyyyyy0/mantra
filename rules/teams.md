@@ -106,6 +106,14 @@ Task received
 
 ---
 
+## Named Failure Modes
+
+- **FM-AGENT-TARGET**: チーム作成前にタスク目標を定義する。明確なタスクなきチームはリソースを浪費する。
+- **FM-SKIP-CHECK**: チームメンバーの出力をマージ前に検証する。並列作業は統合リスクを高める。
+- **FM-AGENT-CRITIC**: セキュリティ・認証・課金・マイグレーション変更のチームでは必ずチャレンジ役を含める。
+
+---
+
 ## Anti-patterns
 
 ### Overuse of Team

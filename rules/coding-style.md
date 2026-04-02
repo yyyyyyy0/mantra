@@ -68,3 +68,9 @@ Before marking work complete:
 - [ ] No console.log statements
 - [ ] No hardcoded values
 - [ ] No mutation (immutable patterns used)
+
+## Named Failure Modes
+
+- **FM-CODE-SCOPE**: 現在のタスクスコープ外のコードをリファクタ・整理しない。
+- **FM-CODE-CREEP**: 要求された機能のみ実装する。「ついでに」の改善は記録するだけで実行しない。
+- **FM-PLAUSIBLE**: もっともらしい実装はテスト済みの実装ではない。完了前に検証する。

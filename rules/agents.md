@@ -151,3 +151,9 @@ Tagged outputs for structured collaboration:
 **IMPORTANT**: Always include mob-critic for challenging assumptions. Use mob-scribe to normalize outputs before acting.
 
 See `rules/mob-programming.md` for complete protocol.
+
+## Named Failure Modes
+
+- **FM-AGENT-TARGET**: エージェント起動前に決定対象を定義する。目的なき起動はノイズを生む。
+- **FM-AGENT-CRITIC**: セキュリティ・認証・課金・マイグレーション変更では必ずチャレンジ役を含める。
+- **FM-READ**: エージェント出力の要約は検証済み事実ではない。実際のツール実行で確認する。
