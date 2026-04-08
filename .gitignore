@@ -5,6 +5,9 @@ node_modules/
 .claude/*
 !.claude/settings.json
 
+# Serena
+.serena/
+
 # Logs
 *.log
 
