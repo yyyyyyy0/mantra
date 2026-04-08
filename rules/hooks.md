@@ -48,3 +48,8 @@ Use with caution:
 ## Todo / Plan Tracking
 
 Use Todo-style tracking to keep multi-step work visible, especially when a task crosses plan / execute boundaries.
+
+## Named Failure Modes
+
+- **FM-GIT-NOVERIFY**: `dangerously-skip-permissions` や `--no-verify` でフックをバイパスしない。
+- **FM-SKIP-CHECK**: フックが存在するなら理由がある。失敗を修正し、迂回しない。

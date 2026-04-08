@@ -44,3 +44,9 @@ When creating PRs:
 4. **Commit & Push**
    - Detailed commit messages
    - Follow conventional commits format
+
+## Named Failure Modes
+
+- **FM-GIT-AMEND**: フック失敗後は新しいコミットを作成する。`--amend` で前のコミットを変更しない。
+- **FM-GIT-NOVERIFY**: `--no-verify` でフックをスキップしない。根本原因を修正する。
+- **FM-SKIP-CHECK**: PR を ready にする前に canonical verify コマンドを実行する。
