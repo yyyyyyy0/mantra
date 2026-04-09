@@ -28,6 +28,40 @@ trap 'rm -rf "$TMPDIR_REVIEW"' EXIT
 
 echo "[pr-review] Reviewing PR #${PR_NUMBER} in ${REPO}..."
 
+# --- 0. Wait for remote to catch up to EXPECTED_SHA (if provided) ---
+# When invoked from pre-push hook, the remote PR HEAD may not yet reflect
+# the commit being pushed. Poll until remote matches, with a timeout.
+EXPECTED_SHA="${EXPECTED_SHA:-}"
+if [ -n "$EXPECTED_SHA" ]; then
+  # Default 300s (5 min) — pre-push fires before transfer completes,
+  # so this budget must cover the push upload itself on slow links.
+  POLL_TIMEOUT="${POLL_TIMEOUT:-300}"
+  POLL_INTERVAL=2
+  echo "[pr-review] Waiting for remote PR HEAD to reach ${EXPECTED_SHA} (timeout: ${POLL_TIMEOUT}s)..."
+  ELAPSED=0
+  MATCHED=0
+  while [ "$ELAPSED" -lt "$POLL_TIMEOUT" ]; do
+    REMOTE_SHA=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid -q .headRefOid 2>/dev/null || echo "")
+    if [ "$REMOTE_SHA" = "$EXPECTED_SHA" ]; then
+      MATCHED=1
+      break
+    fi
+    sleep "$POLL_INTERVAL"
+    ELAPSED=$((ELAPSED + POLL_INTERVAL))
+  done
+  if [ "$MATCHED" -ne 1 ]; then
+    echo "[pr-review] Timeout: remote did not reach ${EXPECTED_SHA} within ${POLL_TIMEOUT}s" >&2
+    # Post failure on expected SHA to escape pending state
+    gh api "repos/${REPO}/statuses/${EXPECTED_SHA}" \
+      -X POST \
+      -f state="failure" \
+      -f context="ai-review/critical-findings" \
+      -f description="Remote did not catch up within ${POLL_TIMEOUT}s" 2>/dev/null || true
+    exit 1
+  fi
+  echo "[pr-review] Remote caught up to ${EXPECTED_SHA}"
+fi
+
 # --- 1. Pin HEAD SHA first to prevent race conditions ---
 gh pr view "$PR_NUMBER" --repo "$REPO" --json title,body,headRefOid > "${TMPDIR_REVIEW}/meta.json"
 PR_TITLE=$(jq -r '.title // "untitled"' "${TMPDIR_REVIEW}/meta.json")

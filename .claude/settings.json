@@ -6,26 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "input=$(cat); cmd=$(echo \"$input\" | jq -r '.tool_input.command // \"\"'); output=$(echo \"$input\" | jq -r 'if (.tool_response | type) == \"string\" then .tool_response else (.tool_response | tostring) end'); if echo \"$cmd\" | grep -q 'gh pr create'; then url=$(echo \"$output\" | grep -o 'https://github.com[^ ]*' | head -1); [ -n \"$url\" ] && echo \"{\\\"userMessage\\\": \\\"PR作成完了: $url\\\"}\"; fi"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
+            "command": "input=$(cat | tr -d '\\000-\\010\\013-\\037'); cmd=$(echo \"$input\" | jq -r '.tool_input.command // \"\"'); output=$(echo \"$input\" | jq -r 'if (.tool_response | type) == \"string\" then .tool_response else (.tool_response | tostring) end'); if echo \"$cmd\" | grep -q 'gh pr create'; then url=$(echo \"$output\" | grep -o 'https://github.com[^ ]*' | head -1); [ -n \"$url\" ] && echo \"{\\\"userMessage\\\": \\\"PR作成完了: $url\\\"}\"; fi"
+          },
           {
             "type": "command",
-            "command": "input=$(cat); cmd=$(echo \"$input\" | jq -r '.tool_input.command // \"\"'); output=$(echo \"$input\" | jq -r 'if (.tool_response | type) == \"string\" then .tool_response else (.tool_response | tostring) end'); if echo \"$cmd\" | grep -q 'gh pr create'; then cwd=$(echo \"$input\" | jq -r '.cwd // \".\"'); pr_num=$(echo \"$output\" | grep -oE '/pull/[0-9]+' | grep -oE '[0-9]+' | head -1); if [ -n \"$pr_num\" ] && [ -f \"$cwd/scripts/pr-review.sh\" ]; then if bash \"$cwd/scripts/pr-review.sh\" \"$pr_num\" > \"/tmp/pr-review-$pr_num.log\" 2>&1; then echo \"{\\\"userMessage\\\": \\\"AI review completed for #$pr_num\\\"}\"; else echo \"{\\\"userMessage\\\": \\\"AI review failed for #$pr_num (see /tmp/pr-review-$pr_num.log)\\\"}\"; fi; fi; fi",
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "input=$(cat); cmd=$(echo \"$input\" | jq -r '.tool_input.command // \"\"'); output=$(echo \"$input\" | jq -r 'if (.tool_response | type) == \"string\" then .tool_response else (.tool_response | tostring) end'); if echo \"$cmd\" | grep -qE '^git push' && ! echo \"$output\" | grep -qiE '(rejected|error|fatal)'; then cwd=$(echo \"$input\" | jq -r '.cwd // \".\"'); pr_num=$(cd \"$cwd\" && gh pr view --json number -q .number 2>/dev/null); if [ -n \"$pr_num\" ] && [ -f \"$cwd/scripts/pr-review.sh\" ]; then if bash \"$cwd/scripts/pr-review.sh\" \"$pr_num\" > \"/tmp/pr-review-$pr_num.log\" 2>&1; then echo \"{\\\"userMessage\\\": \\\"AI review completed for #$pr_num\\\"}\"; else echo \"{\\\"userMessage\\\": \\\"AI review failed for #$pr_num (see /tmp/pr-review-$pr_num.log)\\\"}\"; fi; fi; fi",
+            "command": "input=$(cat | tr -d '\\000-\\010\\013-\\037'); cmd=$(echo \"$input\" | jq -r '.tool_input.command // \"\"'); output=$(echo \"$input\" | jq -r 'if (.tool_response | type) == \"string\" then .tool_response else (.tool_response | tostring) end'); if echo \"$cmd\" | grep -q 'gh pr create'; then cwd=$(echo \"$input\" | jq -r '.cwd // \".\"'); pr_num=$(echo \"$output\" | grep -oE '/pull/[0-9]+' | grep -oE '[0-9]+' | head -1); if [ -n \"$pr_num\" ] && [ -f \"$cwd/scripts/pr-review.sh\" ]; then if bash \"$cwd/scripts/pr-review.sh\" \"$pr_num\" > \"/tmp/pr-review-$pr_num.log\" 2>&1; then echo \"{\\\"userMessage\\\": \\\"AI review completed for #$pr_num\\\"}\"; else echo \"{\\\"userMessage\\\": \\\"AI review failed for #$pr_num (see /tmp/pr-review-$pr_num.log)\\\"}\"; fi; fi; fi",
             "async": true
           }
         ]

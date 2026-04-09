@@ -1,1 +1,29 @@
+# Read pre-push stdin first (before verify consumes it).
+# git passes "<local-ref> <local-sha> <remote-ref> <remote-sha>" per line
+# for every ref being pushed. We save this to parse the SHA for the
+# current branch's upstream later.
+push_refs=$(cat)
+
 npm run verify
+
+# Run AI review in background (non-blocking).
+# Parse the SHA being pushed to the current branch's upstream from
+# stdin (not `git rev-parse HEAD`) so we handle `git push HEAD~1:branch`,
+# pushes of other branches, and multi-ref pushes correctly.
+if pr_num=$(gh pr view --json number -q .number 2>/dev/null); then
+  if [ -n "$pr_num" ] && [ -f "scripts/pr-review.sh" ]; then
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    upstream_ref="refs/heads/${current_branch}"
+    expected_sha=""
+    while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+      [ -z "$local_ref" ] && continue
+      if [ "$remote_ref" = "$upstream_ref" ] && [ "$local_sha" != "0000000000000000000000000000000000000000" ]; then
+        expected_sha="$local_sha"
+        break
+      fi
+    done <<< "$push_refs"
+    if [ -n "$expected_sha" ]; then
+      EXPECTED_SHA="$expected_sha" bash scripts/pr-review.sh "$pr_num" > "/tmp/pr-review-$pr_num.log" 2>&1 &
+    fi
+  fi
+fi
