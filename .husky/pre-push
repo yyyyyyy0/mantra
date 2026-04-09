@@ -1,8 +1,11 @@
 npm run verify
 
-# Run AI review in background (non-blocking)
+# Run AI review in background (non-blocking).
+# Pass EXPECTED_SHA so pr-review.sh waits until remote catches up
+# to the commit being pushed before fetching diff and posting status.
 if pr_num=$(gh pr view --json number -q .number 2>/dev/null); then
   if [ -n "$pr_num" ] && [ -f "scripts/pr-review.sh" ]; then
-    bash scripts/pr-review.sh "$pr_num" > "/tmp/pr-review-$pr_num.log" 2>&1 &
+    local_sha=$(git rev-parse HEAD)
+    EXPECTED_SHA="$local_sha" bash scripts/pr-review.sh "$pr_num" > "/tmp/pr-review-$pr_num.log" 2>&1 &
   fi
 fi
