@@ -108,6 +108,12 @@ PROMPT_EOF
 # --- 4. Run claude -p (with timeout when available) ---
 REVIEW_TIMEOUT="${REVIEW_TIMEOUT:-120}"
 
+# Validate REVIEW_TIMEOUT is a positive integer
+if ! [[ "$REVIEW_TIMEOUT" =~ ^[1-9][0-9]*$ ]]; then
+  echo "[pr-review] Invalid REVIEW_TIMEOUT='${REVIEW_TIMEOUT}', using default 120s" >&2
+  REVIEW_TIMEOUT=120
+fi
+
 # Detect timeout command: GNU coreutils `timeout`, Homebrew `gtimeout`, or none
 TIMEOUT_CMD=""
 if command -v timeout >/dev/null 2>&1; then
@@ -123,8 +129,9 @@ else
 fi
 
 REVIEW_TEXT=""
+KILL_AFTER=10
 if [ -n "$TIMEOUT_CMD" ]; then
-  CLAUDE_CMD=("$TIMEOUT_CMD" "$REVIEW_TIMEOUT" claude -p --model sonnet --output-format text)
+  CLAUDE_CMD=("$TIMEOUT_CMD" --kill-after="${KILL_AFTER}s" "$REVIEW_TIMEOUT" claude -p --model sonnet --output-format text)
 else
   CLAUDE_CMD=(claude -p --model sonnet --output-format text)
 fi
