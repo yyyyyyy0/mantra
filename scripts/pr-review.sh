@@ -33,7 +33,9 @@ echo "[pr-review] Reviewing PR #${PR_NUMBER} in ${REPO}..."
 # the commit being pushed. Poll until remote matches, with a timeout.
 EXPECTED_SHA="${EXPECTED_SHA:-}"
 if [ -n "$EXPECTED_SHA" ]; then
-  POLL_TIMEOUT="${POLL_TIMEOUT:-60}"
+  # Default 300s (5 min) — pre-push fires before transfer completes,
+  # so this budget must cover the push upload itself on slow links.
+  POLL_TIMEOUT="${POLL_TIMEOUT:-300}"
   POLL_INTERVAL=2
   echo "[pr-review] Waiting for remote PR HEAD to reach ${EXPECTED_SHA} (timeout: ${POLL_TIMEOUT}s)..."
   ELAPSED=0
