@@ -1,1 +1,8 @@
 npm run verify
+
+# Run AI review in background (non-blocking)
+if pr_num=$(gh pr view --json number -q .number 2>/dev/null); then
+  if [ -n "$pr_num" ] && [ -f "scripts/pr-review.sh" ]; then
+    bash scripts/pr-review.sh "$pr_num" > "/tmp/pr-review-$pr_num.log" 2>&1 &
+  fi
+fi
