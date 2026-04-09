@@ -3,6 +3,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { listContentEntries } from '../scripts/lib/content-entries'
+import { __resetSourcesFileCache } from '../scripts/lib/content-sources'
 
 function createTempDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix))
@@ -29,13 +30,22 @@ function writeFamily(args: {
 describe('content entries', () => {
   const tempDirs: string[] = []
   const originalRootsEnv = process.env.MANTRA_USER_CONTENT_ROOTS
+  const originalLocalesEnv = process.env.MANTRA_USER_LOCALES
 
   beforeEach(() => {
     process.env.MANTRA_USER_CONTENT_ROOTS = ''
+    delete process.env.MANTRA_USER_LOCALES
+    __resetSourcesFileCache()
   })
 
   afterEach(() => {
     process.env.MANTRA_USER_CONTENT_ROOTS = originalRootsEnv
+    if (originalLocalesEnv === undefined) {
+      delete process.env.MANTRA_USER_LOCALES
+    } else {
+      process.env.MANTRA_USER_LOCALES = originalLocalesEnv
+    }
+    __resetSourcesFileCache()
     while (tempDirs.length > 0) {
       fs.rmSync(tempDirs.pop() as string, { recursive: true, force: true })
     }
@@ -221,5 +231,26 @@ describe('content entries', () => {
 
     expect(rootEntry).toBeDefined()
     expect(localeEntry).toBeDefined()
+  })
+
+  it('respects MANTRA_USER_LOCALES env var when sources.json absent', () => {
+    const root = createTempDir('mantra-content-entries-locale-env-')
+    tempDirs.push(root)
+
+    const examplesFr = path.join(root, 'examples', 'fr')
+    fs.mkdirSync(examplesFr, { recursive: true })
+    fs.writeFileSync(path.join(examplesFr, 'sample.md'), '# FR', 'utf8')
+
+    process.env.MANTRA_USER_CONTENT_ROOTS = root
+    process.env.MANTRA_USER_LOCALES = 'fr'
+    __resetSourcesFileCache()
+
+    const result = listContentEntries('examples')
+    const entry = result.entries.find(
+      item => item.source.dir === path.join(root, 'examples') && item.relativeName === 'sample.md',
+    )
+
+    expect(entry).toBeDefined()
+    expect(entry?.entryKind).toBe('legacy')
   })
 })
