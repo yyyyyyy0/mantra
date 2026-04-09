@@ -28,7 +28,7 @@
 
 ## Canonical Docs
 - `README.md`
-- `docs/architecture.md`
+- `docs/ja/harness-engineering.md`
 
 ## Non-Goals
 - 長い運用メモの再掲
