@@ -105,19 +105,36 @@ PROMPT_EOF
   cat "${TMPDIR_REVIEW}/diff.txt"
 } >> "${TMPDIR_REVIEW}/prompt.txt"
 
-# --- 4. Run claude -p (with timeout) ---
+# --- 4. Run claude -p (with timeout when available) ---
 REVIEW_TIMEOUT="${REVIEW_TIMEOUT:-120}"
-echo "[pr-review] Running Claude review (timeout: ${REVIEW_TIMEOUT}s)..."
+
+# Detect timeout command: GNU coreutils `timeout`, Homebrew `gtimeout`, or none
+TIMEOUT_CMD=""
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT_CMD="timeout"
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT_CMD="gtimeout"
+fi
+
+if [ -n "$TIMEOUT_CMD" ]; then
+  echo "[pr-review] Running Claude review (timeout: ${REVIEW_TIMEOUT}s via ${TIMEOUT_CMD})..."
+else
+  echo "[pr-review] Running Claude review (no timeout command available, running without timeout)..."
+fi
 
 REVIEW_TEXT=""
-if REVIEW_TEXT=$(timeout "$REVIEW_TIMEOUT" claude -p \
-  --model sonnet \
-  --output-format text \
+if [ -n "$TIMEOUT_CMD" ]; then
+  CLAUDE_CMD=("$TIMEOUT_CMD" "$REVIEW_TIMEOUT" claude -p --model sonnet --output-format text)
+else
+  CLAUDE_CMD=(claude -p --model sonnet --output-format text)
+fi
+
+if REVIEW_TEXT=$("${CLAUDE_CMD[@]}" \
   < "${TMPDIR_REVIEW}/prompt.txt" 2>"${TMPDIR_REVIEW}/claude-stderr.txt"); then
   echo "[pr-review] Claude review completed."
 else
   EXIT_CODE=$?
-  if [ "$EXIT_CODE" -eq 124 ]; then
+  if [ -n "$TIMEOUT_CMD" ] && [ "$EXIT_CODE" -eq 124 ]; then
     echo "[pr-review] Claude CLI timed out after ${REVIEW_TIMEOUT}s" >&2
     DESC="AI review timed out (${REVIEW_TIMEOUT}s)"
   else
