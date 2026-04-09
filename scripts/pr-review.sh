@@ -105,24 +105,32 @@ PROMPT_EOF
   cat "${TMPDIR_REVIEW}/diff.txt"
 } >> "${TMPDIR_REVIEW}/prompt.txt"
 
-# --- 4. Run claude -p ---
-echo "[pr-review] Running Claude review..."
+# --- 4. Run claude -p (with timeout) ---
+REVIEW_TIMEOUT="${REVIEW_TIMEOUT:-120}"
+echo "[pr-review] Running Claude review (timeout: ${REVIEW_TIMEOUT}s)..."
 
 REVIEW_TEXT=""
-if REVIEW_TEXT=$(claude -p \
+if REVIEW_TEXT=$(timeout "$REVIEW_TIMEOUT" claude -p \
   --model sonnet \
   --output-format text \
   < "${TMPDIR_REVIEW}/prompt.txt" 2>"${TMPDIR_REVIEW}/claude-stderr.txt"); then
   echo "[pr-review] Claude review completed."
 else
-  echo "[pr-review] Claude CLI failed:" >&2
-  cat "${TMPDIR_REVIEW}/claude-stderr.txt" >&2
+  EXIT_CODE=$?
+  if [ "$EXIT_CODE" -eq 124 ]; then
+    echo "[pr-review] Claude CLI timed out after ${REVIEW_TIMEOUT}s" >&2
+    DESC="AI review timed out (${REVIEW_TIMEOUT}s)"
+  else
+    echo "[pr-review] Claude CLI failed (exit $EXIT_CODE):" >&2
+    cat "${TMPDIR_REVIEW}/claude-stderr.txt" >&2
+    DESC="AI review failed (claude CLI error)"
+  fi
   # Fail-closed: post failure status
   gh api "repos/${REPO}/statuses/${HEAD_SHA}" \
     -X POST \
     -f state="failure" \
     -f context="ai-review/critical-findings" \
-    -f description="AI review failed (claude CLI error)" 2>/dev/null || true
+    -f description="$DESC" 2>/dev/null || true
   exit 1
 fi
 
