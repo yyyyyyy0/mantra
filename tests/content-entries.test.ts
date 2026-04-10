@@ -198,6 +198,48 @@ describe('content entries', () => {
     expect(entry?.entryKind).toBe('family')
   })
 
+  it('emits cross-locale-last-wins warning when ja/foo.md and en/foo.md collide', () => {
+    const root = createTempDir('mantra-content-entries-cross-locale-')
+    tempDirs.push(root)
+
+    const examplesJa = path.join(root, 'examples', 'ja')
+    const examplesEn = path.join(root, 'examples', 'en')
+    fs.mkdirSync(examplesJa, { recursive: true })
+    fs.mkdirSync(examplesEn, { recursive: true })
+    fs.writeFileSync(path.join(examplesJa, 'collision.md'), '# JA', 'utf8')
+    fs.writeFileSync(path.join(examplesEn, 'collision.md'), '# EN', 'utf8')
+
+    process.env.MANTRA_USER_CONTENT_ROOTS = root
+
+    const result = listContentEntries('examples')
+    const matching = result.entries.filter(e => e.relativeName === 'collision.md')
+    expect(matching).toHaveLength(1)
+    expect(result.warningHooks).toHaveLength(1)
+    expect(result.warningHooks[0]?.policy).toBe('cross-locale-last-wins')
+    expect(result.warningHooks[0]?.target).toBe('collision.md')
+    expect(result.warningHooks[0]?.code).toBe('W_SOURCE_CONFLICT_FILENAME')
+  })
+
+  it('alphabetical last locale wins in cross-locale collision', () => {
+    const root = createTempDir('mantra-content-entries-cross-locale-order-')
+    tempDirs.push(root)
+
+    const examplesJa = path.join(root, 'examples', 'ja')
+    const examplesEn = path.join(root, 'examples', 'en')
+    fs.mkdirSync(examplesJa, { recursive: true })
+    fs.mkdirSync(examplesEn, { recursive: true })
+    fs.writeFileSync(path.join(examplesJa, 'collision.md'), '# JA', 'utf8')
+    fs.writeFileSync(path.join(examplesEn, 'collision.md'), '# EN', 'utf8')
+
+    process.env.MANTRA_USER_CONTENT_ROOTS = root
+
+    const result = listContentEntries('examples')
+    // sortedDirectoryNames returns ['en', 'ja'] alphabetically, so en is scanned first
+    // then ja overwrites → winner is ja, loser is en
+    expect(result.warningHooks[0]?.winnerPath).toBe(path.join(examplesJa, 'collision.md'))
+    expect(result.warningHooks[0]?.loserPath).toBe(path.join(examplesEn, 'collision.md'))
+  })
+
   it('returns both root-level and locale subdirectory entries', () => {
     const root = createTempDir('mantra-content-entries-locale-compat-')
     tempDirs.push(root)

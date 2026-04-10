@@ -37,12 +37,12 @@ export type ContentEntry = LegacyContentEntry | FamilyContentEntry
 
 export interface ContentEntryWarningHook {
   code: 'W_SOURCE_CONFLICT_FILENAME'
-  policy: 'family-over-legacy'
+  policy: 'family-over-legacy' | 'cross-locale-last-wins'
   source: ContentSource
   target: string
   message: string
-  winnerKind: 'family'
-  loserKind: 'legacy'
+  winnerKind: 'legacy' | 'family'
+  loserKind: 'legacy' | 'family'
   winnerPath: string
   loserPath: string
 }
@@ -102,6 +102,25 @@ function isFamilyPreferred(
   incoming: ContentEntry,
 ): boolean {
   return current.entryKind === 'legacy' && incoming.entryKind === 'family'
+}
+
+function createCrossLocaleConflictHook(
+  source: ContentSource,
+  relativeName: string,
+  winnerPath: string,
+  loserPath: string,
+): ContentEntryWarningHook {
+  return {
+    code: 'W_SOURCE_CONFLICT_FILENAME',
+    policy: 'cross-locale-last-wins',
+    source,
+    target: relativeName,
+    message: `cross-locale-last-wins policy applied for "${relativeName}"`,
+    winnerKind: 'legacy',
+    loserKind: 'legacy',
+    winnerPath,
+    loserPath,
+  }
 }
 
 function createFamilyConflictHook(
@@ -170,6 +189,17 @@ function mergeEntriesByPolicy(sourceEntries: ContentEntry[]): {
       )
     }
 
+    // Same-kind fall-through: both legacy → cross-locale (or same-source) collision.
+    if (existing.entryKind === 'legacy' && entry.entryKind === 'legacy') {
+      warningHooks.push(
+        createCrossLocaleConflictHook(
+          entry.source,
+          entry.relativeName,
+          entry.fullPath,    // winner: later entry
+          existing.fullPath, // loser: overwritten entry
+        ),
+      )
+    }
     // Preserve prior behavior: later entries win when the entry type is the same.
     merged.set(entry.relativeName, entry)
   }
