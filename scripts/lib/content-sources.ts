@@ -13,6 +13,7 @@ const SourcesFileSchema = z.object({
   rulesDirs: z.array(z.string()).optional().default([]),
   templatesDirs: z.array(z.string()).optional().default([]),
   examplesDirs: z.array(z.string()).optional().default([]),
+  locales: z.array(z.string()).optional().default(['ja', 'en']),
 })
 
 type SourcesFile = z.infer<typeof SourcesFileSchema>
@@ -225,4 +226,18 @@ export function countUserSources(kinds: ContentKind | ContentKind[]): number {
   }
 
   return seen.size
+}
+
+export function getLocaleSubdirs(): ReadonlySet<string> {
+  const sourcesFile = loadSourcesFile()
+  if (sourcesFile !== null) {
+    return new Set(sourcesFile.locales)
+  }
+
+  const envDirs = parseList(process.env.MANTRA_USER_LOCALES)
+  if (envDirs.length > 0) {
+    return new Set(envDirs)
+  }
+
+  return new Set(['ja', 'en'])
 }

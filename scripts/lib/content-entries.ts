@@ -1,7 +1,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { CliError } from './cli-telemetry'
-import { type ContentKind, type ContentSource, resolveContentSources } from './content-sources'
+import { type ContentKind, type ContentSource, resolveContentSources, getLocaleSubdirs } from './content-sources'
 import {
   composeSkillFamily,
   isSkillFamilyDirectoryName,
@@ -9,8 +9,6 @@ import {
   type LoadedSkillFamily,
 } from './skill-family'
 import { type SkillFamilyTarget } from './skill-family-schema'
-
-const LOCALE_SUBDIRS = new Set(['ja', 'en'])
 
 export type ContentEntryKind = 'legacy' | 'family'
 export type ContentTarget = SkillFamilyTarget
@@ -215,6 +213,7 @@ function listEntriesForSource(
   kind: ContentKind,
   target: ContentTarget,
 ): { entries: ContentEntry[]; warningHooks: ContentEntryWarningHook[] } {
+  const localeSubdirs = getLocaleSubdirs()
   const scanned: ContentEntry[] = []
 
   for (const name of sortedDirectoryNames(source.dir)) {
@@ -233,7 +232,7 @@ function listEntriesForSource(
     if (stat.isDirectory()) {
       if (isSkillFamilyDirectoryName(name)) {
         scanned.push(toFamilyEntry(source, fullPath, kind, target))
-      } else if (kind === 'examples' && LOCALE_SUBDIRS.has(name)) {
+      } else if (kind === 'examples' && localeSubdirs.has(name)) {
         for (const subName of sortedDirectoryNames(fullPath)) {
           const subFullPath = path.join(fullPath, subName)
           const subStat = fs.statSync(subFullPath)
