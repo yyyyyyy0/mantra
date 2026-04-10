@@ -15,6 +15,10 @@ export default defineConfig({
         'scripts/lib/rule-parser.ts',
         'scripts/lib/rule-schema.ts',
         'scripts/lib/validation-summary.ts',
+        'scripts/lib/content-entries.ts',
+        'scripts/lib/content-sources.ts',
+        'scripts/lib/skill-family.ts',
+        'scripts/lib/skill-family-schema.ts',
       ],
       thresholds: {
         statements: 80,
