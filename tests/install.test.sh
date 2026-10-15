@@ -3,6 +3,7 @@
 # temporary copy of the repo used as the "live" clone; the real ~/.claude and
 # ~/.mantra are never touched.
 set -euo pipefail
+unset CDPATH GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 
@@ -136,6 +137,94 @@ check "planner.md is now the live symlink" is_symlink_to "$H/.claude/agents/plan
 before=$(snapshot "$H")
 install_in "$H" >/dev/null
 check "second run after backups changes nothing" test "$before" = "$(snapshot "$H")"
+
+# --- real-HOME rule (simulated with the test-only MANTRA_TEST_REAL_HOME) ------
+H="$TMP/rh"
+mkdir -p "$H/.mantra"
+cp -R "$LIVE" "$H/.mantra/live"
+before=$(snapshot "$H")
+set +e
+out=$(HOME="$H" MANTRA_TEST_REAL_HOME="$H" MANTRA_LIVE="$LIVE" bash "$LIVE/scripts/install.sh" 2>&1)
+rc=$?
+set -e
+check "real home: a live clone outside ~/.mantra/live is refused (exit 2)" test "$rc" -eq 2
+check "real home: refusal names the required path" contains "$out" ".mantra/live"
+check "real home: refusal changes nothing" test "$before" = "$(snapshot "$H")"
+out=$(HOME="$H" MANTRA_TEST_REAL_HOME="$H" MANTRA_LIVE="$H/.mantra/live" bash "$H/.mantra/live/scripts/install.sh")
+check "real home: ~/.mantra/live is accepted" is_symlink_to "$H/.claude/rules" "$H/.mantra/live/rules"
+
+# --- a linked worktree is refused ----------------------------------------------
+WT="$TMP/worktree-live"
+cp -R "$LIVE" "$WT"
+printf 'gitdir: /nonexistent/.git/worktrees/x\n' >"$WT/.git"
+H=$(new_home wt)
+before=$(snapshot "$H")
+set +e
+out=$(HOME="$H" MANTRA_LIVE="$WT" bash "$WT/scripts/install.sh" 2>&1)
+rc=$?
+set -e
+check "linked worktree as live clone is refused (exit 2)" test "$rc" -eq 2
+check "worktree refusal explains" contains "$out" "worktree"
+check "worktree refusal changes nothing" test "$before" = "$(snapshot "$H")"
+
+# --- agents that is not a directory is refused before ANY change ---------------
+H="$TMP/notdir"
+mkdir -p "$H/.claude"
+echo "i am a file" >"$H/.claude/agents"
+before=$(snapshot "$H")
+set +e
+out=$(install_in "$H" 2>&1)
+rc=$?
+set -e
+check "agents is a regular file: exit 2" test "$rc" -eq 2
+check "agents is a regular file: rules were not linked either" absent "$H/.claude/rules"
+check "agents is a regular file: nothing changed" test "$before" = "$(snapshot "$H")"
+
+# --- interrupted migration: resume instead of mkdir -----------------------------
+H="$TMP/resume"
+mkdir -p "$H/.claude/agents.migrating/web-search-modules"
+: >"$H/.claude/agents.migrating/web-search-agent.md"
+: >"$H/.claude/agents.migrating/web-search-modules/x.md"
+before=$(snapshot "$H")
+out=$(install_in "$H" --dry-run)
+check "resume: --dry-run announces it" contains "$out" "resume"
+check "resume: --dry-run changes nothing" test "$before" = "$(snapshot "$H")"
+install_in "$H" >/dev/null
+check "resume: staging dir moved into place" absent "$H/.claude/agents.migrating"
+check "resume: preserved file survives" test -f "$H/.claude/agents/web-search-agent.md"
+check "resume: preserved dir survives" test -f "$H/.claude/agents/web-search-modules/x.md"
+links=$(find "$H/.claude/agents" -maxdepth 1 -type l | wc -l | tr -d ' ')
+check "resume: agents are linked afterwards" test "$links" -eq "$agent_count"
+before=$(snapshot "$H")
+install_in "$H" >/dev/null
+check "resume: second run changes nothing" test "$before" = "$(snapshot "$H")"
+
+# --- stale staging dir next to a still-symlinked agents dir ----------------------
+H=$(new_home stale)
+mkdir -p "$H/.claude/agents.migrating"
+: >"$H/.claude/agents.migrating/junk.md"
+install_in "$H" >/dev/null
+check "stale staging: moved aside, not reused" test -f "$(find "$H/.claude" -maxdepth 2 -path '*/agents.migrating.bak-*/junk.md' | head -1)"
+check "stale staging: junk is not in agents" absent "$H/.claude/agents/junk.md"
+check "stale staging: migration still completed" test -f "$H/.claude/agents/web-search-agent.md"
+
+# --- copy failure cleans up the staging dir and keeps the old symlink -------------
+if [ "$(id -u)" -ne 0 ]; then
+  H=$(new_home cpfail)
+  chmod 000 "$H/.mantra/generated/agents/web-search-agent.md"
+  set +e
+  out=$(install_in "$H" 2>&1)
+  rc=$?
+  set -e
+  check "copy failure: install exits non-zero" test "$rc" -ne 0
+  check "copy failure: staging dir removed" absent "$H/.claude/agents.migrating"
+  check "copy failure: old agents symlink intact" is_symlink_to "$H/.claude/agents" "$H/.mantra/generated/agents"
+  chmod 644 "$H/.mantra/generated/agents/web-search-agent.md"
+  install_in "$H" >/dev/null
+  check "copy failure: retry after fixing succeeds" test -f "$H/.claude/agents/web-search-agent.md"
+else
+  echo "skip copy-failure test (running as root)"
+fi
 
 # --- fresh HOME --------------------------------------------------------------
 H="$TMP/fresh"
