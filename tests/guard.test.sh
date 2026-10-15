@@ -140,8 +140,9 @@ assert_deny 'git config core.hooksPath $(echo /dev/null)'
 
 # Quoted text is data when the command only reads it (jq, echo, printf, grep,
 # for): a separator or a hook-bypass word inside the quotes does not count.
-# Executors, command substitution, unquoted separators and quotes that span
-# lines are still checked.
+# Executors, unquoted separators and substitutions, strings that are run as
+# code, and any command with a quote left open at the end of a line are still
+# checked.
 assert_deny "bash -c 'cd x; rm -rf y'"
 assert_deny "sh -c 'a && git reset --hard'"
 assert_deny "FOO=1 bash -c 'cd x; rm -rf y'"
@@ -155,10 +156,66 @@ assert_deny "echo 'cd x; rm -rf y' | bash"
 assert_deny "echo 'cd x; rm -rf y' | sh -s"
 assert_deny "printf '%s' 'a && git reset --hard' | env bash"
 assert_deny $'echo \'cd x; rm -rf y\' | sh\necho done'
+assert_deny "echo 'cd x; rm -rf y' | /bin/bash"
+assert_deny "echo 'cd x; rm -rf y' | bash 2>&1"
+assert_deny "echo 'cd x; rm -rf y' | sh > out.log"
+assert_deny "echo 'cd x; rm -rf y' | bash -"
+assert_deny "echo 'cd x; rm -rf y' | /usr/bin/env bash"
+assert_deny "echo 'cd x; rm -rf y' | source /dev/stdin"
+assert_deny "echo 'cd x; rm -rf y' | . /dev/stdin"
+assert_deny "echo 'cd x; rm -rf y' | xargs -I{} sh -c {}"
 assert_deny 'echo "$(cd x; rm -rf y)"'
 assert_deny 'echo "`cd x; rm -rf y`"'
+assert_deny "echo 'cd x; rm -rf y' | bash -s foo"
+assert_deny "echo 'cd x; rm -rf y' | bash -o pipefail"
+assert_deny "echo 'cd x; rm -rf y' | sh 2>&1 | tail"
+assert_deny "echo 'cd x; rm -rf y' |& bash"
+assert_deny "echo 'cd x; rm -rf y' | env FOO=1 bash"
+assert_deny "echo 'cd x; rm -rf y' | (bash)"
+assert_deny "echo 'cd x; rm -rf y' | { bash; }"
+assert_deny "echo 'cd x; rm -rf y' | busybox sh"
+assert_deny "echo 'cd x; rm -rf y' | python3"
+assert_deny "echo 'cd x; rm -rf y' | \$SHELL"
+assert_deny "echo 'cd x; rm -rf y' | \$(echo bash)"
+assert_deny "echo 'cd x; rm -rf y' | 'bash'"
+assert_deny "echo 'cd x; rm -rf y' | cat | bash"
+assert_deny "echo 'cd x; rm -rf y' | while read l; do eval \"\$l\"; done"
+assert_deny $'echo \'cd x; rm -rf y\' |\nbash'
+# Quotes nested in $( ) inside double quotes pair up wrongly in a scanner that
+# does not parse the substitution; what follows must stay visible.
+assert_deny 'echo "$(cd "$d" && rm -rf build)"'
+assert_deny 'echo "x: $(test -d "$d" && rm -rf "$d")"'
+assert_deny 'echo "x: $(echo "a" ; rm -rf y)"'
+assert_deny $'printf \'%s\\n\' "x: $(cd "$d" && git push --force origin y)"'
+assert_deny 'grep -q "x" f && echo "ok: $(cd "$d" && rm -rf build)"'
+assert_deny 'echo "done" "$(cd "$d"; rm -rf build)"'
+assert_deny 'echo "$(cd "$d" && git config core.hooksPath /dev/null)"'
+assert_deny 'echo "$(cd "$d" && HUSKY=0 git commit -m x)"'
+assert_deny 'echo "`cd "$d" && rm -rf build`"'
+# Unquoted substitutions: the string inside belongs to another command.
+assert_deny "echo \$(bash -c 'cd x; rm -rf y')"
+assert_deny "echo \`bash -c 'cd x; rm -rf y'\`"
+assert_deny "echo <(bash -c 'cd x; rm -rf y')"
+assert_deny "grep -r x \$(sh -c 'cd x; rm -rf y')"
+assert_deny "for f in \$(bash -c 'cd x; rm -rf y'); do echo \$f; done"
+assert_deny "printf '%s' \$(eval 'a; rm -rf y')"
+# A for list that is run: eval, sh -c.
+assert_deny "for c in 'cd x; rm -rf y'; do eval \"\$c\"; done"
+assert_deny "for c in 'cd x; rm -rf y'; do bash -c \"\$c\"; done"
+assert_deny "for c in 'cd x; rm -rf y'; do sh -c \$c; done"
+# A stray apostrophe (comment, heredoc prose) must not shift which strings the
+# blanking sees: the destructive command below is real.
 assert_deny $'echo \'a\nb; rm -rf y\''
 assert_deny $'echo start # don\'t\ngit push --force origin x\necho done # it\'s'
+assert_deny $'echo \'x\' # it\'s\ngit commit -m \'a\' && rm -rf y \'main\''
+assert_deny $'echo x # it\'s\ngit commit -m \'a\' ; git push --force origin \'main\''
+assert_deny $'cat <<EOF\nfor the user\'s sake\nEOF\ngit commit -m \'a\'; rm -rf y; echo \'b\''
+assert_deny $'echo hi # it\'s\necho \'x\' && rm -rf y && echo \'z\''
+assert_deny $'echo hi # it\'s\ngit commit -m \'x\' && git push --force origin y && echo \'ok\''
+assert_deny $'echo "hi" # it"s\ngit commit -m "x" && git push --force origin y && echo "ok"'
+assert_deny $'grep -n foo f # it\'s\necho \'a\'; rm -rf x; echo \'b\''
+assert_deny $'cat > notes.md <<\'EOF\'\nfor example it\'s fine\nEOF\ngit commit -m \'x\' && git push --force origin y && echo \'ok\''
+assert_deny $'cat > notes.md <<\'EOF\'\necho it\'s here\nEOF\necho \'building\'; rm -rf dist; echo \'done\''
 
 # Quote-aware splitting: a separator inside quotes does not hide a later flag.
 assert_deny 'git commit -m "fix: a; b" --no-verify'
@@ -216,8 +273,14 @@ assert_allow "jq -cn --arg c 'git config core.hooksPath githooks' '{tool_input:{
 assert_allow "jq -cn --arg c 'cd x && git config core.hooksPath githooks' '{tool_input:{command:\$c}}'"
 assert_allow "jq -cn --arg c 'git commit -m x; git config core.hooksPath /dev/null' '{tool_input:{command:\$c}}' | bash hooks/guard.sh"
 assert_allow "for c in 'git config core.hooksPath githooks' 'cd x && git config core.hooksPath githooks' '( cd x && git config core.hooksPath githooks )'; do echo \"\$c\"; done"
+# The loop that was blocked while testing this guard.
+assert_allow "for c in 'git config core.hooksPath githooks' 'cd ~/src/mantra && git config core.hooksPath githooks' '( cd x && git config core.hooksPath githooks )' 'git config --get core.hooksPath' 'git config --get core.hooksPath )'; do printf '%-58s %s\\n' \"\$c\" \"\$(jq -cn --arg c \"\$c\" '{tool_input:{command:\$c}}' | bash ~/.mantra/live/hooks/guard.sh | jq -r '.hookSpecificOutput.permissionDecision // \"allow\"')\"; done"
 assert_allow "echo '{\"tool_input\":{\"command\":\"cd x && git reset --hard\"}}' | bash hooks/guard.sh"
 assert_allow "echo 'a; git reset --hard' | sha256sum"
+assert_allow "echo 'a; git reset --hard' | jq -R ."
+assert_allow "echo 'a; git reset --hard' | wc -c | tr -d ' '"
+assert_allow "(echo 'a; git reset --hard' | wc -c)"
+assert_allow "echo 'a; git reset --hard' \"\$(date)\""
 assert_allow "echo 'a; git reset --hard'"
 assert_allow "echo \"cd x && git reset --hard\""
 assert_allow "printf '%s' 'x && rm -rf y'"
