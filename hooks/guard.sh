@@ -2,7 +2,9 @@
 # PreToolUse guard for the Bash tool.
 #
 # Reads the hook JSON on stdin and takes .tool_input.command. Backslash-newline
-# continuations are joined and the command is lowercased. It is then split into
+# continuations are joined and the command is lowercased. Quoted strings that
+# are only data for jq, echo, printf, grep, egrep, fgrep or a `for` list are
+# blanked (see AWK_MASK and the first limit below). It is then split into
 # segments twice, and the segments of both splits are checked: once on
 # & && | || ; and newlines everywhere, and once with a quote-aware awk scanner
 # that splits only outside quotes (so `git commit -m "a; b" --no-verify` is one
@@ -21,7 +23,18 @@
 # This is a seatbelt against accidents, not a sandbox. Residual limits:
 #   - Quoted text that contains a separator (for example "a; rm -rf x") is also
 #     split by the plain pass, so it can cause a false positive. That is the
-#     intended direction of error.
+#     intended direction of error. The exception is a closed, single-line
+#     string that is only an argument of jq, echo, printf, grep, egrep, fgrep
+#     or a `for` list (double quotes: no $ or backtick in it): it is blanked
+#     first, so `jq --arg c 'a && git config core.hooksPath x'` passes. What
+#     such a command then does with the string is not followed: writing it to
+#     a file and running the file passes, as `echo 'rm -rf x' | sh` always
+#     did. A pipe into a shell that reads stdin (`| sh`, `| bash -s`,
+#     `| env bash`) turns the blanking off for the whole command.
+#   - `git config core.hooksPath` is read-only and allowed, with `git config
+#     --get core.hooksPath` and the exact value `githooks` (a trailing `)` of a
+#     subshell is ignored for these). Any other value, flag or global option
+#     (`-C`, `-c`) is denied, including reads such as `--get-all`.
 #   - A destructive command nested mid-segment is not detected:
 #     `echo $(rm -rf x)`, `find -exec rm -rf`, `xargs -a list rm -rf`.
 #   - Indirection is not followed: aliases, shell functions, variables
@@ -120,12 +133,16 @@ is_rm_rf() {
 }
 
 # Git hook bypass through core.hooksPath: any `git` segment that sets it with
-# -c, --config-env or `git config`, except the two exact forms below.
+# -c, --config-env or `git config`, except the exact forms below. Trailing
+# `)` of a subshell is dropped for that comparison only (`( cd x && git config
+# core.hooksPath githooks )`); `}` is not, because `githooks}` is a value.
 hooks_path_override() {
-  local s=$1
+  local s=$1 t
   [[ $s == *hookspath* ]] || return 1
-  [[ $s == 'git config core.hookspath githooks' ]] && return 1
-  [[ $s == 'git config --get core.hookspath' ]] && return 1
+  t=${s%"${s##*[![:space:])]}"}
+  [[ $t == 'git config core.hookspath githooks' ]] && return 1
+  [[ $t == 'git config core.hookspath' ]] && return 1
+  [[ $t == 'git config --get core.hookspath' ]] && return 1
   [[ $s =~ ^git([[:space:]]|$) ]] || return 1
   [[ $s =~ [[:space:]]-c[[:space:]]+[\"\']?core\.hookspath ]] && return 0
   [[ $s =~ --config-env[=[:space:]][\"\']?core\.hookspath ]] && return 0
@@ -181,6 +198,105 @@ END {
   }
 }
 '
+
+# awk program that blanks quoted data before splitting (must not contain a
+# single quote). A closed, single-line quoted string that is an argument of a
+# command which only reads it (jq, echo, printf, grep, egrep, fgrep, for) is
+# emptied: 'a; b' becomes ''. Double-quoted text is blanked only when it has no
+# $ or backtick, since those expand. Nothing else is touched: executors (bash
+# -c, xargs, eval), command names that are not plain words, strings that span
+# lines and unterminated quotes stay visible to both split passes.
+# shellcheck disable=SC2016  # awk variables such as $0 must not expand in the shell
+AWK_MASK='
+function first_word(s) {
+  while (1) {
+    if (match(s, "^[ \t({!]+") || match(s, "^(if|then|else|elif|do|while|until)[ \t]+") || match(s, "^[a-z_][a-z0-9_]*=[a-z0-9_./:@%+,=-]*[ \t]+")) {
+      s = substr(s, RLENGTH + 1)
+    } else break
+  }
+  if (match(s, "^[^ \t]+[ \t]")) return substr(s, 1, RLENGTH - 1)
+  return ""
+}
+function seg_add(t) {
+  if (fw_done == 0) {
+    seg = seg t
+    if (length(seg) > 200) { fw = ""; fw_done = 1 }
+  }
+}
+function close_region(   inert) {
+  inq = 0
+  inert = 0
+  if (rnl == 0) {
+    if (fw_done == 0) { fw = first_word(seg); fw_done = 1 }
+    if (fw ~ "^(jq|echo|printf|grep|egrep|fgrep|for)$") {
+      if (rq == sq) inert = 1
+      else if (index(rbuf, "$") == 0 && index(rbuf, "`") == 0) inert = 1
+    }
+  }
+  if (inert) out = out rq rq
+  else out = out rbuf
+  rbuf = ""
+}
+BEGIN { dq = "\"" }
+{
+  line = $0
+  if (inq == 0 && !index(line, sq) && !index(line, dq)) {
+    print line
+    seg = ""; fw_done = 0
+    next
+  }
+  n = length(line)
+  for (i = 1; i <= n; i++) {
+    c = substr(line, i, 1)
+    if (inq == 1) {
+      rbuf = rbuf c
+      if (c == sq) close_region()
+    } else if (inq == 2) {
+      if (c == "\\") { rbuf = rbuf c substr(line, i + 1, 1); i++; continue }
+      rbuf = rbuf c
+      if (c == dq) close_region()
+    } else if (inq == 3) {
+      if (c == "\\") { out = out c substr(line, i + 1, 1); i++; continue }
+      out = out c
+      if (c == sq) inq = 0
+    } else if (c == "\\") {
+      out = out c substr(line, i + 1, 1)
+      seg_add(c substr(line, i + 1, 1))
+      i++
+    } else if (c == sq || c == dq) {
+      inq = (c == sq) ? 1 : 2; rq = c; rbuf = c; rnl = 0
+    } else if (c == "$" && substr(line, i + 1, 1) == sq) {
+      inq = 3; out = out c sq; i++
+      fw = ""; fw_done = 1
+    } else if (c == "&" || c == "|" || c == ";") {
+      out = out c
+      seg = ""; fw_done = 0
+    } else {
+      out = out c
+      seg_add(c)
+    }
+  }
+  if (inq == 0) {
+    print out
+    out = ""
+    seg = ""; fw_done = 0
+  } else if (inq == 3) {
+    out = out "\n"
+  } else {
+    rnl = 1
+    rbuf = rbuf "\n"
+  }
+}
+END {
+  if (inq == 1 || inq == 2) print out rbuf
+  else if (inq == 3) print out
+}
+'
+
+# A pipe into a shell that reads its script from stdin: `| bash`, `| sh -s`,
+# `| env bash`. (`| bash script.sh` and `| sh -c '...'` do not match.)
+NL=$'\n'
+RE_SHELL_SINK="\\|[[:space:]]*((env|command|exec|nohup|time|nice)[[:space:]]+(-[^[:space:]]+[[:space:]]+)*)?(sh|bash|zsh|dash|ksh)([[:space:]]+-[^[:space:]]+)*[[:space:]]*([;&|)${NL}]|\$)"
 
 matched=''
 matched_seg=''
@@ -243,6 +359,10 @@ while IFS= read -r seg || [ -n "$seg" ]; do
   done
 done < <(
   lower=$(printf '%s\n' "$cmd" | tr '[:upper:]' '[:lower:]')
+  # A string piped into a shell is code, not data: blank nothing in that case.
+  if ! [[ $lower =~ $RE_SHELL_SINK ]]; then
+    lower=$(printf '%s\n' "$lower" | awk -v sq="'" "$AWK_MASK")
+  fi
   {
     # Plain split: separators everywhere, quotes ignored.
     printf '%s\n' "$lower" | tr '&|;' '\n'

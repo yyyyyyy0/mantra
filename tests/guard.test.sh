@@ -119,16 +119,46 @@ assert_deny 'git config --local core.hooksPath .git/hooks'
 assert_deny 'env FOO=1 git config core.hooksPath /dev/null'
 assert_deny 'git --config-env=core.hooksPath=EVIL commit -m x'
 assert_deny 'GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null GIT_CONFIG_COUNT=1 git commit -m x'
-# Only the exact forms `git config core.hooksPath githooks` and
-# `git config --get core.hooksPath` pass; every other way to touch it is denied.
+# Only the exact forms `git config core.hooksPath githooks`,
+# `git config core.hooksPath` and `git config --get core.hooksPath` pass (also
+# inside a subshell); every other way to touch it is denied.
 assert_deny 'git -c core.hooksPath=githooks status'
 assert_deny 'git -c core.hookspath=githooks status'
 assert_deny 'git config --local core.hooksPath githooks'
-assert_deny 'git config core.hooksPath'
 assert_deny 'git config --unset core.hooksPath'
 assert_deny 'git config --global --unset core.hooksPath'
 assert_deny 'git config --get-all core.hooksPath'
 assert_deny 'git -C repo config core.hooksPath githooks'
+# A subshell closer is dropped only after the exact forms; it never hides a value.
+assert_deny '( cd x && git config core.hooksPath /dev/null )'
+assert_deny '(git config core.hooksPath /dev/null)'
+assert_deny '( git config --unset core.hooksPath )'
+assert_deny '(git config core.hooksPath githooks;git config core.hooksPath /dev/null)'
+assert_deny 'git config core.hooksPath githooks}'
+assert_deny 'git config core.hooksPath githooks\)'
+assert_deny 'git config core.hooksPath $(echo /dev/null)'
+
+# Quoted text is data when the command only reads it (jq, echo, printf, grep,
+# for): a separator or a hook-bypass word inside the quotes does not count.
+# Executors, command substitution, unquoted separators and quotes that span
+# lines are still checked.
+assert_deny "bash -c 'cd x; rm -rf y'"
+assert_deny "sh -c 'a && git reset --hard'"
+assert_deny "FOO=1 bash -c 'cd x; rm -rf y'"
+assert_deny "x=a\\ jq bash -c 'cd x; rm -rf y'"
+assert_deny "echo 'a' && rm -rf y"
+assert_deny "echo 'a'; git commit -m 'x; y' --no-verify"
+assert_deny "echo 'a' | xargs sh -c 'cd x; rm -rf y'"
+assert_deny "for c in 'a'; do bash -c 'cd x; rm -rf y'; done"
+assert_deny "psql -c 'drop table users;'"
+assert_deny "echo 'cd x; rm -rf y' | bash"
+assert_deny "echo 'cd x; rm -rf y' | sh -s"
+assert_deny "printf '%s' 'a && git reset --hard' | env bash"
+assert_deny $'echo \'cd x; rm -rf y\' | sh\necho done'
+assert_deny 'echo "$(cd x; rm -rf y)"'
+assert_deny 'echo "`cd x; rm -rf y`"'
+assert_deny $'echo \'a\nb; rm -rf y\''
+assert_deny $'echo start # don\'t\ngit push --force origin x\necho done # it\'s'
 
 # Quote-aware splitting: a separator inside quotes does not hide a later flag.
 assert_deny 'git commit -m "fix: a; b" --no-verify'
@@ -175,6 +205,27 @@ assert_allow 'git commit -m "feat: block rm -rf (via the guard)"'
 assert_allow 'git config core.hooksPath githooks'
 assert_allow 'GIT CONFIG CORE.HOOKSPATH GITHOOKS'
 assert_allow 'git config --get core.hooksPath'
+# A value-less read, and the exact forms inside a subshell.
+assert_allow 'git config core.hooksPath'
+assert_allow '( cd x && git config core.hooksPath githooks )'
+assert_allow '(cd x && git config core.hooksPath githooks)'
+assert_allow '( git config --get core.hooksPath )'
+assert_allow '(git config core.hooksPath)'
+# Quoted text that is only an argument of a data command.
+assert_allow "jq -cn --arg c 'git config core.hooksPath githooks' '{tool_input:{command:\$c}}'"
+assert_allow "jq -cn --arg c 'cd x && git config core.hooksPath githooks' '{tool_input:{command:\$c}}'"
+assert_allow "jq -cn --arg c 'git commit -m x; git config core.hooksPath /dev/null' '{tool_input:{command:\$c}}' | bash hooks/guard.sh"
+assert_allow "for c in 'git config core.hooksPath githooks' 'cd x && git config core.hooksPath githooks' '( cd x && git config core.hooksPath githooks )'; do echo \"\$c\"; done"
+assert_allow "echo '{\"tool_input\":{\"command\":\"cd x && git reset --hard\"}}' | bash hooks/guard.sh"
+assert_allow "echo 'a; git reset --hard' | sha256sum"
+assert_allow "echo 'a; git reset --hard'"
+assert_allow "echo \"cd x && git reset --hard\""
+assert_allow "printf '%s' 'x && rm -rf y'"
+assert_allow "grep -rn 'git push --force; rm -rf' docs"
+assert_allow "grep -rn 'drop table users' migrations"
+assert_allow "echo 'HUSKY=0 git commit -m x'"
+assert_allow "jq -cn --arg c 'GIT_CONFIG_KEY_0=core.hooksPath git commit -m x' '\$c'"
+assert_allow "if true; then echo 'a; rm -rf y'; fi"
 assert_allow 'git config --global --list'
 assert_allow 'git merge topic'
 assert_allow 'git commit -m "x" && git log -n 5'
