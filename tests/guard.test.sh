@@ -119,6 +119,44 @@ assert_deny 'git config --local core.hooksPath .git/hooks'
 assert_deny 'env FOO=1 git config core.hooksPath /dev/null'
 assert_deny 'git --config-env=core.hooksPath=EVIL commit -m x'
 assert_deny 'GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null GIT_CONFIG_COUNT=1 git commit -m x'
+# Only the exact forms `git config core.hooksPath githooks` and
+# `git config --get core.hooksPath` pass; every other way to touch it is denied.
+assert_deny 'git -c core.hooksPath=githooks status'
+assert_deny 'git -c core.hookspath=githooks status'
+assert_deny 'git config --local core.hooksPath githooks'
+assert_deny 'git config core.hooksPath'
+assert_deny 'git config --unset core.hooksPath'
+assert_deny 'git config --global --unset core.hooksPath'
+assert_deny 'git config --get-all core.hooksPath'
+assert_deny 'git -C repo config core.hooksPath githooks'
+
+# Quote-aware splitting: a separator inside quotes does not hide a later flag.
+assert_deny 'git commit -m "fix: a; b" --no-verify'
+assert_deny 'git commit -m "R&D" -n'
+assert_deny 'git push -m "a|b" --force'
+assert_deny "git commit -m 'x; y' --no-verify"
+assert_deny 'git commit -m "say \"hi\"; ok" --no-verify'
+assert_deny $'git commit -m "line one\nline two" --no-verify'
+assert_deny 'bash -c "echo a; rm -rf x"'
+# An apostrophe in a heredoc body must not hide a later command from the guard.
+assert_deny $'git commit -F - <<\'EOF\'\nfix: don\'t do it\nEOF\ngit push --force origin x'
+assert_deny $'echo "unbalanced\nrm -rf x'
+
+# Global git options with quoted or separate arguments.
+assert_deny 'git -C "dir with space" reset --hard'
+assert_deny "git -C 'dir with space' push --force origin x"
+assert_deny 'git --git-dir=/x/.git --work-tree=/x reset --hard'
+assert_deny 'git --git-dir /x/.git --work-tree /x push -f origin x'
+assert_deny 'git -c user.name="A B" commit --no-verify -m x'
+
+# Prefix abbreviations git accepts.
+assert_deny 'git reset --ha'
+assert_deny 'git reset --har HEAD~1'
+assert_deny 'git commit --no-veri -m x'
+assert_deny 'git commit --no-verif -m x'
+assert_deny 'git push --no-veri origin x'
+assert_deny 'git merge --no-verif topic'
+assert_deny 'git rebase --no-veri main'
 assert_deny 'git merge --no-verify topic'
 assert_deny 'git rebase --no-verify main'
 
@@ -135,13 +173,19 @@ assert_allow 'git push --follow-tags origin main'
 assert_allow 'git clean -n'
 assert_allow 'git commit -m "feat: block rm -rf (via the guard)"'
 assert_allow 'git config core.hooksPath githooks'
-assert_allow 'git config --local core.hooksPath githooks'
+assert_allow 'GIT CONFIG CORE.HOOKSPATH GITHOOKS'
 assert_allow 'git config --get core.hooksPath'
-assert_allow 'git config core.hooksPath'
-assert_allow 'git config --unset core.hooksPath'
 assert_allow 'git config --global --list'
-assert_allow 'git -c core.hooksPath=githooks status'
 assert_allow 'git merge topic'
+assert_allow 'git commit -m "x" && git log -n 5'
+assert_allow 'git commit -m "fix: a; b" -S'
+assert_allow 'git commit -m "R&D notes"'
+assert_allow 'git -C "dir with space" status'
+assert_allow 'git -C "dir with space" push origin main'
+assert_allow 'git reset --soft HEAD~1'
+assert_allow 'git commit --verify -m x'
+assert_allow 'git push --no-thin origin main'
+assert_allow 'echo "it is fine"; git status'
 assert_allow 'nice -n 10 make test'
 assert_allow 'xargs -0 echo'
 assert_allow 'timeout 5 sleep 1'
@@ -208,6 +252,27 @@ if [ -z "$out" ] && [ "$elapsed" -le 10 ]; then
 else
   fail=$((fail + 1))
   echo "FAIL 5100-line heredoc: ${elapsed}s, output: ${out:-<empty>}"
+fi
+
+# Same size, but every line has quotes, apostrophes and separators.
+big=$(mktemp)
+{
+  echo "git commit -F - <<'EOF'"
+  for i in $(seq 1 3000); do
+    echo "line $i: don't break \"quoted\" things; a & b | c, release $i"
+  done
+  echo "EOF"
+} >"$big"
+start=$SECONDS
+out=$(jq -cn --rawfile c "$big" '{tool_name: "Bash", tool_input: {command: $c}}' | bash "$GUARD")
+elapsed=$((SECONDS - start))
+rm -f -- "$big"
+if [ -z "$out" ] && [ "$elapsed" -le 10 ]; then
+  pass=$((pass + 1))
+  echo "ok   allow  (3000 quote-heavy heredoc lines in ${elapsed}s)"
+else
+  fail=$((fail + 1))
+  echo "FAIL quote-heavy heredoc: ${elapsed}s, output: ${out:-<empty>}"
 fi
 
 echo "guard.test.sh: $pass passed, $fail failed"

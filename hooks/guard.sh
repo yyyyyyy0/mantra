@@ -2,24 +2,40 @@
 # PreToolUse guard for the Bash tool.
 #
 # Reads the hook JSON on stdin and takes .tool_input.command. Backslash-newline
-# continuations are joined, the command is lowercased, then split into
-# segments on & && | || ; and newlines. Each segment is normalized (leading
-# grouping characters, shell keywords such as `then`/`do`, env assignments,
-# absolute paths and wrappers such as `command`, `time -p`, `env -i`,
-# `nice -n 10`, `xargs -0`, `eval`, `bash -c` are stripped) and checked against
-# a deny list of destructive commands and git-hook bypasses. On a match it
-# prints one permissionDecision=deny JSON object and exits 0. Otherwise it
-# prints nothing and exits 0.
+# continuations are joined and the command is lowercased. It is then split into
+# segments twice, and the segments of both splits are checked: once on
+# & && | || ; and newlines everywhere, and once with a quote-aware awk scanner
+# that splits only outside quotes (so `git commit -m "a; b" --no-verify` is one
+# segment). Each segment is normalized (leading grouping characters, shell
+# keywords such as `then`/`do`, env assignments, absolute paths and wrappers
+# such as `command`, `time -p`, `env -i`, `nice -n 10`, `xargs -0`, `eval`,
+# `bash -c` are stripped) and checked against a deny list of destructive
+# commands and git-hook bypasses. On a match it prints one
+# permissionDecision=deny JSON object and exits 0. Otherwise it prints nothing
+# and exits 0.
 #
 # FAIL-OPEN: if jq is not installed (one line on stderr), stdin is not
 # parseable JSON, or there is no .tool_input.command, the hook exits 0 and the
 # command runs.
 #
-# This is a seatbelt against accidents, not a sandbox. Quoted text that
-# contains a separator (for example "a; rm -rf x") is split too and can cause
-# a false positive, which is the intended direction of error; a destructive
-# command nested mid-segment (`echo $(rm -rf x)`, `find -exec rm -rf`) is not
-# detected.
+# This is a seatbelt against accidents, not a sandbox. Residual limits:
+#   - Quoted text that contains a separator (for example "a; rm -rf x") is also
+#     split by the plain pass, so it can cause a false positive. That is the
+#     intended direction of error.
+#   - A destructive command nested mid-segment is not detected:
+#     `echo $(rm -rf x)`, `find -exec rm -rf`, `xargs -a list rm -rf`.
+#   - Indirection is not followed: aliases, shell functions, variables
+#     (`$CMD`), `source`d files, scripts that run rm/git themselves, other
+#     interpreters (`python -c`, `perl -e`), and `git` through a wrapper not
+#     listed above (`sudo` is itself denied).
+#   - Option abbreviations are covered only for --no-verify (--no-veri...) and
+#     reset --hard (--ha...). Other git aliases and config (alias.* or
+#     push.default/remote.*.push that force) are not inspected.
+#   - A heredoc body is checked line by line like any other text: a body line
+#     that starts with a blocked command is denied (use `git commit -F <file>`
+#     or avoid such lines); an apostrophe in a heredoc only disturbs the
+#     quote-aware pass, the plain pass still sees every line.
+#   - Attribute-style tricks (`git -c alias.x='!rm -rf' x`) are not parsed.
 #
 # Registration is manual (settings.json -> hooks.PreToolUse, matcher "Bash",
 # command: ~/.mantra/live/hooks/guard.sh). This script registers nothing.
@@ -44,18 +60,20 @@ add_rule() {
   REGEXES+=("$2")
 }
 
-# `git`, then any global options (-C <dir>, -c <k=v>, --flag, -x), then a space.
-GIT_OPTS='([[:space:]]+(-[cC][[:space:]]+[^[:space:]]+|-[^[:space:]]+))*'
+# `git`, then any global options (-C <dir>, -c <k=v>, --git-dir <p>, --work-tree
+# <p>, --flag, -x; arguments may be quoted), then a space.
+ARG='(([^[:space:]"'"'"']|"[^"]*"|'"'"'[^'"'"']*'"'"')+)'
+GIT_OPTS="([[:space:]]+(-[cC][[:space:]]+${ARG}|--(git-dir|work-tree|namespace|super-prefix|exec-path|config-env)[[:space:]]+${ARG}|-[^[:space:]]+))*"
 GIT="^git${GIT_OPTS}[[:space:]]+"
 # What may follow the end of a token: whitespace, end of line, or a closer.
 END='([[:space:])}"'"'"'`<>]|$)'
 
-add_rule 'git reset --hard' "${GIT}reset([[:space:]].*)?[[:space:]]--hard${END}"
+add_rule 'git reset --hard' "${GIT}reset([[:space:]].*)?[[:space:]]--ha(r(d)?)?${END}"
 add_rule 'git clean -f/-d/-x' "${GIT}clean[[:space:]]+(.*[[:space:]])?(-[a-z]*[fdx][a-z]*|--force)${END}"
 add_rule 'git push --force / -f / --force-with-lease / +refspec' \
   "${GIT}push([[:space:]].*)?[[:space:]](--force[^[:space:]]*|-[a-z]*f[a-z]*|\\+[^[:space:]]+)${END}"
 add_rule 'git commit/push/merge/rebase --no-verify' \
-  "${GIT}(commit|push|merge|rebase)([[:space:]].*)?[[:space:]]--no-verify(=[^[:space:]]*)?${END}"
+  "${GIT}(commit|push|merge|rebase)([[:space:]].*)?[[:space:]]--no-veri(f(y)?)?(=[^[:space:]]*)?${END}"
 # `git commit -n` is --no-verify. (`git push -n` is --dry-run and stays allowed.)
 add_rule 'git commit -n (--no-verify)' "${GIT}commit([[:space:]].*)?[[:space:]]-[a-z]*n[a-z]*${END}"
 add_rule 'rmdir' "^rmdir${END}"
@@ -101,26 +119,68 @@ is_rm_rf() {
   return 0
 }
 
-# Git hook bypass through core.hooksPath. Allowed: the repo's own `githooks`
-# value, and read/unset calls (--get, --unset, --list, or no value at all).
+# Git hook bypass through core.hooksPath: any `git` segment that sets it with
+# -c, --config-env or `git config`, except the two exact forms below.
 hooks_path_override() {
   local s=$1
   [[ $s == *hookspath* ]] || return 1
-  if [[ $s =~ ^git[[:space:]]+(.*[[:space:]])?--config-env=core\.hookspath ]]; then
-    return 0
-  fi
-  if [[ $s =~ ^git[[:space:]]+(.*[[:space:]])?-c[[:space:]]+[\"\']?core\.hookspath= ]]; then
-    [[ $s =~ core\.hookspath=[\"\']?githooks[\"\']?([[:space:]]|$) ]] && return 1
-    return 0
-  fi
-  if [[ $s =~ ^git${GIT_OPTS}[[:space:]]+config([[:space:]].*)?[[:space:]]core\.hookspath ]]; then
-    [[ $s =~ [[:space:]](--get|--get-all|--get-regexp|--unset|--unset-all|--list|-l)([[:space:]]|$) ]] && return 1
-    [[ $s =~ core\.hookspath[[:space:]]*$ ]] && return 1
-    [[ $s =~ core\.hookspath[[:space:]]+[\"\']?githooks[\"\']?([[:space:]]|$) ]] && return 1
-    return 0
-  fi
+  [[ $s == 'git config core.hookspath githooks' ]] && return 1
+  [[ $s == 'git config --get core.hookspath' ]] && return 1
+  [[ $s =~ ^git([[:space:]]|$) ]] || return 1
+  [[ $s =~ [[:space:]]-c[[:space:]]+[\"\']?core\.hookspath ]] && return 0
+  [[ $s =~ --config-env[=[:space:]][\"\']?core\.hookspath ]] && return 0
+  [[ $s =~ [[:space:]]config([[:space:]].*)?[[:space:]][\"\']?core\.hookspath ]] && return 0
   return 1
 }
+
+# awk program for the quote-aware split (must not contain a single quote).
+# shellcheck disable=SC2016  # awk variables such as $0 must not expand in the shell
+AWK_SPLIT='
+function flush() {
+  if (buf != "") print buf
+  buf = ""
+}
+{
+  line = $0
+  if (inq == 0 && !index(line, "\"") && !index(line, sq) && !index(line, "\\") && !index(line, "&") && !index(line, "|") && !index(line, ";")) {
+    flush()
+    print line
+    next
+  }
+  if (inq != 0) buf = buf " "
+  n = length(line)
+  for (i = 1; i <= n; i++) {
+    c = substr(line, i, 1)
+    if (inq == 1) {
+      buf = buf c
+      if (c == sq) inq = 0
+    } else if (inq == 2 || inq == 3) {
+      if (c == "\\") { buf = buf c substr(line, i + 1, 1); i++; continue }
+      buf = buf c
+      if ((inq == 2 && c == "\"") || (inq == 3 && c == sq)) inq = 0
+    } else if (c == "\\") {
+      buf = buf c substr(line, i + 1, 1); i++
+    } else if (c == sq) {
+      inq = 1; buf = buf c
+    } else if (c == "\"") {
+      inq = 2; buf = buf c
+    } else if (c == "$" && substr(line, i + 1, 1) == sq) {
+      inq = 3; buf = buf c sq; i++
+    } else if (c == "&" || c == "|" || c == ";") {
+      flush()
+    } else {
+      buf = buf c
+    }
+  }
+  if (inq == 0) flush()
+}
+END {
+  if (inq != 0) {
+    gsub(/[&|;]/, "\n", buf)
+    print buf
+  }
+}
+'
 
 matched=''
 matched_seg=''
@@ -181,7 +241,16 @@ while IFS= read -r seg || [ -n "$seg" ]; do
     fi
     i=$((i + 1))
   done
-done < <(printf '%s\n' "$cmd" | tr '[:upper:]' '[:lower:]' | tr '&|;' '\n')
+done < <(
+  lower=$(printf '%s\n' "$cmd" | tr '[:upper:]' '[:lower:]')
+  {
+    # Plain split: separators everywhere, quotes ignored.
+    printf '%s\n' "$lower" | tr '&|;' '\n'
+    # Quote-aware split: separators only outside quotes; a newline inside
+    # quotes becomes a space; an unterminated quote falls back to the plain split.
+    printf '%s\n' "$lower" | awk -v sq="'" "$AWK_SPLIT"
+  } | awk '!seen[$0]++'
+)
 
 [ -n "$matched" ] || exit 0
 
