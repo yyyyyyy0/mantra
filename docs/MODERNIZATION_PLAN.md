@@ -1,305 +1,288 @@
-# mantra モダナイゼーション計画（2026-10-15）
+# mantra 再評価と再設計計画（2026-10-15）
 
-Status: **承認待ち（ドラフト v2。mob-critic のレビューを反映済み）**。承認後はこのファイルを実装の SSOT とする。決定事項（D 番号）を変えるときは、先にこのファイルを更新する。
+Status: **承認待ち（v4。mob-critic の 2 回目のレビューを反映済み）**。
 
-## 目的
+v2（commit `c936392`）は、仕組みを残したまま最新化する計画だった。v3 以降はそこから方針を変え、次の 3 点を確かめたうえで計画を作り直している。
 
-- mantra を Claude Code の現行機能に合わせ、標準機能で代わりがきく自前の仕組みを減らす。前提とするバージョンは、手元が 2.1.287、公式ドキュメントが 2.1.300 時点。
-- Codex 連携を撤去する。Codex は使っていない。GPT 契約がなく、手元の Codex.app は古くてマルウェア扱いされている。
-- 毎セッション常に読み込まれるルールを減らす。現在は rules/ が 12 ファイル、1,159 行、約 40KB で、およそ 1 万トークンになる。
-- 2026-10-15 に追加した 2 つのルールは、文言を変えずに残す。
-  - FM-VERSION
-  - `rules/agents.md` の段落「サブエージェントを使う計画ではオーケストレーション、モデル、検証ゲートを明記する」
+- mantra の本来の意図が、いまも有用か
+- 実際に意図どおりに効いているか
+- 世界の動向に照らして古くなっていないか
 
-## 前提と制約
+承認後は、このファイルを実装の唯一の正本（SSOT）とする。
 
-- `~/.claude/rules` は `~/src/mantra/rules` へのシンボリックリンクになっている。そのため、メインの checkout のブランチと作業ツリーが、そのまま全セッションのルールになる。この構造を、以下では「checkout = ライブ」と呼ぶ。
-  - 作業はすべて worktree（`.maw-workspaces/<name>`）で行う。
-  - メインの checkout は、各フェーズの「反映」ステップでだけ `git pull --ff-only` する。
-- 既存のフック `hooks/p-judge.sh` は、`feat/p-judge-hook`（PR #62、未マージ）にしか存在しない。
-- main ブランチに保護設定はない（`gh api .../protection` が 404 を返す）。`auto-merge.yml` は、risk:low の PR を AI レビューが通った時点でマージする。`**/*.md` は risk:low に分類される。そのため、P0 で自動マージを止めるまでは、人の承認ゲートを素通りする経路が残っている。
-- 次の 2 つは、P2 の反映が終わるまで、どの checkout でも実行しない。`setup-merge.ts:78` が `~/.mantra/generated/agents` を `rmSync` で消してしまうため。
-  - `npm run setup`、`npm run onboarding*`、`npm run sync:*`
-  - `setup-args.ts` は未知のフラグを黙って無視するので、`--dry-run` を付けても実際に走る。
-- 各 worktree では、最初に `npm ci` を実行する。これを実行しないと `.husky/_` が作られず、git hooks が動かない（確認済み）。
-- Agent ツールに `name` を渡さない。Teams フラグが有効な環境で `name` を渡すと、サブエージェントが teammate として起動してしまう（O5）。
+## 1. 結論
 
-## 現状の観察（2026-10-15 に検証済み）
+- **意図はいまも有用だが、手段の大半は古い。**
+  - 意図とは「毎回言わなくても、Claude が自分の流儀（委譲とコスト、計画の透明性、検証、スコープを守ること）で仕事をする」こと。これは今でも妥当。
+  - 一方、それを実現する手段の大部分は、使われていないか、効果が確認できないか、標準機能で置き換えられる。
+- **推奨は案 A′「mantra を小さく作り直す」。** 次の 4 つだけを持つ、依存パッケージなしのリポジトリにする。
+  - ≤200 行のルール
+  - エージェント 4 体（planner と、レビュー役 3 体）
+  - バージョン管理されたガードフック
+  - ライブ用の clone を作るインストールスクリプト
+- **比較対象は案 B′「dotfiles に統合して mantra はアーカイブ」。** どちらにするかは、ユーザーに決めてもらいたい（§5）。
+- 2026 年の動向もこの方向を支持している。
+  - 有効とされているのは仕組みのほう: hooks、薄いリポジトリ規約、検証コマンド、まっさらな文脈で見るレビュー役。
+  - 有害とされているのは量のほう: 常時読み込む長文、役柄だけのエージェント群、キーワード判定でエージェント起動を促す仕組み。モデルの世代が上がるたびに削るのが標準になっている。
 
-| # | 観察 | 根拠 |
+## 2. 本来の意図（履歴から再構成）
+
+| # | 意図 | いつ、何として作られたか |
 |---|---|---|
-| O1 | Claude Code は `~/.claude/rules/**/*.md` を自動で読み込む。サブディレクトリも読み、シンボリックリンクにも対応している。`paths:` frontmatter を付けると、該当ファイルに触れたときだけ読み込まれる。1 ファイル 200 行未満が推奨。このため、CLAUDE.md の「ルール参照」節は内容が重複している。 | docs: memory。12 ファイルがすべて読み込まれていることをセッション内で確認 |
-| O2 | `~/.claude/agents` は `~/.mantra/generated/agents` へのリンクで、中身は次の 3 つが混ざっている。setup を実行すると、これらは消える。<br>(a) setup が生成したファイル<br>(b) 3/24 に手で入れたパッチ。7 エージェントに browser-use の tools と「Visual Capabilities」節を追加しており、git には入っていない<br>(c) mantra 由来ではない `web-search-agent.md` と `web-search-modules/`<br>ディレクトリ直下にシンボリックリンクは 0 件で、すべて実ファイル。 | `setup-merge.ts:78`、`find -type l` |
-| O3 | `sync:claude` は、シンボリックリンク越しに生成先とリポジトリの rules/ 自体に書き込んでいる。テストはなく、README の説明も誤っている。 | 棚卸し §4.8 |
-| O4 | Codex に関する現状は次のとおり。<br>- Codex は PATH にないため、codex MCP は ENOENT で失敗する。<br>- `~/.claude/settings.json` の `codex review` フックは、エラーを出さずに失敗している。<br>- `sync:codex` の出力は 3 月から更新されていない。<br>- Codex への参照が 28 ファイルに残っている。<br>- CLAUDE.md とメモリは、今も「コード生成は Codex に委譲する」と指示している。 | `which codex`、`git grep -i codex` |
-| O5 | Agent Teams は現在も experimental で、環境変数フラグが必要。<br>- `TeamCreate`/`TeamDelete` は公式ドキュメントに存在しない。<br>- フラグが有効な状態で `name` 付きのサブエージェントを起動すると、teammate として起動する。<br>- `rules/teams.md` は、存在しないツールを前提に書かれている。 | docs: agent-teams、tools-reference |
-| O6 | フック出力の書き方に古いものが残っている。<br>- `userMessage` は公式に定義されていないフィールドで、無視される。プロジェクトの `.claude/settings.json` と `~/.claude/settings.json` の両方で使われている。<br>- PreToolUse の `{"decision":"block"}` は非推奨で、deny に読み替えられる。<br>- UserPromptSubmit の `matcher` は無視される。 | docs: hooks |
-| O7 | プラグインの性質は次のとおり。<br>- agents / skills / hooks / workflows は配布できるが、rules は配布できない。<br>- プラグインのエージェント名は `mantra:planner` のように名前空間付きになり、優先度は最も低い。<br>- ディレクトリ型のマーケットプレイスからインストールしたプラグインも、キャッシュ（`~/.claude/plugins/cache/<mkt>/<plugin>/<version>`）にコピーされ、バージョンと commit SHA が固定される。<br>- そのため、プラグインを更新するには、version を上げてから `claude plugin marketplace update` → `claude plugin update` が必要になる。<br>- 一方で、hooks と skills は checkout のブランチに依存しなくなる。 | `~/.claude/plugins/installed_plugins.json`（myak 0.3.0 の installPath） |
-| O8 | サブエージェントの frontmatter には、`model`（fable/opus/sonnet/haiku/inherit/ID）、`effort`、`maxTurns`、`skills`、`memory`、`isolation: worktree`、`disallowedTools`、`background`、`color` などが書ける。<br>しかし mantra のスキーマは strict ではなく、`buildAgentContent` が出力するのは 4 フィールドだけ。そのため、新しいフィールドは黙って落ちる。 | docs: sub-agents、`agent-schema.ts` |
-| O9 | エージェント 14 体のうち 7 体は、everything-claude-code 由来の汎用的な定型文で、全 3,858 行のうち約 2,700 行を占める。<br>- 300 行を超えるものが 5 体あり、e2e-runner は 797 行ある。<br>- doc-updater は、存在しない `/update-codemaps` を前提にしている。 | 棚卸し §4.3 |
-| O10 | PR 自動化は、作りかけのまま止まっている。<br>- ローカルレビューが実行されないため、PR #62 の status は pending のまま。<br>- md ファイルの変更は自動マージの対象になっている。<br>- レビューの起動経路が 2 つあり、二重に動く。<br>- デスクトップアプリの PR 監視（Auto-fix / Auto-merge）と `/code-review --comment` で代わりがきく。 | 棚卸し §4.2、docs: desktop、code-review |
-| O11 | ルールの記述が重複している。<br>- mob の手順が 3 か所に書かれている。<br>- 委譲とモデル選択の説明が 4 か所にある。<br>- pr-automation.md は mantra 固有の内容なのに、全プロジェクトで読み込まれる。<br>- testing.md は vitest を前提にしている。<br>- rules 内の `../docs/...` という相対リンクは、シンボリックリンク越しに読むと、存在しない `~/.claude/docs` を指してしまう。 | 棚卸し §6、§7 |
-| O12 | p-judge は誤検知が多い。<br>- 部分一致で判定しているため、author は auth に、rapid は api に引っかかる。<br>- 関数についての質問にも P4 を出す。<br>- サブエージェントの報告やタスク通知にも反応する。このセッションでも実際に起きた。 | 棚卸し §4.2、本セッション |
-| O13 | CI は Node 20 で動いているが、Node 20 は 2026-04-30 にサポートが終了している。手元は 22.22.0。また、`test:unit` はテストファイルを列挙する形になっており、`cli-telemetry.test.ts` が実行されていない。 | `validate.yml`、`package.json:33` |
-| O14 | origin/main の上で `npm ci && npm run verify` を実行し、18 ファイル 134 テストがすべて通った。 | 本計画のブランチ |
+| I1 | 自分の基準で仕事をさせ、品質の底を上げる | 2026-02: everything-claude-code 系のルールとエージェントを取り込み |
+| I2 | 毎回言わなくても、適切にエージェントを使う | 03-20 と 03-23 の不満（「都度言わないと使ってくれない」）から、P0〜P4 ラダー（03-17）を作り、07-06 に p-judge フックで強制 |
+| I3 | 危険な判断の質を上げる | 02-25: mob（navigator / critic / scribe）、03-01: replan |
+| I4 | コストを抑える | 04-09: 委譲基準（計画は Opus、コードは Codex、調査は sonnet） |
+| I5 | LLM の手抜きを防ぐ | 04-02: Named Failure Modes（FM-xxx） |
+| I6 | 既存リポジトリを安全に少しずつ良くする | 03-22: 「bounded repo improvement harness」に再定義（AIL と、リポジトリごとのハーネス） |
+| I7 | Claude / Codex のどちらでも、どのマシンでも同じ設定を使う | 02-24 以降: setup / sync / family / ユーザーソース |
+| I8 | PR を安全に自動マージする | 03-23: risk 分類、ローカル AI レビュー、自動マージ |
 
-## 決定事項（承認対象）
+背景にある方針（7 月の「AI 活用改善計画」より）は 3 つある。最優先は自分の製品を出荷すること。新しく作る前に、既製品を試すこと。AI を盛り込みすぎないこと（「AI 乗っけ過ぎ病への免疫」）。
 
-ラベルの意味:
-- **[コア]** 依頼の範囲そのもの（標準機能への置き換えと Codex 撤去）。
-- **[任意]** 改善の提案。個別に承認・却下できる。
-- ★ 推奨案。
+## 3. 実際に効いているか（使用実績）
 
-| # | 論点 | 内容 |
+調べられた範囲には限りがある。transcript は 30 日分しか残っておらず、実質的なセッションは 8 件だった。それより前は、myak・metrics・各リポジトリ・`/insights` で補った。詳細は共有ノートの `mantra-usage-evidence.md` にある。主要な数字は、私が transcript から数え直して一致を確かめた。
+
+| 意図 | 観察 | 判定 |
 |---|---|---|
-| D1 [コア] | Codex の撤去 | ★次のものをすべて撤去する。必要になれば git の履歴から戻せる。<br>- `sync:codex` 一式と `codex-utils`<br>- `onboarding:full*`（Codex への同期専用）<br>- setup の案内文「npm run sync:codex」<br>- 関連するテストと文書<br>- 環境側の設定: codex MCP、`codex review` フック、`mcp__codex__*` の許可、`~/.claude/skills/mantra*` のリンク、CLAUDE.md とメモリにある委譲の指示 |
-| D2 [コア] | 配布モデル | ★生成とマージの仕組みをやめ、Claude Code の標準の読み込みに任せる。<br>- `~/.claude/rules` は現状どおり、ディレクトリごとのリンクにする。<br>- `~/.claude/agents` は実ディレクトリに変え、その中に `mantra → <repo>/agents` というサブディレクトリのリンクを置く。mantra 以外のエージェントは、その隣に移す。<br>- 次のものを削除する: setup-merge、`~/.mantra/generated`、skill-family 一式、`validate:drift`、`sync:claude*`、`onboarding:claude`、ユーザーソース / locale の合成、metric の `user_source_count`。<br>- AIL family は 1 ファイルにまとめる。<br>- hooks と skills は、`plugin/` 配下のローカルプラグイン `mantra@mantra` で配布する。マーケットプレイスはリポジトリのルートに置く。<br>- エージェントはプラグインに入れない。O7 の名前空間の問題があるため。 |
-| D2a [コア] | サブディレクトリのリンクが読まれるか | P2 の最初に実機で確かめる。読まれない場合は、エージェントごとのファイル単位のリンクに切り替える。 |
-| D2b [コア] | setup の安全化 | ★次の 4 点を入れる。<br>- 未知のフラグをエラーにする。<br>- HOME が本物のときに linked worktree から実行されたら拒否する。<br>- `--dry-run` を本当に何も変更しない動作にする。<br>- mantra 以外のファイルを移動して保全する。 |
-| D3 | PR 自動化 | **[コア]** P0 で `auto-merge.yml` を無効にする（`gh workflow disable`。元に戻すのは `enable`）。<br>**[任意★]** 自動化一式を退役させる。対象は `pr-review.sh`、`ai-review.yml`、`auto-merge.yml`、`risk-classifier.yml`、`risk-paths.json`、`review:pr`、pre-push で裏で走るレビュー、プロジェクトの PostToolUse フック。<br>代わりに、ready にする前に `/code-review --comment` を実行し、CI の修正はデスクトップの PR 監視に任せ、マージは人が行う。`validate.yml` は残す。<br>代案: 一式を残したうえで、rules / agents / hooks を high リスクに分類し直す。 |
-| D4 | ルールの再編 | **[コア]** 次の点を直す。<br>- 古くなったツールへの言及（Codex、TeamCreate、Task、ultrathink）<br>- `teams.md` を agents.md に統合する（15 行以内）<br>- `../` 形式の相対リンク<br>- testing.md の vitest 前提を一般化する<br>- coding-style と testing に `paths:` を付ける<br>- pr-automation.md を docs へ移す<br>- hooks.md を docs へ移す<br><br>**[任意★]** 次の点も行う。<br>- mob の詳しい手順を、スキル `/mantra:mob` として必要なときだけ読み込む形にする。自動で使う前提（P3 の発動条件、役割、使い分け）は、agents.md に 20 行以内の要約として常に読み込む形で残す。<br>- patterns.md を削除する。<br>- 常に読み込む量を 18KB 以下にし、各ファイルを 200 行未満にする。 |
-| D5 | エージェント | **[コア]** 次の点を行う。<br>- 名前は変えない。<br>- スキーマを strict にして、現行のフィールドを受け付ける。未知のキーはエラーにする。<br>- P0 で取り込んだ browser-use の tools は残す。<br><br>**[任意★]** 次の点も行う。<br>- 定型文の多い 7 体を 200 行以下に削る。<br>- モデルの割り当てを次のように見直す。<br>  - opus: planner / architect / replan / mob-navigator / mob-critic / code-reviewer / security-reviewer。重要な判断と品質ゲートを担うため、現状維持とする。<br>  - sonnet: tdd-guide / build-error-resolver / refactor-cleaner / doc-updater / e2e-runner / autonomous-improvement-loop / mob-scribe。実行と要約が中心なので、opus から下げる。<br>- security-reviewer から Write と Edit を外す。スキャナを実行するので、Bash は残す。 |
-| D6 | settings.json にあるフック | **[コア]** 次の点を直す。<br>- 無効な出力形式（`userMessage` と `decision:block`）<br>- `codex review` フックを削除する<br>- tmux の注意喚起を削除する（実際には何も表示されていない）<br><br>**[任意★]** ハーネスとしての方針を担うフックを、プラグインに移してテストを付ける。<br>- 危険なコマンドのガードは `permissionDecision: deny` にする。<br>- console.log のチェックと HANDOVER の鮮度チェックは `systemMessage` にする。<br>- 個人用の zed フックは settings.json に残す。<br>- 移すのと同時に、settings.json 側の重複を消す。 |
-| D7 [任意] | 新しいフック | SessionStart で `readlink ~/.claude/rules` からライブの checkout を割り出し、main 以外のブランチになっているか、未コミットの変更があれば `systemMessage` で警告する。 |
-| D8 [コア] | Teams のフラグ | ★有効のままにする。O5 の副作用をルールに明記する。今回の作業では Teams を使わない。 |
-| D9 [コア] | Node | ★Node 22 にそろえる。`engines`、`.nvmrc` に 22.22.0、CI、`ensureNodeVersion(22)`。`test:unit` をディレクトリ指定にし、vitest のカバレッジ対象を実在するファイルに合わせる。 |
-| D10 [任意] | 後片付け | マージ済みの worktree `harness_2026` と、マージ済みのローカルブランチ 7 本を削除する。stash は残す。 |
-| D11 | p-judge | **[コア]** ユーザー以外が送った内容には反応しないようにする。対象は agent-message、task-notification、side-sessions-event、ci-monitor-event。<br>**[任意★]** 単語境界で判定し、O12 の誤検知例を回帰テストにする。使われていない haiku バックエンドを削除する。 |
-| D12 [任意] | 履歴文書 | 参照されていない `issue4-closeout-checklist.md` と `mob-release-notes.md` を削除する。 |
+| I1 ルール | rules は全セッションで約 40KB 読み込まれている。FM-ID の引用は 3 件あり、そのうち因果を追えたのは 1 件だけ。FM-AGENT-CRITIC を読んだ planner が mob-critic を呼び、critic の指摘で設計が変わった。`/insights` の主な不満（バージョンの取り違え、頼んでいない範囲の変更）は、これに対応する規則がなかったか、適用されたか判断が微妙な例だった | **効果は未証明**。失敗したとまでは言えない |
+| I1 エージェント | 15 体のうち、起動されたのは 4 体（code-reviewer 10 回、security-reviewer 4、planner 2、mob-critic 1）。残り 10 体は 0 回。レビュー役の結果 11 件のうち 6 件が重要度の高い問題を見つけた | **レビュー役と planner は有用** |
+| I2 p-judge | 注入は 63 件。そのうち 73% は、人の入力ではなくサブエージェントの報告や通知に反応していた。人の入力に対して推奨どおりの起動が起きた割合は、P1→planner が 0/8、P4→code-reviewer が 4/10。人の入力への注入 15 件のうち 8 件は、推奨が不適切だった | **効いていない。ノイズになっている** |
+| I2 ラダー（文章） | myak の作業では、hook の指示がない最初の依頼から planner → 実装 → レビューを自発的に行った。ただし 10-13 には、ユーザーが「安いモデルに委譲して」と言い直している | **効いている唯一の仕組み** |
+| I3 mob | flash / plan / review-mob の実施は 0 件。navigator と scribe も 0 回。critic は 1 回で有効だった（sonnet で実行） | critic だけ有用 |
+| I4 委譲 | Codex 委譲は 4 月から 0 件。sonnet 指定は 42 件中 35 件だが、多くはユーザーに言われてからだった。エージェント定義の 15 体中 13 体は `model: opus` で、指定なしで呼ぶと Opus で動く | 半分だけ効いている |
+| I6 AIL | 実際に動かした記録は 1 度もない | 未使用 |
+| I6 リポジトリ用ハーネス | pre-push と verify を持つリポジトリは 4 つあるが、そのうち 2 つは mantra より前からあった。03-17 以降にテンプレートを採用したリポジトリは 0。Obsidian の ledger は使用実績なし | mantra 経由では広まっていない |
+| I7 配布 | onboarding は 4/4 回、setup は 8/10 回失敗している。生成物は、手で当てたパッチとずれている | 費用に見合っていない |
+| I8 PR 自動化 | ローカルのレビューが動かず、PR #62 は pending のまま止まっている | 停止している |
 
-## 自前の仕組みと置き換え先
+**組み込みエージェントとルールの関係（実機で確認済み）**: 組み込みの Plan と Explore は `~/.claude/rules` を読み込まない。自作のエージェントと general-purpose は読み込む。したがって planner を組み込みの Plan に置き換えると、計画を立てる段階で自分のルールが効かなくなる。
 
-| いまの自前の仕組み | 置き換え先 |
+**基準値（P5 の比較用に今記録しておく）**
+- コードを変更したセッションのうち、レビュー役が起動したもの: 5 件中 3 件（60%）
+- 「サブエージェントや安いモデルを使って」という言い直し: 約月 1 回（最近では 10-13）
+- 計画の差し戻し: 07-09 に 1 件
+
+## 4. 世界の動向との照合（2026-10 時点）
+
+出典の全体は共有ノートの `harness-trends-2026.md` にある。★の付いたものは私が原文を確認した。
+
+- **常に読み込む指示ファイルは、効果が薄くコストがかかる。**
+  - ★ ETH の研究（arXiv 2602.11988、v3 2026-09-29）: リポジトリの文脈ファイルは成功率を全体として上げず、推論コストを平均 20% 以上増やす。
+  - ★ Claude Code の公式ベストプラクティス:
+    - 各行について「消すとミスが起きるか？」を問う。
+    - 放っておいても正しくやれることは、消すか hook にする。
+    - 肥大化したファイルは、肝心の指示まで無視させる。
+    - 検証にはまっさらな文脈のレビューを使い、手段として `/code-review` を挙げている。
+- **モデルが上がったら足場を削る。**
+  - ★ Fable 5 ガイドより:
+    - 旧モデル向けに書いたスキルは指示が細かすぎて、品質を下げることがある。見直して削除を検討する。
+    - まっさらな文脈で検証させるサブエージェントは、自己批判より成果がよい。
+    - 現行モデルはサブエージェントを自発的に並列で使う。
+- **役柄（ペルソナ）を与えても精度は上がらない**（Wharton、2025-12）。サブエージェントの価値は、文脈の分離、ツールの制限、安いモデルを使えること、まっさらな文脈で見るレビューにある。
+- **複数エージェントの議論の効果は限定的。** 実行の証拠に基づく critic は効く。素朴な議論は誤った合意を生み、トークンを約 4.5 倍使う（2026-08）。
+- **標準化が進んだ。** AGENTS.md と SKILL.md はツールをまたいで共通化された。ツールごとの同期スクリプトは不要になった。
+- **最も強く支持されている部分。** 薄いリポジトリ規約、検証コマンド 1 本、hooks と CI による強制、人がマージすること。
+
+| mantra の考え方 | 2026 年の評価 |
 |---|---|
-| CLAUDE.md の「ルール参照」節 | rules の標準の自動読み込み（節を削除） |
-| setup によるマージ、生成ディレクトリ、family と overlay、ユーザーソースの合成、`sync:claude` | 標準の再帰的な読み込みとシンボリックリンク（D2） |
-| settings.json に直接書いた p-judge などのフック | プラグインの `hooks/hooks.json`（`${CLAUDE_PLUGIN_ROOT}` を使う） |
-| 常に読み込まれる mob-programming.md（285 行） | 20 行の常時要約と、必要なときに読むスキル `/mantra:mob`（D4 任意） |
-| teams.md に書かれた TeamCreate 前提の手順 | 標準の Agent Teams（experimental）について数行で説明 |
-| Codex への委譲（`mcp__codex__codex`） | Claude のサブエージェントに、Agent ツールの `model` や frontmatter の `model` を指定して任せる |
-| `pr-review.sh`（`claude -p`）、pending status、自動マージ | `/code-review --comment`、デスクトップの PR 監視、人によるマージ |
-| `ultrathink` | effort レベル（`/effort`、frontmatter の `effort`） |
-| maw による worktree の補助 | 標準の worktree（`claude -w`、EnterWorktree、`isolation: worktree`）。maw は選択肢の一つとして残す |
+| 約 1 万トークンの常時ルール | 有害。推測できない個人の流儀だけに絞れば有効 |
+| FM 一覧 | 有効。ただし起動条件として働くもの（FM-AGENT-CRITIC）と、再発しているものに絞る。機械的に強制できるものは hook にする |
+| 役柄だけのエージェント 9 体 | 古い。残すなら 3〜4 体 |
+| P0〜P4 ラダー（文章） | 短く書き直せば有効（効果の確認できた唯一の仕組み） |
+| キーワード判定のプロンプト hook | 古い（不正確で、文章を注入するだけでは弱い） |
+| mob の navigator / scribe | 古い。critic は、まっさらな文脈で見るレビューとして有効 |
+| モデルの使い分け | 有効だが、標準機能（frontmatter の `model`、effort）で実現できる |
+| AIL | 有効だが、標準機能（`/goal`、`/loop`）で実現できる |
+| リポジトリ用ハーネス | 最も支持されている |
+| hooks による強制 | 有効 |
+| Codex との同期 | 古い |
+| ローカル AI レビューと自動マージ | 標準機能で置き換えられる |
 
-## 完了後のライブ構成
+## 5. 選択肢（ユーザーに選んでほしい）
+
+| 案 | 内容 | 長所 | 短所 |
+|---|---|---|---|
+| **A′ 縮小して作り直す（推奨）** | mantra を「rules（≤200 行）、agents（4 体）、hooks（ガード）、install / deploy / verify のシェルスクリプト」だけの、依存パッケージなしのリポジトリにする。ライブ設定は専用の clone（`~/.mantra/live`、main 固定）から張る | <ul><li>mantra の名前と履歴、CI による検査を保てる</li><li>開発用の checkout のブランチが、ライブ設定に影響しなくなる</li><li>保守する TypeScript が、約 5,000 行から 0 行になる</li></ul> | 一度、大きな削除 PR が必要 |
+| B′ dotfiles に統合する | rules / agents / hooks を `~/src/dotfiles` に `claude/` として移し、既存の bootstrap の流れで配る。mantra はアーカイブする | <ul><li>仕組みが 1 つ減る（既にあるものを使う）</li><li>複数マシンへの配布も、既存の手順に乗る</li></ul> | <ul><li>mantra という公開リポジトリと、その検査（行数の上限など）がなくなる</li><li>dotfiles 側に検査を足す必要がある</li></ul> |
+| C v2 の計画 | 仕組みを残したまま最新化する | — | 使われていない仕組みに工数をかけることになり、証拠と逆行する |
+
+以下は A′ を前提に書く。B′ を選んだ場合も、P1（ルール）と P2 のうちエージェント・フックの中身は同じで、置き場所と配布方法だけが変わる。
+
+## 6. A′ の目標像
+
+### 残すもの
+
+**rules/**（常時読み込みは合計 200 行以下、8KB 以下）
+- `delegation.md`
+  - 旧 `agents.md` をこの名前に改める。macOS の大文字小文字を区別しないファイルシステムでは、`agents.md` が AGENTS.md として誤って注入されることが確認されたため。
+  - 「頼まれなくても行うこと」を 8 行程度で書き、存在をテストする。内容は次の 4 つ。
+    - 非自明なコード変更のあとは code-reviewer を使う。
+    - 認証・秘密情報・マイグレーション・データ整合性に関わる変更では、security-reviewer と mob-critic を使う。
+    - サブエージェントは、理由がない限り sonnet で動かす。
+    - 計画には、オーケストレーション・モデル・検証ゲートを書く（既存の段落を文言どおり残す）。
+- `performance.md`: モデルと effort の選び方。Codex は削除する。
+- `failure-modes.md`
+  - FM-VERSION と FM-AGENT-CRITIC は文言どおり残す。
+  - そのほかは、実際に再発しているものと、起動条件として働くものだけを残す。
+- `git-workflow.md`: 個人の作業手順。main を fetch してから着手する、worktree を使う、検証の証拠を見せる、UI はスクショを撮る、rm ではなく trash を使う、など。
+- 書き方は、各行について「消すとミスが起きるか」を問い、推測できることは書かない。
+
+**agents/**（4 体、各 80 行以下。名前は記録やメモリとのつながりのため据え置く）
+
+| エージェント | model | 理由 |
+|---|---|---|
+| planner | opus | ユーザーの方針「計画は Opus」に従う。組み込みの Plan はルールを読まないため、自作で残す。出力には、フェーズ・並列か逐次か・モデル・ゲートと、高リスクなら mob-critic を呼ぶべきという指摘を含める |
+| code-reviewer | sonnet | 実績のある有用なレビュー役 |
+| security-reviewer | sonnet（重要なときは呼び出し時に opus を理由つきで指定） | 実績あり。Write / Edit を外して読み取り専用にする |
+| mob-critic | sonnet（同上） | 設計を変えた唯一の critic 実行は sonnet だった |
+
+- 手で当てた browser-use のツールと「Visual Capabilities」節は削除する。使用実績が 0 回で、スクショはメインセッション側で撮るため。
+
+**hooks/guard.sh**（バージョン管理し、テストを付ける）
+- settings.json にある危険コマンドのガードを移す。
+- `--no-verify` も遮断する（FM-GIT-NOVERIFY を hook として強制する）。
+- 出力は `permissionDecision: deny` にする。
+- settings.json からは `~/.mantra/live/hooks/guard.sh` を呼ぶ。
+
+**scripts/**（依存パッケージなし）
+- `install.sh`（冪等）
+  - `~/.claude/rules` を `~/.mantra/live/rules` へのリンクにする。
+  - `~/.claude/agents/` は実ディレクトリにし、4 体をファイル単位でリンクする。
+  - 既存の `~/.claude/agents` は退避し、mantra 以外のファイル（web-search-agent など）を移す。
+  - 本物の HOME に対しては、`~/.mantra/live` 以外から実行されたら拒否する。
+- `deploy.sh`
+  - 中身は `git -C ~/.mantra/live fetch && checkout --detach origin/main && install.sh`。
+  - 開発は `~/src/mantra` で自由に行え、反映は deploy.sh を実行したときだけになる。
+- `verify.sh` が検査する項目:
+  - ルールの行数とバイト数の上限
+  - 文言どおり残す 3 項目（FM-VERSION、FM-AGENT-CRITIC、オーケストレーションの段落）と、「頼まれなくても行うこと」の節が存在すること
+  - エージェントの frontmatter（name、description、model が明示されていること。未知のキーは警告にとどめる）
+  - `../` 形式の相対リンクがないこと
+  - guard.sh のテストケース
+  - install.sh を一時 HOME で実行するテスト
+- `package.json` は `"verify": "bash scripts/verify.sh"` だけにする。これで `npm run verify` は引き続き使える。
+- CI は `validate.yml` で verify.sh を実行する。
+
+**templates/**: `repo-agents-pointer.md` と `repo-pre-push.example.sh` を残し、短い docs を付ける。
+
+### 退役させるもの（タグ `pre-redesign` と git の履歴から戻せる）
+- エージェント 11 体: architect、replan、tdd-guide、build-error-resolver、e2e-runner、refactor-cleaner、doc-updater、mob-navigator、mob-scribe、autonomous-improvement-loop、family 一式。代わりは、組み込みの Explore / general-purpose、`/code-review`、`/goal`、`/loop`。
+- p-judge フックと PR #62。
+- TypeScript 一式: setup / onboarding / sync（Claude と Codex）/ merge / family / ユーザーソース / metrics / テレメトリ / validate-drift と、それぞれの contract テスト、vitest、eslint、tsconfig、node_modules。
+- Codex 関連のすべて。
+- PR 自動化一式: `pr-review.sh`、`ai-review.yml`、`auto-merge.yml`、`risk-classifier.yml`、`risk-paths.json`、プロジェクトの `.claude/settings.json` のフック。
+- ルール: mob-programming、teams、hooks、pr-automation、patterns、coding-style、security、testing。必要な行は、残す 4 ファイルへ移す。
+- 文書と例: mob 関連の文書・テンプレート・例、AIL の例、MOB_QUICKSTART、`repo-obsidian-ledger`、docs/ja の CLI 契約・metrics・トラブルシュート・履歴文書。
+
+### 環境側（項目ごとに承認を得る）
+- `~/.claude/settings.json`
+  - 削除: p-judge、`codex review`、表示されない `userMessage` のフック（tmux 案内、HANDOVER 催促）、`mcp__codex__*` の許可。
+  - 移行: 危険コマンドのガードを guard.sh に移す。
+  - 残す: zed を起動するフック（起動は実際に効いている）。出力の形式だけ直す。
+  - 追加: `cleanupPeriodDays`（例: 120）。効果測定のために transcript を残す。
+- `claude mcp remove codex`
+- `~/.claude/CLAUDE.md`: mantra と重複する節を削除し、myak の節だけを残す。
+- メモリ: `feedback_follow_claude_md_rules`、`feedback_model_delegation_strategy`、`MEMORY.md` の索引行を新しい規約に合わせて更新する。`project_superpowers_evaluation` には、比較の前提が変わったことを注記する。
+- `~/.claude/skills/mantra*` と `~/.claude/templates/pr-automation` を trash に移す。`~/.mantra/generated` は P5 が終わるまで残す。
+
+## 7. フェーズ計画とオーケストレーション
 
 ```
-~/.claude/rules            -> ~/src/mantra/rules             (現状維持。git pull で反映)
-~/.claude/agents/          実ディレクトリ
-  mantra                   -> ~/src/mantra/agents            (D2a の結果によってはファイル単位のリンク)
-  web-search-agent.md, web-search-modules/                   (~/.mantra/generated から移す)
-plugin mantra@mantra       ~/.claude/plugins/cache/mantra/mantra/<version>  (version を上げてから update で反映)
-  hooks                    p-judge / pre-tool-guard / stop-checks / session-start-guard(D7)
-  skills/mob               mob と teams の手順、テンプレート、例
-~/.mantra/metrics          現状維持（~/.mantra/generated は P2 の反映後に trash へ移す）
+P0 安全化と基準値 ─▶ ┬─ P1 ルール（私）              ─┬─▶ P3 文書 ─▶ P4 切り替え ─▶ P5 効果測定（4週後・8週後）
+                       └─ P2 エージェント・hooks・scripts（sonnet）┘
+                          （マージは P1 → P2 の順。P2 は P1 の上に rebase してからマージする）
 ```
 
-## フェーズ計画とオーケストレーション
-
-```
-P0 地ならし ─▶ P1 Codex撤去 ─▶ P2 配布モデル ─┬─▶ P4 エージェント ─┬─▶ P3 ルール+mob ─▶ P6 PR自動化+文書 ─▶ P7 最終確認
-                                                 └─▶ P5 フック      ─┘
-```
-
-- **逐次で進めるもの**
-  - P0 → P1 → P2: いずれも scripts、tests、package.json を大きく変える。P4 以降は P2 の構成を前提にする。
-  - P3 は P4 と P5 の後に行う。agents.md にはロスターとモデル（P4 の結果）が載り、p-judge の助言文はラダーの文言（P3）と一致させる必要がある。plugin.json の version も P3 で上げる。
-- **並列で進めるもの**: P4 ∥ P5。それぞれ別の worktree と別ブランチで進め、担当するファイルを分ける。
-  - P4: `agents/`、`agent-schema.ts`、`validate-agents.ts`、agents のテスト
-  - P5: `plugin/hooks/`、`.claude/settings.json`、フックのテスト
-  - 共有ファイルの担当: `package.json`（lint-staged、scripts）と `vitest.config.ts` は P2 で整える。それ以降に変更が必要になったら、マージ順で後になる方が rebase して吸収する。`plugin.json` の version は P5 → P3 の順に上げる。README は、contract テストのために P1 と P2 で Scripts 表の行だけ直し、残りは P6 で直す。
-- **サブエージェントの同時実行は最大 3 体**。P4 で定型文を削る作業は 2 体で並列に進め、P5 の 1 体と合わせて 3 体になる。
-  - Workflow ツールは使わない。ユーザーがワークフローの利用を明示していないため。
-  - Agent Teams も使わない。experimental で、tmux と teammate を管理するコストに見合わないため。
-  - 実行方法は、background のサブエージェントに作業する worktree のパスを明示して渡す形にする。
-- **worktree** は、各フェーズの開始時に私が `git worktree add -b <branch> .maw-workspaces/<name> origin/main && npm ci` で作る。`isolation: worktree` は、どのブランチから作るかを制御しにくいので使わない。
-- **Codex が使えない**ため、コード生成は sonnet のサブエージェントに任せる。これが、今回 rules に書く新しい委譲の方針になる。
-
-### 担当エージェントとモデル
+- **ライブ設定**
+  - P0 で p-judge の登録を外したあとは、ライブの checkout（`feat/p-judge-hook`）には P4 まで触らない。push もしない。
+  - P1〜P3 の PR をマージしても、ライブ設定は変わらない。P4 の deploy で一度に切り替える。
+- **並列**: P1 と P2 は並行して進める。P1 は `rules/` の本文だけを触る。P2 はそれ以外（agents、hooks、scripts、tests、CI、package.json）を担当する。README と docs は P3 で扱う。同時に動かすサブエージェントは最大 2 体。
+- **使わないもの**
+  - Workflow ツールと Agent Teams は使わない。小規模で、明示的な指示もないため。
+  - Agent ツールに `name` を渡さない。Teams のフラグが有効なので、渡すと teammate として起動してしまうため。
+- **作業場所**: worktree は `git worktree add -b <branch> .maw-workspaces/<name> origin/main` で作る（P2 で TypeScript を消すまでは、`npm ci` も実行する）。
+- **P2 のサブエージェントへの禁止事項**: `npm run setup`、`onboarding*`、`sync:*` を実行しない。ライブの `~/.claude` には書き込まない。
 
 | フェーズ | 作業 | 担当 | モデル | 理由 |
 |---|---|---|---|---|
-| 全体 | 計画、設計の判断、統合、差分のレビュー、PR 作成、各フェーズの反映 | メインセッション（私） | Opus 5.5 | 判断が中心で、全体の文脈を持っているのは私だけだから |
-| P0 | バックアップ、自動マージの停止、ルールのコミット、パッチの取り込み、checkout の切り替え | 私が直接 | Opus 5.5 | 作業は小さいが、ライブ設定に直接触れるため |
-| P1 | Codex 関連の削除（約 25 ファイル） | general-purpose | sonnet | ファイル一覧つきの機械的な削除作業 |
-| P1 | レビュー | code-reviewer | sonnet（呼び出し時に指定） | 削除漏れと参照切れの確認が中心 |
-| P2 | 実装前に、設計に反論してもらう | mob-critic | opus | ライブ設定を切り替えるため（FM-AGENT-CRITIC）。読み取り専用なので、差分はファイルに保存して渡す |
-| P2 | setup の移行処理と、その安全装置・テスト | 私が直接 | Opus 5.5 | ライブのデータに触れるため。performance.md の「委譲すべきでない」に当たる |
-| P2 | family と sync の削除、プラグインの雛形と構成テスト | general-purpose | sonnet | 仕様が決まっている削除と定型的なコード |
-| P2 | レビュー | code-reviewer | opus | 設定の読み込み経路と、データが失われないかの確認 |
-| P4 | strict スキーマとテスト（TDD） | tdd-guide | sonnet | 小さな TDD |
-| P4 | 定型文の削減（2 グループを並列）<br>[architect, tdd-guide, refactor-cleaner, doc-updater] / [build-error-resolver, e2e-runner, security-reviewer] | general-purpose ×2 | sonnet | 量の多い編集を仕様どおりに進める作業。全差分は私が読む |
-| P5 | p-judge の修正、フックのプラグイン化（TDD） | tdd-guide | sonnet | テスト可能なシェルスクリプトの作業 |
-| P5 | ガードのレビュー | security-reviewer | opus | PreToolUse のガードはセキュリティ境界にあたるため |
-| P3 | ルール本文の書き直し | 私が直接 | Opus 5.5 | ルールは全セッションの振る舞いを決めるので、判断が中心になる |
-| P3 | mob スキルの切り出し（既存の文章の移動と圧縮） | general-purpose | sonnet | 既存の文章を組み替える作業。doc-updater は codemaps 前提の定型文が強いので使わない |
-| P3 | 「削除・移動した記述」の対応表に反論してもらう | mob-critic | opus | ルールの欠落は気づきにくいため |
-| P6 | PR 自動化の削除（D3 任意）と Node 22 対応 | general-purpose | sonnet | 機械的な作業 |
-| P6 | CI の変更に反論してもらう | mob-critic | opus | CI の設定は高リスクのため |
-| P6 | README 2 本、docs/ja、HANDOVER | general-purpose | sonnet | 文書の作業 |
-| P7 | 最終確認の要約 | mob-scribe | sonnet | 人が承認する要約なので haiku にはしない |
+| 全体 | 判断、統合、全差分の確認、PR 作成、切り替え | メインセッション（私） | Opus 5.5 | 文脈と判断が必要で、ライブ設定に触れるため |
+| P0 | バックアップ、自動マージの停止、p-judge の登録解除、未コミットの 2 ルールをローカルでコミット、タグ付け、PR #62 のクローズ、`cleanupPeriodDays` の設定 | 私が直接 | Opus 5.5 | ライブ設定と外部への操作を含むため |
+| P1 | 4 ファイルのルールを書き直す。旧ルールの全文について「残す / 統合する / 削除する（理由）」の対応表を作る | 私が直接 | Opus 5.5 | 全セッションの振る舞いを決める本文なので、判断が中心になる |
+| P1 | 対応表への反論（必要な規則が抜けていないか） | mob-critic | opus | 抜けは気づきにくいため。この回は重要な判断なので opus を指定する |
+| P2 | 11 体と TypeScript 一式の削除、4 体の短縮、guard.sh、install / deploy / verify.sh、CI | general-purpose（worktree を指定） | sonnet | 仕様が決まった削除と小さなシェルスクリプトなので |
+| P2 | レビュー | code-reviewer と security-reviewer | sonnet | 削除漏れ、install.sh の冪等性と安全性、ガードの抜け道を見るため |
+| P3 | README（英日 2 本）と docs の書き直し、退役した文書の削除、HANDOVER | general-purpose | sonnet | 文書の作業なので |
+| P4 | 切り替えの手順書と戻し方への反論 | mob-critic | opus | ライブ設定とデータの移動を伴うため |
+| P4 | 実行と確認 | 私が直接 | Opus 5.5 | 項目ごとに承認を得るため |
+| P5 | 効果の測定 | 私（とユーザーの `/insights`） | — | 新しい仕組みは作らない |
 
-### 共通の検証ゲート（フェーズごと）
+### 検証ゲート
+- **G1**: worktree で `npm run verify` が通ること。P2 以降は、新しい verify.sh が通ること。
+- **G2**: レビュアーが CRITICAL または HIGH とした指摘が 0 件であること。P1 の対応表は、mob-critic とユーザーの両方が確認すること。
+- **G3**: 私が全差分を読み、範囲外の変更がないこと。各サブエージェントの作業前後で、次の 2 つが変わっていないこと。
+  - `git -C ~/src/mantra status --porcelain` の出力
+  - `~/.mantra/generated/agents` と `~/.claude/settings.json` のハッシュ
+- **G4**: PR の本文に、退役させたものの一覧と戻し方（タグ `pre-redesign` から）を書くこと。
+- **G5（P4）**: 次の順で進めること。
+  1. 一時 HOME で、本番と戻し方の両方をリハーサルする。
+  2. バックアップを取る。
+  3. `~/.mantra/live` を clone する。
+  4. `deploy.sh` を実行する。
+  5. settings.json と CLAUDE.md とメモリを、項目ごとに承認を得て更新する。
+  6. 新しいセッションで確認する。
+     - `/context` で、ルールが 200 行以下になっていること
+     - エージェントの一覧が、4 体＋組み込み＋web-search-agent になっていること
+     - `/hooks` に guard だけがあること
+     - planner に、ルールの番兵行（例: FM-VERSION の見出し）を引用させられること
+  7. 失敗したら、バックアップとタグから戻す。
 
-- **G1**: worktree で `npm run verify` が通ること。scripts、tests、package.json を変えたフェーズでは、`npm run test:coverage` と `npm run smoke:onboarding` も通すこと。plugin/ を変えたフェーズでは、`claude plugin validate .` と `claude plugin validate plugin` の出力を PR に貼ること（CI には claude CLI がないため）。
-- **G2**: レビュアーが挙げた CRITICAL / HIGH を 0 件にすること。フェーズごとの反論役（mob-critic）と security-reviewer の指摘も含む。
-- **G3**: 私が差分全体を読み、そのフェーズの範囲外の変更がないことを確かめること（FM-CODE-SCOPE）。さらに、各サブエージェントが終わるたびに `git -C ~/src/mantra status --porcelain` を確認し、ライブの checkout が変わっていないことを確かめること。
-- **G4**: PR の本文に「意図して変えた契約（contract テスト、metric、CLI の出力）の一覧」とテスト計画を書くこと。テストの変更は、すべて D 番号に結びつけること（FM-TEST-FIX）。
-- **G5（反映）**: 人の承認を得てマージしたあと、次の手順を行うこと。
-  1. ライブ checkout で `git fetch && git status` を実行し、HEAD が main であることを確かめる。
-  2. `git pull --ff-only` を実行する。
-  3. plugin/ を変えた場合は、version を上げたうえで `claude plugin marketplace update mantra && claude plugin update mantra@mantra` を実行し、`installed_plugins.json` の version と SHA を確かめる。
-  4. そのフェーズに対応する settings.json / CLAUDE.md の変更を行う。項目ごとに承認を得る。
-  5. 新しいセッションで確認する。`/hooks` でフックの数と出どころ、エージェントの一覧、ルールの読み込みを見る。
-  - 停止スイッチは `claude plugin disable mantra@mantra`。
-- 次のフェーズは、反映が終わってから `git fetch origin main` を実行して始める。
+### 各フェーズの詳細
+- **P0**（push はしない）
+  1. バックアップを `~/.claude/backups/mantra-redesign-20261015/` に `cp -RL` で取る。対象は settings.json、CLAUDE.md、`~/.claude.json`、`~/.mantra/generated/agents`。あわせて `~/.claude/agents` と `~/.claude/rules` のリンク先を記録する。
+  2. `gh workflow disable auto-merge.yml` で自動マージを止める。PR #62 に自動マージの予約がないことは確認済み。main には保護設定がなく、ruleset は削除と force-push を禁止しているだけで、必須チェックはない。
+  3. settings.json から p-judge を外す。
+  4. 2 つのルールを、ライブの checkout でローカルにコミットする。
+  5. ローカルにタグ `pre-redesign` を付ける。
+  6. PR #62 に計測結果をコメントしてからクローズする。
+  7. `cleanupPeriodDays` を設定する。
 
-## 各フェーズの内容
+  2、3、6、7 は、実行前に承認を得る。
+- **P1**（`feat/redesign-p1-rules`）
+  - 入力は、旧ルール 12 ファイルと、CLAUDE.md・メモリの該当部分。
+  - 理由を添えて短く書く。条件の列挙や強調の乱用はしない。
+- **P2**（`feat/redesign-p2-slim`）: §6 の内容。P1 のマージ後に rebase して、行数上限の検査を通す。
+- **P3**（`feat/redesign-p3-docs`）: README には、何をするリポジトリか、なぜ小さいか、install / deploy の方法、新しいモデルが出たら `/doctor prompt-audit` を実行して 1 行ずつ削るという運用、を書く。
+- **P4**: G5 のとおりに進める。
+- **P5**: §8 の指標を 4 週後と 8 週後に測る。悪化していたら、文章を足すのではなく、その一点に絞った規則 1 行か hook で対処する。どの 1 行を戻せばよいかは、対応表から引けるようにしておく。
 
-### P0 地ならし
-1. **バックアップ**: `~/.claude/settings.json`、`~/.claude/CLAUDE.md`、`~/.claude.json` のうち codex の定義部分、`~/.mantra/generated/agents` を、`~/.claude/backups/mantra-modernization-20261015/` に `cp -a` でコピーする。`~/.mantra/generated/agents` の直下にシンボリックリンクがないことは確認済み。
-2. **自動マージを止める**: 承認を得てから `gh workflow disable auto-merge.yml` を実行する（D3 コア）。
-3. **未コミットの 2 ルールをコミットする**: メインの checkout 上で、ブランチは切り替えずにコミットし、PR #62 に 1 コミットとして追加して push する。
-4. **ライブにしかないパッチを取り込む**: browser-use の tools と「Visual Capabilities」節を `agents/*.md` に反映し、`chore/capture-live-agents` として別の PR にする。
-5. **マージ**: 承認を得て、PR #62、4 の PR、この計画の PR（`docs/modernization-plan`）の順にマージする。
-6. **checkout の切り替え**: 承認を得てから、次の順に実行する。
-   - `git fetch`
-   - `git diff feat/p-judge-hook origin/main -- rules hooks` の結果が空であることを確かめる
-   - `git branch -f main origin/main && git switch main`
-   - 新しいセッションで、p-judge と FM-VERSION が生きていることを確かめる
+## 8. 成功の測り方（新しい仕組みは作らない）
 
-### P1 Codex の撤去（`feat/modernize-p1-remove-codex`）
-- **削除するもの**
-  - `scripts/sync-{agents,rules,templates,examples}-to-codex.ts`
-  - `scripts/lib/codex-utils.ts`。`YAML_DUMP_OPTIONS` は残りの利用箇所のために移動する
-  - package.json の `sync:codex*` と `onboarding:full*`
-  - `--full` の処理
-- **書き換えるもの**
-  - setup の案内文
-  - テスト: cli-json / package-scripts / setup-message / smoke
-  - docs: authoring / cli-contract / troubleshooting / ops-metrics
-  - README 2 本の Scripts 表と、その周辺の行
-  - `rules/performance.md` と `rules/teams.md` の Codex 行は、最小限の修正にとどめる
-- **触らないもの**: AIL の codex overlay と、skill-family のテスト。P2 で family ごと消すため、ここで直すと二度手間になる。
-- **受け入れ条件**: G1〜G4 を満たし、`git grep -i codex` の結果が AIL family の overlay とこの計画書だけになっていること。
-- **反映（G5）**: 承認を得てから次を行う。
-  - settings.json から `mcp__codex__*` の許可と `codex review` フックを削除する
-  - `claude mcp remove codex`
-  - `~/.claude/skills/mantra*` のリンクを trash に移す
-  - CLAUDE.md の Codex 委譲の記述（「実装の委譲」節と「モデル選択」節のコード生成の行）を「sonnet サブエージェント」に置き換える
-  - メモリ `feedback_model_delegation_strategy.md` を更新する
+| 指標 | 基準値 | 目標 | 測り方 |
+|---|---|---|---|
+| 常時読み込むルールの量 | 1,159 行・約 40KB | 200 行以下・8KB 以下 | verify.sh と `/context` |
+| コードを変更したセッションのうち、頼まなくてもレビュー役が起動した割合 | 60%（3/5） | 60% 以上を維持 | transcript を数える（`cleanupPeriodDays` で保持） |
+| 「サブエージェントや安いモデルを使って」「毎回言わないと」系の言い直し | 約月 1 回 | 8 週で 0〜1 回 | myak で検索 |
+| サブエージェントを使う計画に、オーケストレーション・モデル・ゲートが書かれている割合 | 07-09 に差し戻しあり | 100% | 次の 3 件を目視で確認 |
+| バージョンの取り違え、頼んでいない範囲の変更 | `/insights` の主な不満 | 減少 | 4 週後と 8 週後に `/insights` |
 
-### P2 配布モデルの刷新（`feat/modernize-p2-wiring`）
-0. **実機で確認する（D2a）**: 一時ディレクトリに、次の 3 通りでプローブ用のエージェントを置く。
-   - 実ディレクトリのサブディレクトリ
-   - シンボリックリンクにしたサブディレクトリ
-   - 名前に名前空間が付かないことの確認
+サンプルが小さく、偶然で合格する可能性がある。そのため、最後の安全網はユーザー自身の指摘とし、指摘を受けたら対応表から該当の 1 行を戻す。
 
-   それぞれを `~/.claude/agents/zz-probe*` 経由で見せ、`claude -p --output-format stream-json --verbose` の init イベント（なければ実際に起動を試す）で、`subagent_type` の名前のまま見えるかを確かめる。確認が終わったら片付け、結果をこの計画書に追記する。
-1. **設計への反論**: mob-critic が設計をレビューし、指摘をこの計画書に反映する。
-2. **最初のコミットは安全装置にする（D2b、私が担当）**: 未知のフラグをエラーにする、worktree から実行されたら拒否する、本当に何もしない `--dry-run`、mantra 以外のファイルの保全。それぞれテストを付ける。
-3. **新しい setup を作る（私が担当）**: D2 の構成を作るようにする。既存のリンクは退避してから変換し、mantra 以外のファイルは移動する。テストは、実際の構成を複製した一時 HOME で行う。
-4. **削除と雛形（sonnet）**
-   - AIL を 1 ファイルにまとめる。lock の文言と AIL の契約テストは維持する。
-   - family / sync / drift / ユーザーソースの仕組みを削除する。
-   - lint-staged から `validate:drift` を外す。
-   - `test:unit` をディレクトリ指定にする。
-   - vitest のカバレッジ対象を更新する。新しい setup とプラグインのコードを対象に入れる。
-   - プラグインを作る: `plugin/.claude-plugin/plugin.json`（version は package.json と一致させる）、`plugin/hooks/hooks.json`、`hooks/p-judge.sh` を `plugin/hooks/` へ移す、ルートに `.claude-plugin/marketplace.json` を置く、構成テストを書く。
-   - README の Scripts 表を直す。
-5. **ゲート**: G1〜G4 を満たすこと。さらに、`claude -p --plugin-dir <worktree>/plugin` を使い、hooks.json の配線が動くことを smoke で確かめる（FM-TEST-PASS）。
-6. **反映（G5、リハーサルしてから本番）**
-   1. 一時 HOME で、本番と同じ手順を一度通す。
-   2. 本番では、まず settings.json から p-judge の行を削除する。
-   3. 次に `git pull` を実行する。
-   4. HEAD が origin/main であることを確かめてから setup を実行する。
-   5. `claude plugin marketplace add ~/src/mantra` と `claude plugin install mantra@mantra` を実行する。
-   6. 新しいセッションで次を確かめる。
-      - `/hooks` に、p-judge の UserPromptSubmit が 1 件だけあり、出どころがプラグインになっている
-      - エージェントが 15 体見える
-      - ルールが読み込まれている
-   7. 問題がなければ `~/.mantra/generated` を trash に移す。戻すときはバックアップから復元する。手順は PR に書く。
-
-### P4 エージェントの刷新（`feat/modernize-p4-agents`、P5 と並列）
-- strict スキーマにして、現行のフィールドを受け付けるようにする。モデルは別名か ID で指定する。未知のキーと長すぎる description はエラーにする。それぞれテストを付ける（D5 コア）。
-- D5 任意を承認した場合は、モデルの割り当てを見直し、7 体を 200 行以下に削る。役割、チェックリスト、出力形式は残し、特定の技術スタックに寄った例、存在しないコマンド、外部ツールのインストール手順は消す。e2e-runner は、手元で使えるブラウザ自動化（Playwright MCP、agent-browser スキル）を前提に書き直す。
-- 反映: `git pull` を実行し、新しいセッションで planner と code-reviewer を 1 回ずつ起動して確かめる。
-
-### P5 フックの刷新（`feat/modernize-p5-hooks`、P4 と並列）
-- D11 の p-judge の修正を、テストファーストで行う。
-- D6 任意を承認した場合は、`pre-tool-guard.sh`（`permissionDecision` を返す）と `stop-checks.sh`（`systemMessage` を返す）を作り、契約テストを付ける。
-  - 異常があっても exit 0 で終わること、タイムアウトしたときは遮断しないことを仕様として書く。
-  - D7 を承認した場合は `session-start-guard.sh` も作る。
-- プロジェクトの `.claude/settings.json` から、prettier、tsc、console.log、PR レビューのフックを削除する。
-- `plugin.json` の version を上げる。
-- 反映: プラグインを更新するのと同時に、settings.json から、移した分の重複と tmux の注意喚起を削除する。zed のフックは出力形式だけ直す。
-
-### P3 ルールの再編と mob スキル（`feat/modernize-p3-rules`）
-- ファイルごとの処置は次のとおり。
-
-| ファイル | 処置 | 読み込み |
-|---|---|---|
-| failure-modes.md | 維持する（FM-VERSION を含む）。古いツールへの言及だけ直す | 常時 |
-| agents.md | 書き直す。<br>- ロスター（AIL を含む）<br>- P0〜P4<br>- Plan/Execute の分離（新しく追加した段落は文言を変えない）<br>- mob の要約（20 行以内）<br>- Teams / Workflow / サブエージェントの使い分け（15 行以内。O5 の副作用も書く） | 常時 |
-| performance.md | 書き直す。<br>- Codex を外す<br>- モデルの別名と effort<br>- frontmatter での指定<br>- Workflow は明示的に頼まれたときだけ使う | 常時 |
-| git-workflow.md | PR は `/code-review` を通してから ready にし、マージは人が行う | 常時 |
-| security.md | 維持する。重複を整理する | 常時 |
-| testing.md | 一般化する | `paths:` コード・テスト |
-| coding-style.md | 維持する。軽く整理する | `paths:` コード |
-| mob-programming.md | D4 任意を承認した場合は `plugin/skills/mob/` へ移す。テンプレート、例、役割の境界の説明（ja と en の stub）、MOB_QUICKSTART も一緒に移す | 必要なときだけ |
-| teams.md | agents.md に統合し、削除する | — |
-| hooks.md | `docs/ja/harness-engineering.md` へ移し、削除する | — |
-| pr-automation.md | `docs/ja/pr-automation.md` へ移す。D3 任意を承認した場合は削除する | — |
-| patterns.md | D4 任意を承認した場合は削除する | — |
-
-- `../docs/...` という相対リンクは、「mantra リポジトリの docs/ja/...」という表記に変える。
-- p-judge の助言文を、新しいラダーの文言に合わせる。`plugin.json` の version を上げる。
-- `rule-parser` と `validate-rules` を、frontmatter の `paths:` に対応させる。
-- ルール内容の契約テストを新しく作る。確かめる内容は次のとおり。
-  - FM-VERSION の見出しが存在すること
-  - 「Do not leave model assignment implicit.」が存在すること
-  - `../` 形式のリンクがないこと
-  - D4 任意を承認した場合は、常に読み込まれる分（再帰的に数え、`paths:` 付きは除く）が 18KB 以下であること
-- PR には「削除・移動した記述 → 移動先」の対応表を付け、mob-critic とユーザーに確認してもらう。
-- 反映: `git pull`、プラグインの更新、CLAUDE.md の「ルール参照」節の削除（承認を得る）、新しいセッションで `/mantra:mob` とルールが読み込まれていることを確かめる。
-
-### P6 PR 自動化と文書（`feat/modernize-p6-pr-docs`）
-- D3 任意を承認した場合は、自動化一式を削除し、pre-push は `npm run verify` だけにする。承認しなかった場合は、`auto-merge.yml` を有効に戻すかどうかを決める。
-- D9 の Node 22 対応を行う。
-- 文書を更新する。
-  - README 2 本: 契約で決まっている見出しは維持する。clone 先は任意だが、setup した checkout がそのままライブになることを書く。
-  - harness-engineering.md: 標準の worktree とプラグインについて書く。
-  - authoring.md: frontmatter、プラグイン、スキルの書き方。
-  - cli-contract / ops-metrics / troubleshooting。
-  - templates/repo-* のリンクを直す。テンプレート自体は維持する。
-  - AIL の例（examples/ja）は維持する。
-  - D12 を承認した場合は、該当する文書を削除する。
-  - HANDOVER.md を書き直す。
-- 反映: `git pull`、`gh workflow` の状態を確かめる。
-
-### P7 最終確認と後片付け
-- D10 を承認した場合は、後片付けを行う。この計画の worktree も削除する。
-- 新しいセッションで、エージェント、ルール、スキル、フック、設定が計画どおりになっているかを確かめる。mob-scribe（sonnet）に要約させ、HANDOVER に記録する。
-
-## リスク
+## 9. リスク
 
 | リスク | 重大度 | 対策 |
 |---|---|---|
-| setup を実行して、ライブのエージェントが消える | High | P0 でバックアップを最初に取る。P2 の反映までは setup を実行しない。D2b の安全装置を入れる。一時 HOME でリハーサルする |
-| 反映の途中で、ライブ設定が壊れたり二重になったりする | High | フェーズごとに G5 を行う。先に settings.json の行を削除してからプラグインを入れる。`/hooks` で確かめる。停止スイッチ。バックアップから戻す |
-| 自動マージで人の承認ゲートが抜かれる | Medium | P0 で `auto-merge.yml` を無効にする |
-| サブディレクトリのリンクが読まれない | Medium | D2a で実機確認し、だめならファイル単位のリンクに切り替える |
-| プラグインの更新を忘れて、スキルやフックが古いまま残る | Medium | G5 に version を上げる手順と、`installed_plugins.json` の確認を入れる |
-| contract テストの変更で、後退が隠れる | Medium | G4 |
-| ルールを削って、頼っていた振る舞いが消える | Medium | 対応表を作り、mob-critic とユーザーに確認してもらう。mob の要約は常に読み込む形で残す |
-| サブエージェントが誤ってライブの checkout を編集する | Medium | G3 で `git -C ~/src/mantra status` を確認する |
-| checkout = ライブという構造そのものが残る | Low | 運用ルールと D7。将来の案として、ライブ専用の checkout を用意する |
-| 手元の Claude Code（2.1.287）がドキュメント（2.1.300）より古い | Low | 2.1.288 以降の機能（`onFailure` など）には依存しない |
+| 削りすぎて「毎回言わないと」が再発する | High | 「頼まれなくても行うこと」の節と FM-AGENT-CRITIC を必ず残し、テストする。planner も残す。P5 で測る。戻す 1 行は対応表に記録しておく |
+| 切り替えでライブのエージェントやファイルを失う | High | `cp -RL` によるバックアップ、本番と戻し方の両方のリハーサル、install.sh による移動と保全、タグ。`~/.mantra/generated` は P5 が終わるまで残す |
+| P2 の作業中に古いスクリプトがライブ設定を壊す | Medium | 実行の禁止と、G3 のハッシュ確認 |
+| 退役させたものが実は必要だった | Medium | タグから戻せる。P5 で myak を使い、「欲しかった場面」がなかったかを確かめる |
+| 調べた範囲が小さい | Medium | 結論は「未証明」と「未使用」に限って述べる。P5 で継続して測る |
+| 自動マージで人の承認なしにマージされる | Low | P0 で止め、P2 で一式を削除する |
 
-## スコープ外
+## 10. スコープ外
 
-- myak の変更
-- `~/.codex` の中身。Codex.app の削除はユーザーが行う。
-- metrics の仕様変更。ただし、`user_source_count` を外すことは除く。
-- 新しいエージェントの追加
-- 保存済みワークフロー（mob を Workflow 化する案）。今回の作業がすべて終わってから改めて検討する。
+- myak の変更。
+- `~/.codex` と Codex.app の削除（ユーザーが行う）。
+- 新しいリポジトリへのハーネス導入（必要になったら `templates/` を使う）。
+- 評価の仕組みを新たに作ること。
