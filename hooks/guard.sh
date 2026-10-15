@@ -44,9 +44,10 @@
 #     always did.
 #   - `git config core.hooksPath` is read-only and allowed, with `git config
 #     --get core.hooksPath` and the exact value `githooks` (a trailing `)` of a
-#     subshell is ignored for these). Any other value, flag or global option
-#     (`-C`, `-c`) is denied, including reads such as `--get-all`. The
-#     value-less read is denied behind `xargs`, which appends the value.
+#     subshell is ignored for these). Any other value or flag is denied,
+#     including reads such as `--get-all`. Only the two reads accept a
+#     `git -C <dir>` prefix; the value-less read is denied behind `xargs`,
+#     which appends the value.
 #   - A destructive command nested mid-segment is not detected:
 #     `echo $(rm -rf x)`, `find -exec rm -rf`, `xargs -a list rm -rf`.
 #   - Indirection is not followed: aliases, shell functions, variables
@@ -153,15 +154,21 @@ is_rm_rf() {
 # core.hooksPath githooks )`); `}` is not, because `githooks}` is a value.
 # $2 is the segment before normalize() stripped its wrappers: the value-less
 # read is not a read behind `xargs`, which appends its stdin as the value.
+# The two reads also pass after `git -C <dir>` (the command is lowercased, so
+# it reads as `-c <dir>` here); the set form `githooks` does not.
 hooks_path_override() {
-  local s=$1 t
+  local s=$1 t u
   [[ $s == *hookspath* ]] || return 1
   t=${s%"${s##*[![:space:])]}"}
   [[ $t == 'git config core.hookspath githooks' ]] && return 1
-  if [[ $t == 'git config core.hookspath' && ! $2 =~ (^|[^[:alnum:]_-])xargs([^[:alnum:]_-]|$) ]]; then
+  u=$t
+  while [[ $u =~ ^git[[:space:]]+-c[[:space:]]+${ARG}[[:space:]]+(.*)$ && ${BASH_REMATCH[1]} != *hookspath* ]]; do
+    u="git ${BASH_REMATCH[3]}"
+  done
+  if [[ $u == 'git config core.hookspath' && ! $2 =~ (^|[^[:alnum:]_-])xargs([^[:alnum:]_-]|$) ]]; then
     return 1
   fi
-  [[ $t == 'git config --get core.hookspath' ]] && return 1
+  [[ $u == 'git config --get core.hookspath' ]] && return 1
   [[ $s =~ ^git([[:space:]]|$) ]] || return 1
   [[ $s =~ [[:space:]]-c[[:space:]]+[\"\']?core\.hookspath ]] && return 0
   [[ $s =~ --config-env[=[:space:]][\"\']?core\.hookspath ]] && return 0

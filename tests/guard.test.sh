@@ -129,6 +129,14 @@ assert_deny 'git config --unset core.hooksPath'
 assert_deny 'git config --global --unset core.hooksPath'
 assert_deny 'git config --get-all core.hooksPath'
 assert_deny 'git -C repo config core.hooksPath githooks'
+# A `git -C <dir>` prefix is accepted for the two reads only.
+assert_deny 'git -C repo config core.hooksPath /dev/null'
+assert_deny 'git -C repo config --unset core.hooksPath'
+assert_deny 'git -C repo config --get-all core.hooksPath'
+assert_deny 'git -C repo -c core.hooksPath=/dev/null config --get core.hooksPath'
+assert_deny 'git -C repo commit config --get core.hooksPath'
+assert_deny 'git -C repo config --get core.hooksPath /dev/null'
+assert_deny 'echo /dev/null | xargs git -C repo config core.hooksPath'
 # A subshell closer is dropped only after the exact forms; it never hides a value.
 assert_deny '( cd x && git config core.hooksPath /dev/null )'
 assert_deny '(git config core.hooksPath /dev/null)'
@@ -139,7 +147,8 @@ assert_deny 'git config core.hooksPath githooks\)'
 assert_deny 'git config core.hooksPath $(echo /dev/null)'
 
 # Quoted text is data when the command only reads it (jq, echo, printf, grep,
-# for): a separator or a hook-bypass word inside the quotes does not count.
+# egrep, fgrep): a separator or a hook-bypass word inside the quotes does not
+# count.
 # Everything below is still checked: executors, unquoted separators, strings
 # that are run as code, and commands where the scanner could misread the quotes.
 assert_deny "bash -c 'cd x; rm -rf y'"
@@ -359,6 +368,10 @@ assert_allow '( cd x && git config core.hooksPath githooks )'
 assert_allow '(cd x && git config core.hooksPath githooks)'
 assert_allow '( git config --get core.hooksPath )'
 assert_allow '(git config core.hooksPath)'
+assert_allow 'git -C repo config --get core.hooksPath'
+assert_allow 'git -C repo config core.hooksPath'
+assert_allow 'git -C "dir with space" config --get core.hooksPath'
+assert_allow '( cd x && git -C repo config --get core.hooksPath )'
 # Quoted text that is only an argument of a data command.
 assert_allow "jq -cn --arg c 'git config core.hooksPath githooks' '{tool_input:{command:\$c}}'"
 assert_allow "jq -cn --arg c 'cd x && git config core.hooksPath githooks' '{tool_input:{command:\$c}}'"
