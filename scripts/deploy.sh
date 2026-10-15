@@ -17,8 +17,9 @@
 #      clone (not a linked worktree) whose toplevel is exactly that directory
 #   2. the live clone has no uncommitted changes
 #   3. origin/main is a fast-forward of the live HEAD (unless --force)
-#   4. origin/main, exported to a temp dir, passes bash -n hooks/guard.sh and
-#      scripts/verify.sh
+#   4. origin/main, exported to a temp dir with checkout-index (so .gitattributes
+#      export-ignore cannot hide files) and run with a fresh HOME, passes
+#      bash -n hooks/guard.sh and scripts/verify.sh
 # Only then is origin/main checked out detached and install.sh run. If
 # install.sh fails, the previous HEAD is checked out again and deploy.sh
 # exits non-zero.
@@ -108,9 +109,12 @@ if [ -n "$(git -C "$LIVE" status --porcelain)" ]; then
 fi
 
 PREV_HEAD=$(git -C "$LIVE" rev-parse HEAD)
-echo "git -C $LIVE fetch origin"
-git -C "$LIVE" fetch origin
-if ! NEW_HEAD=$(git -C "$LIVE" rev-parse --verify --quiet 'origin/main^{commit}'); then
+# The target is the remote-tracking ref, spelled out in full, and resolved to a
+# SHA exactly once: a local branch or tag called "origin/main" cannot shadow it,
+# and everything below (gates, checkout) uses the SHA, never the name.
+echo "git -C $LIVE fetch origin +refs/heads/main:refs/remotes/origin/main"
+git -C "$LIVE" fetch origin '+refs/heads/main:refs/remotes/origin/main'
+if ! NEW_HEAD=$(git -C "$LIVE" rev-parse --verify --quiet 'refs/remotes/origin/main^{commit}'); then
   echo "deploy.sh: origin/main does not exist in $LIVE" >&2
   exit 1
 fi
@@ -133,29 +137,43 @@ else
   git -C "$LIVE" log --oneline --stat "$PREV_HEAD..$NEW_HEAD" || true
 fi
 
-# Gate 4: verify the exact tree that would be checked out, outside the live clone.
-EXPORT_DIR=$(mktemp -d)
-cleanup_export() {
-  if [ -n "${EXPORT_DIR:-}" ] && [ -d "$EXPORT_DIR" ]; then
-    rm -rf -- "$EXPORT_DIR" || true
+# Gate 4: verify the exact tree that would be checked out, outside the live
+# clone. The tree is written from the commit's index with checkout-index, not
+# git archive: archive honours export-ignore / export-subst in .gitattributes,
+# which would let a commit hide files from the very check that guards it.
+# Attribute filters and autocrlf are switched off for the export.
+WORK_DIR=$(mktemp -d)
+cleanup_work() {
+  if [ -n "${WORK_DIR:-}" ] && [ -d "$WORK_DIR" ]; then
+    rm -rf -- "$WORK_DIR" || true
   fi
 }
-trap cleanup_export EXIT
-git -C "$LIVE" archive "$NEW_HEAD" | tar -x -C "$EXPORT_DIR"
-echo "verifying origin/main in $EXPORT_DIR"
-if ! (cd "$EXPORT_DIR" && bash -n hooks/guard.sh && bash scripts/verify.sh); then
+trap cleanup_work EXIT
+EXPORT_DIR="$WORK_DIR/tree"
+GATE_HOME="$WORK_DIR/home"
+mkdir -p "$EXPORT_DIR" "$GATE_HOME"
+GIT_INDEX_FILE="$WORK_DIR/index" git -C "$LIVE" -c core.attributesFile=/dev/null -c core.autocrlf=false \
+  read-tree "$NEW_HEAD"
+GIT_INDEX_FILE="$WORK_DIR/index" git -C "$LIVE" -c core.attributesFile=/dev/null -c core.autocrlf=false \
+  checkout-index -a -q --prefix="$EXPORT_DIR/"
+echo "verifying ${NEW_HEAD:0:12} in $EXPORT_DIR"
+# A fresh HOME and no MANTRA_LIVE: the verified code must not see (or be able to
+# change) the real ~/.claude or the live clone.
+if ! (cd "$EXPORT_DIR" &&
+  env -u MANTRA_LIVE -u MANTRA_TEST_REAL_HOME HOME="$GATE_HOME" bash -n hooks/guard.sh &&
+  env -u MANTRA_LIVE -u MANTRA_TEST_REAL_HOME HOME="$GATE_HOME" bash scripts/verify.sh); then
   echo "deploy.sh: origin/main failed verification; the live clone was not changed" >&2
   exit 1
 fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
-  echo "[dry-run] would run: git -C $LIVE checkout --detach origin/main"
+  echo "[dry-run] would run: git -C $LIVE checkout --detach ${NEW_HEAD:0:12}  (origin/main)"
   echo "[dry-run] install.sh below previews the CURRENT live checkout, not origin/main"
   "$LIVE/scripts/install.sh" --dry-run
   exit 0
 fi
 
-echo "git -C $LIVE checkout --detach origin/main"
+echo "git -C $LIVE checkout --detach ${NEW_HEAD:0:12}  (origin/main)"
 git -C "$LIVE" checkout --quiet --detach "$NEW_HEAD"
 echo "live is now at $(git -C "$LIVE" rev-parse --short HEAD)"
 

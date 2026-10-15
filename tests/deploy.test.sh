@@ -8,8 +8,6 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 
 # Hermetic git: ignore the caller's global and system configuration.
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-# deploy.sh runs verify.sh on the exported tree; do not run the suite again.
-export MANTRA_VERIFY_NESTED=1
 
 TMP=$(mktemp -d)
 cleanup() {
@@ -18,6 +16,12 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+
+# deploy.sh runs verify.sh on the exported tree. This test plays the role of an
+# outer verify.sh: a token backed by a file tells the nested run not to execute
+# tests/ again (the throwaway origin has none, and the suite must not recurse).
+printf '%s' "deploy-test-token" >"$TMP/verify-token"
+export MANTRA_VERIFY_TOKEN=deploy-test-token MANTRA_VERIFY_TOKEN_FILE="$TMP/verify-token"
 
 pass=0
 fail=0
@@ -126,6 +130,36 @@ work_commit "fix planner frontmatter"
 c4=$(origin_head)
 deploy >/dev/null 2>&1
 check "fixed commit deploys" test "$(live_head)" = "$c4"
+
+# --- export-ignore in .gitattributes cannot hide a bad file from the gate ---------
+git -C "$TMP/work" checkout -q "$c4" 2>/dev/null || true
+printf -- '---\nname: sneaky\ndescription: x\nmodel: gpt\n---\n' >"$TMP/work/agents/sneaky.md"
+printf 'agents/sneaky.md export-ignore\n' >"$TMP/work/.gitattributes"
+work_commit "bad agent hidden from git archive"
+before=$(snapshot "$HOME_DIR/.claude")
+set +e
+out=$(deploy 2>&1)
+rc=$?
+set -e
+check "export-ignore: gate still fails" test "$rc" -ne 0
+check "export-ignore: bad agent was seen" contains "$out" "sneaky.md"
+check "export-ignore: live HEAD unchanged" test "$(live_head)" = "$c4"
+check "export-ignore: ~/.claude untouched" test "$before" = "$(snapshot "$HOME_DIR/.claude")"
+git -C "$TMP/work" reset -q --hard "$c4"
+git -C "$TMP/work" push -q --force origin HEAD:main
+
+# --- a local branch called origin/main cannot redirect the deploy -----------------
+echo "more" >"$TMP/work/NOTE2"
+work_commit "another change"
+c4b=$(origin_head)
+git -C "$LIVE" branch -q origin/main "$c1" 2>/dev/null
+deploy >/dev/null 2>&1
+check "shadow branch origin/main: deploys the remote-tracking commit" test "$(live_head)" = "$c4b"
+git -C "$LIVE" branch -q -D origin/main
+git -C "$TMP/work" reset -q --hard "$c4"
+git -C "$TMP/work" push -q --force origin HEAD:main
+deploy --force >/dev/null 2>&1
+check "back to c4 for the next test" test "$(live_head)" = "$c4"
 
 # --- non-fast-forward origin/main is refused unless --force -----------------------
 git -C "$TMP/work" reset -q --hard "$c2"
