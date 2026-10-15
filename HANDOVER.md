@@ -1,68 +1,57 @@
-Updated: 2026-04-08
+Updated: 2026-10-15
 
 ---
 
-## 1. このセッションで完了したこと（Done）
+## 1. 完了したこと（Done）
 
-- **ローカル同期**: origin/main (`b8c5385`) に fast-forward
-- **ブランチ整理**: `feat/named-failure-modes` 削除（PR #48 マージ済み）
-- **.gitignore 更新**: `.serena/` 追加 → commit `d2e620f` → push 済み
-- **package-lock.json**: バージョンドリフト（flatted 3.3.3→3.4.2）を破棄
-- **Issue #43 クローズ**: Project Audit (2026-03-24) の唯一のアクション項目（#39 close 判断）が解決済みのためクローズ
-- **Issue #39 確認**: 未チェックタスク2件は実質完了済み（`docs/ja/authoring.md` に言語ポリシー存在、リンク切れなし）
+mantra の再設計（正本は `docs/MODERNIZATION_PLAN.md`）のうち、P0〜P3 を終えました。
 
----
+- **P0（安全化）**
+  - バックアップを `~/.claude/backups/mantra-redesign-20261015` に取った
+  - `auto-merge.yml` を無効にした
+  - `settings.json` から p-judge を外した
+  - `cleanupPeriodDays` を 120 にした
+  - PR #62 をクローズした
+  - 計画の PR は #63
+- **P1（ルール）**: 常時読み込むルールを 4 ファイルに絞った（`feat/redesign-p1-rules`）。旧ルールとの対応表は `docs/redesign/rules-mapping.md`
+- **P2（スリム化）**: エージェントを 4 体にし、`hooks/guard.sh`、`scripts/install.sh`・`deploy.sh`・`verify.sh`、シェルのみの CI を追加した。TypeScript 一式と PR 自動化は削除した（`feat/redesign-p2-slim`）
+- **P3（文書）**: README（英日）と `docs/ja/harness-engineering.md` を書き直した。mob・AIL・CLI 契約・metrics 関連の文書、テンプレート、例を削除した。`templates/repo-agents-pointer.md` では、引き継ぎを任意にした（`feat/redesign-p3-docs`）
 
 ## 2. いまの状態（State）
 
-- **ブランチ**: `main`（origin/main と同期済み `d2e620f`）
-- **未コミットの変更**: なし（clean working tree）
-- **テスト**: 全パス（84 tests / 15 test files）
-- **Open Issues**: 0
-- **Open PRs**: 0
-
----
+- 開発用 checkout `~/src/mantra` は、まだ `feat/p-judge-hook` のまま。これが現在のライブ設定なので、P4 まで触らない（push もしない）
+- `~/.claude` は、まだ旧構成を指している。P1〜P3 のブランチは、どれもマージされていない
+- 退役させたものは、タグ `pre-redesign` から戻せる
 
 ## 3. 決定事項（Decisions）
 
-- Named Failure Modes (FM-xxx) システム導入済み（PR #48）
-- GitHub Actions を commit SHA にピン留め（PR #46）
-- examples/ を locale 分離（PR #45）
-- `.serena/` は git 管理不要（ローカル MCP ツール状態）
-
----
+- 案 A′（縮小して作り直す）で進める
+- ルールは合計 200 行・8KB まで。新モデルが出たら `/doctor prompt-audit` で 1 行ずつ見直す
+- 引き継ぎは任意。`HANDOVER.md` か myak を使い、maw と Obsidian は必須にしない
 
 ## 4. 次にやること（Next）
 
-1. 新規機能・改善の検討（Open Issues ゼロの状態）
-2. 定期 Project Audit の次回実行（今回 2026-04-08 実施済み）
-
----
+1. P1〜P3 の PR を作り、次の順でマージする: 計画（#63）→ P1 → P2 → P3。P2 は P1 のマージ後に rebase してから入れる
+2. P4（切り替え）: 計画 §7 の G5 の手順に従う
+   1. 一時 HOME で、本番と戻し方をリハーサルする
+   2. バックアップを取る
+   3. `scripts/deploy.sh --init` でライブ用 clone を作る
+   4. `settings.json`・`CLAUDE.md`・メモリを、項目ごとに承認を得て更新する
+   5. 新しいセッションで確認する
+3. P5（効果測定）: 切り替えの 4 週間後と 8 週間後に、計画 §8 の指標を測る
 
 ## 5. 罠・注意点（Pitfalls）
 
-- **package-lock.json ドリフト**: `npm install` で再発する可能性あり。意図しない差分は破棄してよい
-- **examples/ja/ の docs/architecture.md 参照**: `examples/ja/ail-repo-improvement-loop.md:31` に存在しないファイルへの参照あり（#39 スコープ外、既知）
-
----
+- **開発用 checkout とライブ用 clone は別物**: `~/.claude` が指すのは `~/.mantra/live` だけ。開発用 checkout でブランチを切り替えても、ライブ設定は変わらない。反映するのは `scripts/deploy.sh` を実行したとき
+- **githooks は自動では有効にならない**: 新しい開発用 checkout では、一度 `git config core.hooksPath githooks` を実行する
+- **`~/.codex` を消さない**: `~/.claude/skills` にある Claude 用スキル 6 つは `~/.codex/skills` へのシンボリックリンクで、`~/.codex` を消すと壊れる
+- **`~/.mantra/generated` は P5 が終わるまで残す**: 戻すときに使う
+- **タグ `pre-redesign` は、確認した時点ではローカルにしかなかった**（origin にはない）。README が参照しているので、切り替えの前に push する
 
 ## 6. 重要リンク・参照（References）
 
-- PR #48: Named Failure Modes (FM-xxx)
-- PR #46: pin GitHub Actions to commit SHA
-- PR #45: examples locale split
-- Commit: `d2e620f` (.serena/ gitignore)
-
----
-
-## Changelog
-
-### 2026-04-08
-- ローカル同期、ブランチ整理、.serena/ gitignore、Issue #43 クローズ
-- Project Audit 実施（Open Issues 0、reopen 不要の確認済み）
-
-### 2026-02-26
-- Publicリポジトリ準備完了（LICENSE, README URL, .gitignore）
-
-### 2026-02-25
-- Mob Programming 用テンプレート3ファイルを追加
+- `docs/MODERNIZATION_PLAN.md`: 計画（§7 が切り替え、§8 が測り方）
+- `docs/redesign/rules-mapping.md`: 旧ルールとの対応表。戻したい振る舞いはここで探す
+- PR #63: 計画
+- PR #62: p-judge。クローズ済み
+- タグ `pre-redesign`: 再設計前の状態
