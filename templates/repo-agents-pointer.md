@@ -1,7 +1,7 @@
 # Agent Operations (<repo>)
 
 ## Purpose
-- This file defines only the operational entry point for bounded repo improvement.
+- This file is only the operational entry point for working in this repo.
 - Specifications and background belong in the SSOT; do not reproduce them here.
 
 ## Canonical Verify
@@ -12,9 +12,9 @@
 - `visual`: `<when to run visual regression>`
 - `acceptance`: `<when to run acceptance or E2E>`
 
-## Session Continuity
-- Source of truth is `maw handover/takeover`
-- Leave `repo / branch_or_workspace / goal / blockers / next_step / evidence_refs` in the Obsidian ledger
+## Session Continuity (optional)
+- Leave state for the next session in `HANDOVER.md` or in myak; delete this section if neither is used
+- Record `goal / blockers / next_step / evidence_refs`
 
 ## Canonical Docs
 - `README.md`

@@ -8,33 +8,28 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
-          cache: npm
+          persist-credentials: false
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install jq and shellcheck
+        run: |
+          missing=""
+          command -v jq >/dev/null 2>&1 || missing="$missing jq"
+          command -v shellcheck >/dev/null 2>&1 || missing="$missing shellcheck"
+          if [ -n "$missing" ]; then
+            sudo apt-get update
+            sudo apt-get install -y $missing
+          fi
 
-      - name: Validate assets (agents/rules/drift)
-        run: npm run validate
-
-      - name: Run typecheck
-        run: npm run typecheck
-
-      - name: Run lint
-        run: npm run lint
-
-      - name: Run unit and contract tests with coverage gate
-        run: npm run test:coverage
-
-      - name: Run onboarding smoke
-        run: npm run smoke:onboarding
+      - name: Verify
+        run: bash scripts/verify.sh

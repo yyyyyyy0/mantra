@@ -1,9 +1,10 @@
-# Dependencies
+# Dependencies and build output (old checkouts may still have them)
 node_modules/
+coverage/
+dist/
 
-# Claude Code
+# Claude Code (local state only)
 .claude/*
-!.claude/settings.json
 
 # Serena
 .serena/
@@ -18,11 +19,6 @@ node_modules/
 .env
 .env.*
 *.local
-
-# Build outputs
-dist/
-build/
-coverage/
 
 # Editor files
 .vscode/
