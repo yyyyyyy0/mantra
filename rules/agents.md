@@ -79,6 +79,14 @@ In those cases:
 - keep `AGENTS.md` thin and point to SSOT docs instead of embedding long playbooks
 - expose one canonical verify command and one test ladder per repo
 
+When the plan uses subagents, state these in the plan itself before execution:
+
+- orchestration strategy: phases, and what runs in parallel vs. sequentially
+- which agent / model handles each phase, and why (see `rules/performance.md` Delegation Criteria)
+- the review / verification gate between phases
+
+Do not leave model assignment implicit.
+
 See [docs/harness-engineering.md](../docs/ja/harness-engineering.md) and
 [templates/repo-agents-pointer.md](../templates/repo-agents-pointer.md).
 

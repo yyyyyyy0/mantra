@@ -35,6 +35,12 @@ Understand why it was denied, adjust the approach, or ask the user.
 Do not ask broad clarifying questions when a specific missing piece can be identified.
 "Is the return type string or number?" not "Can you tell me more about the requirements?"
 
+### FM-VERSION: 「最新」≠「指定バージョン」
+
+Do not assume `latest` for a dependency, module, CI workflow, runtime, or game/mod target.
+Before building or changing dependencies, read the exact version string from the project's config (manifest, lockfile, `west.yml`, workflow file) and use it verbatim — `1.21.11` is not `1.21.1`.
+Check that every module and CI workflow references the same pinned version.
+
 ## Domain-Specific Patterns
 
 ### FM-TEST-PASS: ユニットテスト通過 ≠ フロー全体の証明
