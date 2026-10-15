@@ -302,3 +302,21 @@ P0 安全化と基準値 ─▶ ┬─ P1 ルール（私）              ─┬
   - **組み込みエージェントのルール読み込み**: 実機で確かめた。組み込みの Plan と Explore はルールを読まない。general-purpose と自作のエージェントは読む。この結果を受けて planner を残した。
   - **main ブランチの保護**: branch protection は設定されていない。ruleset `main` があるが、内容は削除と force-push の禁止だけで、必須チェックはない。
 - **注意**: `~/.claude/skills` のうち 6 件（gh-address-comments、gh-fix-ci、gh-issue-projects-inventory、gh-pr-review-autofix、project-audit、sisho）は、`~/.codex/skills` へのリンクになっている。`~/.codex` を消すと、これらも使えなくなる。
+- **2026-10-15 P1〜P3 完了**: PR #65（rules）、#66（agents、hooks、scripts）、#67（docs）を積み重ねてマージし、最後に #63 を main にマージした（`7bda3a4`）。
+  - レビューの経過:
+    - code-reviewer の判定は BLOCK。shellcheck の指摘を修正した。
+    - security-reviewer は 2 回。guard の抜け道、deploy の検証ゲート、本物の HOME を守る規則、export の不一致を修正した。
+    - mob-critic は 2 回（P1 の対応表、P4 の手順書）。
+  - verify は 14 項目すべて PASS（テスト 326 件、shellcheck を含む）。CI の validate も PASS。
+  - #64（deepen-request スキル）との README の衝突は、手で解消した。
+- **2026-10-15 P4 完了**: 手順書 v2 で切り替えた。中身は次のとおり。
+  - deploy して `~/.mantra/live` を `7bda3a4` にした。
+  - settings.json を整理した: guard を差し替え、codex 関連と表示されないフックを削除し、zed と console.log のフックを `systemMessage` に直した。
+  - `claude mcp remove codex` を実行した。
+  - CLAUDE.md を myak の節だけにした。
+  - メモリを更新した。
+  - `~/.claude/skills/mantra*` と `~/.claude/templates/pr-automation` を削除した。
+  - 開発用の checkout を main に切り替えた。
+  - 確認: 新しい `claude -p` セッションで、ルール 4 ファイル、新しい番兵行、エージェントの一覧を確かめた。guard の拒否が効くことも実地で確かめた。
+  - 残り: `core.hooksPath githooks` の設定は、guard が拒否するためユーザーが行う。guard の誤検知（読み取りの形、サブシェルの閉じ括弧、引用符の中の文字列）は別作業として直す。
+- **P5 予定**: 2026-11-12 と 2026-12-10。
