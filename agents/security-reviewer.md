@@ -24,6 +24,7 @@ Check what applies to the code at hand; skip the rest without padding.
 - **SSRF and path traversal**: user-controlled URLs or file paths reaching fetch/open/read/write/extract without allow-listing and normalization; symlink and `..` handling.
 - **Dependencies and supply chain**: new or changed packages, unpinned versions, install scripts, CI actions not pinned by SHA, `curl | sh`, lockfile drift.
 - **Data exposure**: secrets or PII in logs, error messages, URLs, telemetry; overly broad CORS; debug modes.
+- **Untrusted machine input**: hook stdin, transcripts, webhooks, other agents' output, and model output reaching prompts, shell commands or files without validation.
 - **Shell scripts**: unquoted variables, missing `set -euo pipefail` where it matters, temp-file races, `rm -rf` on computed paths, writes outside intended dirs.
 
 ## Rules

@@ -42,6 +42,8 @@ add_rule 'git clean -f/-d/-x' "${GIT}clean[[:space:]]+(.*[[:space:]])?(-[a-z]*[f
 add_rule 'git push --force / -f / --force-with-lease / +refspec' \
   "${GIT}push([[:space:]].*)?[[:space:]](--force[^[:space:]]*|-[a-z]*f[a-z]*|\\+[^[:space:]]+)${END}"
 add_rule 'git commit/push --no-verify' "${GIT}(commit|push)([[:space:]].*)?[[:space:]]--no-verify(=[^[:space:]]*)?${END}"
+# `git commit -n` is --no-verify. (`git push -n` is --dry-run and stays allowed.)
+add_rule 'git commit -n (--no-verify)' "${GIT}commit([[:space:]].*)?[[:space:]]-[a-z]*n[a-z]*${END}"
 add_rule 'rmdir' "^rmdir${END}"
 add_rule 'DROP TABLE/DATABASE/SCHEMA' 'drop[[:space:]]+(table|database|schema)([[:space:]]|;|$)'
 add_rule 'fly deploy/scale/secrets set' "^(fly|flyctl)[[:space:]]+(deploy|scale|secrets[[:space:]]+set)${END}"
@@ -80,6 +82,11 @@ is_rm_rf() {
 matched=''
 while IFS= read -r raw || [ -n "$raw" ]; do
   seg=$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')
+  # Hook bypass through the environment (normalize() strips env assignments).
+  if [[ $seg =~ (^|[[:space:]])husky(_skip_hooks)?=[^[:space:]]+ ]]; then
+    matched='HUSKY=… (git hook bypass)'
+    break
+  fi
   seg=$(normalize "$seg")
   [ -n "$seg" ] || continue
   if is_rm_rf "$seg"; then
@@ -98,7 +105,7 @@ done < <(printf '%s\n' "$cmd" | tr '&|;' '\n\n\n')
 
 [ -n "$matched" ] || exit 0
 
-reason="危険なコマンドのパターン「${matched}」に一致したためブロックしました。実行する前に、チャットでユーザーに確認して許可を得てください。ファイルの削除には rm ではなく trash を使ってください。"
+reason="危険なコマンドのパターン「${matched}」に一致したためブロックしました。別の書き方で回避せず、必要ならユーザーに理由を説明して、ユーザー自身に実行してもらってください（サブエージェントは呼び出し元に報告してください）。ファイルの削除には rm ではなく trash を使ってください。"
 jq -cn --arg reason "$reason" \
   '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'
 exit 0
