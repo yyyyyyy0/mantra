@@ -1,6 +1,6 @@
 # mantra 再評価と再設計計画（2026-10-15）
 
-Status: **承認待ち（v4。mob-critic の 2 回目のレビューを反映済み）**。
+Status: **承認済み（案 A′、2026-10-15）・実施中**。経過は末尾の §11 実施記録を参照。
 
 v2（commit `c936392`）は、仕組みを残したまま最新化する計画だった。v3 以降はそこから方針を変え、次の 3 点を確かめたうえで計画を作り直している。
 
@@ -286,3 +286,19 @@ P0 安全化と基準値 ─▶ ┬─ P1 ルール（私）              ─┬
 - `~/.codex` と Codex.app の削除（ユーザーが行う）。
 - 新しいリポジトリへのハーネス導入（必要になったら `templates/` を使う）。
 - 評価の仕組みを新たに作ること。
+
+## 11. 実施記録
+
+- **2026-10-15 承認**: オーナーが案 A′ を承認した。外部に影響する操作は、その都度確認を取ってから行う。
+- **2026-10-15 P0 完了**（いずれも確認を得て実施）
+  - `~/.claude/backups/mantra-redesign-20261015/` にバックアップを取った。対象は settings.json、CLAUDE.md、`~/.claude.json`、generated agents、memory。リンク先も記録した。
+  - `auto-merge.yml` を無効にした。
+  - settings.json から p-judge を削除し、`cleanupPeriodDays: 120` を追加した。
+  - 2 つのルールをライブの checkout でローカルにコミットした（`b6d2c61`）。push はしていない。同じ commit にタグ `pre-redesign` を付けた。
+  - PR #62 に計測結果をコメントし、クローズした。
+  - この計画書を PR #63 にした。
+- **確定した判断**
+  - **D2a**: エージェントはファイル単位のシンボリックリンクにする。サブディレクトリのリンクが読まれるかを確かめる手間と、その不確実さを避けるため。
+  - **組み込みエージェントのルール読み込み**: 実機で確かめた。組み込みの Plan と Explore はルールを読まない。general-purpose と自作のエージェントは読む。この結果を受けて planner を残した。
+  - **main ブランチの保護**: branch protection は設定されていない。ruleset `main` があるが、内容は削除と force-push の禁止だけで、必須チェックはない。
+- **注意**: `~/.claude/skills` のうち 6 件（gh-address-comments、gh-fix-ci、gh-issue-projects-inventory、gh-pr-review-autofix、project-audit、sisho）は、`~/.codex/skills` へのリンクになっている。`~/.codex` を消すと、これらも使えなくなる。
