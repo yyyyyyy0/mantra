@@ -1,52 +1,20 @@
-# Git Workflow
+# Working Agreement
 
-## Commit Message Format
+## Before starting
 
-```
-<type>: <description>
+- In a git repo, run `git fetch origin main` and check how the current branch differs from `origin/main` before investigating, designing, or implementing.
+- Do multi-step changes in a worktree (`claude -w`, a git worktree, or a maw workspace), not in a checkout other things depend on.
+- Before building something new, check whether an existing tool, library, or skill already does it, and say what you found.
 
-<optional body>
-```
+## While working
 
-Types: feat, fix, refactor, docs, test, chore, perf, ci
+- Delete files with `trash`; `rm -rf` is blocked by a hook.
+- After a visible UI change, take a screenshot and show it to the user before the next step.
+- When behavior changes, add or update tests. Follow the repo's coverage gate if it has one.
+- Match the surrounding code's style; leave no debug logging such as `console.log`.
 
-Note: Attribution disabled globally via ~/.claude/settings.json.
+## Commits and PRs
 
-## Pull Request Workflow
-
-When creating PRs:
-1. Analyze full commit history (not just latest commit)
-2. Use `git diff [base-branch]...HEAD` to see all changes
-3. Draft comprehensive PR summary
-4. Include test plan with TODOs
-5. Push with `-u` flag if new branch
-
-## Feature Implementation Workflow
-
-1. **Plan First**
-   - Use **planner** agent when the task is non-trivial (3+ steps / 2+ files / non-obvious tradeoff)
-   - If pre-implementation review leaves unresolved High/Medium risks, run **replan** before coding
-   - Identify dependencies and risks
-   - Break down into phases
-
-2. **TDD Approach**
-   - Use **tdd-guide** agent
-   - Write tests first (RED)
-   - Implement to pass tests (GREEN)
-   - Refactor (IMPROVE)
-   - Verify 80%+ coverage
-
-3. **Code Review**
-   - Use **code-reviewer** agent immediately after writing code
-   - Address CRITICAL and HIGH issues
-   - Fix MEDIUM issues when possible
-
-4. **Commit & Push**
-   - Detailed commit messages
-   - Follow conventional commits format
-
-## Named Failure Modes
-
-- **FM-GIT-AMEND**: フック失敗後は新しいコミットを作成する。`--amend` で前のコミットを変更しない。
-- **FM-GIT-NOVERIFY**: `--no-verify` でフックをスキップしない。根本原因を修正する。
-- **FM-SKIP-CHECK**: PR を ready にする前に canonical verify コマンドを実行する。
+- Commit messages: `<type>: <description>` with type one of feat, fix, refactor, docs, test, chore, perf, ci.
+- Before marking a PR ready: run the repo's canonical verify command and `/code-review` (or `code-reviewer`), and include a test plan in the description.
+- Merge only with the user's approval.
