@@ -8,12 +8,18 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Install jq and shellcheck
         run: |
@@ -26,4 +32,4 @@ jobs:
           fi
 
       - name: Verify
-        run: VERIFY_SKIP_RULES=0 bash scripts/verify.sh
+        run: bash scripts/verify.sh

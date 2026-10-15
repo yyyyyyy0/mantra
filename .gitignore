@@ -1,3 +1,8 @@
+# Dependencies and build output (old checkouts may still have them)
+node_modules/
+coverage/
+dist/
+
 # Claude Code (local state only)
 .claude/*
 
