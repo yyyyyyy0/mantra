@@ -1,166 +1,74 @@
-# Harness Engineering MVH
+# 他のリポジトリに最小限のハーネスを入れる
 
-> **このドキュメントは repo 導入パスの正本です。**
-> README からリンクされており、既存 repo に mantra のハーネスを導入する際の canonical reference として位置づけられています。
+mantra 自体ではなく、ほかのリポジトリに小さなハーネスを足すときのガイドです。mantra 自体の説明は [README](../../README.md) にあります。
 
-このドキュメントは、この Mac 上の複数 repo に共通で入れる最小実行可能ハーネス
-（MVH: Minimum Viable Harness）の正本です。
+目的は、どのリポジトリでも「どこを見て、何を実行すればよいか」が最初の 1 分で分かるようにすることです。長い文書を足すことは目的ではありません。
 
-目標は「深い repo ごとの差異を残したまま、毎回迷わず同じ入口で始められる薄い共通層」を作ることです。
+## 手順
 
-## TL;DR: Adoption Path
+1. 薄い `AGENTS.md` を置く。
+2. 検証コマンドを 1 本に決める。
+3. pre-push フックと CI から、同じコマンドを呼ぶ。
+4. 機械で守れることは、文章ではなく hook にする。
+5. 作業は隔離した worktree で行う。
+6. 引き継ぎは、必要になったときだけ用意する。
 
-既存 repo に MVH を導入する 4 ステップ：
+## 1. 薄い AGENTS.md
 
-1. **Thin AGENTS.md** — [テンプレート](../../templates/repo-agents-pointer.md) をベースにポインタ型 AGENTS.md を置く
-2. **Canonical verify** — repo で 1 本の検証コマンドを定め、AGENTS.md に明記する
-3. **Hook contract** — [repo pre-push テンプレート](../../templates/repo-pre-push.example.sh) で canonical verify を毎 push で呼ぶ
-4. **Session continuity** — `maw handover/takeover` と [Obsidian ledger テンプレート](../../templates/repo-obsidian-ledger.md) でセッション引き継ぎ
+`AGENTS.md` は入口だけにします。ひな形は [templates/repo-agents-pointer.md](../../templates/repo-agents-pointer.md) です。
 
-具体的な walkthrough は [examples/ja/ail-repo-improvement-loop.md](../../examples/ja/ail-repo-improvement-loop.md) を参照。
+- `Canonical Verify`: 最初に実行する 1 本のコマンド
+- `Test Ladder`: どの変更でどのテストを走らせるか
+- `Session Continuity`: 任意。`HANDOVER.md` か myak
+- `Canonical Docs`: 詳しい説明の置き場所
 
-## 1. Thin AGENTS Contract
+仕様や運用メモは、ここに書かずに別の文書へ置いて、リンクだけ張ります。1 画面で読める量に収めてください。長くするほど、本当に守らせたい行が読まれにくくなります。
 
-`AGENTS.md` は入口だけを持ち、仕様・背景・長い運用メモは別ドキュメントへ送ります。
+## 2. 検証コマンドは 1 本
 
-必須要素:
+人にもエージェントにも分かる、検証コマンドを 1 本だけ決めます。例は `npm run verify` や `make check` です。補助のテストは、変更の種類に応じて使い分けます。
 
-- `Purpose`: この repo のハーネス上の優先事項
-- `Canonical verify`: まず実行すべき 1 本の検証コマンド
-- `Test ladder`: unit / visual / acceptance の位置づけ
-- `Session continuity`: `maw handover/takeover` と ledger の参照先
-- `Canonical docs`: 詳細の SSOT
+- `default`: unit、lint、typecheck、contract。毎回走らせる。
+- `visual`: 見た目や出力レイアウトを変えたときだけ。
+- `acceptance`: 重要なフローや外部連携、リリース前だけ。
 
-非推奨:
+visual と acceptance を毎回の push に載せないでください。ただし、実行方法と成果物の置き場所は文書に残します。
 
-- エージェント一覧の長文再掲
-- 詳細 runbook のコピペ
-- 実装仕様の長文化
-- 同じ趣旨の rule を複数ファイルへ重複記載
+## 3. pre-push と CI
 
-推奨長さ:
+検証コマンドは、2 か所から同じものを呼びます。
 
-- 1 画面で読める量
-- まず最初の 60 秒で「どこを見て、何を打てばよいか」が分かる量
+- ローカルの pre-push。ひな形は [templates/repo-pre-push.example.sh](../../templates/repo-pre-push.example.sh) です。リポジトリ側の `githooks/` に置き、`git config core.hooksPath githooks` で有効にします。
+- CI。pull request と main への push で実行します。
 
-## 2. Policy-as-Code Hooks
+pre-push は、毎回の push で待てる時間に収めます。重いゲートは CI か手動の手順に回します。エディタやツールの hook がない環境でも、この 2 か所は効きます。mantra 自身も同じ構成です（`githooks/pre-push` と `.github/workflows/validate.yml`）。
 
-ハーネス上の hook は「説明」ではなく「機械で実行される軽いガード」を置きます。
+## 4. 機械で守れることは hook にする
 
-### PreToolUse / Pre-execution
+hook は、説明ではなく、実行される軽いガードとして置きます。
 
-責務:
+- **PreToolUse**: 破壊的な操作を止めます。`git reset --hard`、`rm -rf`、`git push --force`、`--no-verify` などです。mantra の [hooks/guard.sh](../../hooks/guard.sh) が実装例です。拒否は `permissionDecision: deny` の JSON で返します。jq がなければ何もしない fail-open にして、事故を防ぐシートベルトと割り切ります。
+- **Stop**: 変更があるのに検証していないときに、検証コマンドを走らせることもできます。任意です。失敗で止める場合は、無限ループを避けるため、入力の `stop_hook_active` を確認してください。
 
-- 破壊的操作の遮断または確認
-- dirty tree での直接編集を避ける
-- `maw` / worktree の利用を促す
-- 高リスク作業を plan-first に戻す
+文章のルールは短く保ちます。1 行ごとに「消すとミスが起きるか」を問い、起きない行は削ります。モデルが新しくなったら、同じ見直しをもう一度行います。読み飛ばされると困るルールは、文章を増やさずに hook か CI へ移します。
 
-代表例:
+## 5. 隔離した作業場所
 
-- `git reset --hard`, `rm -rf`, `fly deploy`, `sudo` を即時ブロック
-- 3+ step / migration / public contract change は plan-first を促す
-- 既存未コミット差分がある tree では隔離 workspace を要求する
+Claude Code の標準機能を使います。
 
-### PostToolUse / Post-edit
+- `claude -w` で、worktree の中でセッションを始めます。
+- サブエージェントが書き込みをするなら、frontmatter に `isolation: worktree` を指定します。
 
-責務:
+未コミットの差分があるツリーで、直接編集を始めないでください。`maw` などの独自ツールは必要ありません。
 
-- 変更直後の軽量 verify
-- changed-file 単位の lint / typecheck
-- 補助 artifact の場所を示す
+## 6. 引き継ぎ（任意）
 
-代表例:
+セッションをまたぐ作業には、`HANDOVER.md` か myak が使えます。残すのは、目的、ブロッカー、次の一手、根拠になる参照先です。台帳を別に用意する必要はありません。maw や Obsidian は、すでに使っているなら使ってよい、という扱いです。
 
-- TypeScript 編集後に `tsc --noEmit` または repo verify の軽量版
-- visual diff の出力先を案内
-- 受け入れテスト runbook への導線を出す
+## 導入の順序
 
-### Stop / Session end
-
-責務:
-
-- verify 漏れ検知
-- handover 漏れ検知
-- 継続に必要な evidence の確認
-
-代表例:
-
-- 変更があるのに verify 実行記録が無ければ警告
-- `maw` workspace なら `maw handover` 未実施を警告
-- ledger に `next step` と `evidence refs` が無ければ補完を促す
-
-### Repo Hook Contract
-
-editor/tool hook が無い環境でも最低限効くように、repo 側には `pre-push` を置きます。
-
-期待値:
-
-- 1 repo 1 command の canonical verify を呼ぶ
-- 追加で重い visual / acceptance は手動トリガに残す
-- 実行時間は「毎 push で耐えられる」範囲に抑える
-
-ひな形は [templates/repo-pre-push.example.sh](../../templates/repo-pre-push.example.sh) を使います。
-
-## 3. Plan / Execute Split
-
-次の条件では plan-first を既定にします。
-
-- 3 つ以上の実装ステップ
-- 2 ファイル以上で public behavior が変わる
-- migration / auth / billing / data loss risk
-- rollback が難しい
-
-軽微な docs-only や 1 ファイルの明確な修正では single-agent execute-first で構いません。
-
-重要なのは「plan-first を AGENTS に長文で埋める」ことではなく、「高リスク時だけ確実に戻れること」です。
-
-## 4. Canonical Verify Contract
-
-各 repo は人間にも agent にも分かりやすい 1 本の verify command を持ちます。
-
-例:
-
-- `eval "$(mise env -s zsh)" && npm run verify`
-- `corepack yarn validate`
-- `npm run check`
-
-補助的な test は ladder で扱います。
-
-### Test ladder
-
-- `default`: unit / lint / typecheck / contract
-- `visual`: UI, rendering, CLI layout 変更時のみ
-- `acceptance`: 重要フロー、外部連携、リリース前ゲートのみ
-
-原則:
-
-- visual を常時必須にしない
-- acceptance を全 push に載せない
-- ただし runbook と artifact の置き場は常に明示する
-
-## 5. Session Continuity Contract
-
-継続の source of truth は `maw handover/takeover` です。
-
-Obsidian は検索・俯瞰・一覧のための index として使い、handover の代替にはしません。
-
-最低限そろえるメタデータ:
-
-- `repo`
-- `branch_or_workspace`
-- `goal`
-- `blockers`
-- `next_step`
-- `evidence_refs`
-- `updated_at`
-
-Obsidian 用の雛形は [templates/repo-obsidian-ledger.md](../../templates/repo-obsidian-ledger.md) を使います。
-
-## 6. Recommended Rollout
-
-1. `AGENTS.md` をポインタ型へ薄くする
-2. canonical verify command を明記する
-3. repo `pre-push` を canonical verify に寄せる
-4. visual / acceptance の手動 runbook を docs へ寄せる
-5. `maw handover/takeover` と ledger をセットで運用する
+1. `AGENTS.md` をポインタ型にする。
+2. 検証コマンドを決めて、`AGENTS.md` に書く。
+3. pre-push と CI を、そのコマンドにそろえる。
+4. 事故が実際に起きた操作から順に、hook で止める。
+5. visual と acceptance の手順を、文書にまとめる。

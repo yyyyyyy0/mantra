@@ -1,71 +1,9 @@
 {
   "name": "mantra",
-  "version": "1.0.0",
-  "license": "MIT",
+  "version": "2.0.0",
   "private": true,
+  "license": "MIT",
   "scripts": {
-    "setup": "tsx scripts/setup.ts",
-    "onboarding": "tsx scripts/onboarding.ts",
-    "onboarding:full": "tsx scripts/onboarding.ts --full",
-    "onboarding:json": "tsx scripts/onboarding.ts --json",
-    "onboarding:full:json": "tsx scripts/onboarding.ts --full --json",
-    "metrics:report": "tsx scripts/metrics-report.ts",
-    "sync:codex": "tsx scripts/sync-agents-to-codex.ts && tsx scripts/sync-rules-to-codex.ts && tsx scripts/sync-templates-to-codex.ts && tsx scripts/sync-examples-to-codex.ts",
-    "sync:codex:json": "npm run sync:codex:agents -- --json && npm run sync:codex:rules -- --json && npm run sync:codex:templates -- --json && npm run sync:codex:examples -- --json",
-    "sync:codex:agents": "tsx scripts/sync-agents-to-codex.ts",
-    "sync:codex:rules": "tsx scripts/sync-rules-to-codex.ts",
-    "sync:codex:templates": "tsx scripts/sync-templates-to-codex.ts",
-    "sync:codex:examples": "tsx scripts/sync-examples-to-codex.ts",
-    "sync:codex:preview": "npm run sync:codex:agents -- --preview && npm run sync:codex:rules -- --preview && npm run sync:codex:templates -- --preview && npm run sync:codex:examples -- --preview",
-    "sync:codex:preview:json": "npm run sync:codex:agents -- --json --preview && npm run sync:codex:rules -- --json --preview && npm run sync:codex:templates -- --json --preview && npm run sync:codex:examples -- --json --preview",
-    "sync:claude": "npm run sync:claude:agents && npm run sync:claude:rules",
-    "sync:claude:json": "npm run sync:claude:agents -- --json && npm run sync:claude:rules -- --json",
-    "sync:claude:agents": "tsx scripts/sync-agents-to-claude.ts",
-    "sync:claude:rules": "tsx scripts/sync-rules-to-claude.ts",
-    "sync:claude:preview": "npm run sync:claude:agents -- --preview && npm run sync:claude:rules -- --preview",
-    "onboarding:claude": "npm run onboarding && npm run sync:claude",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "eslint \"scripts/**/*.ts\" \"tests/**/*.ts\" --max-warnings=0",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "test:unit": "vitest run tests/agents.test.ts tests/rules.test.ts tests/contracts tests/setup-fs.test.ts tests/setup-merge.test.ts tests/setup-orchestrator.test.ts tests/content-entries.test.ts tests/skill-family.test.ts tests/content-sources-extra.test.ts",
-    "verify": "npm run validate && npm run typecheck && npm run lint && npm run test:unit",
-    "test:coverage": "vitest run --coverage tests/agents.test.ts tests/rules.test.ts tests/contracts tests/setup-fs.test.ts tests/setup-merge.test.ts tests/setup-orchestrator.test.ts tests/content-entries.test.ts tests/skill-family.test.ts tests/content-sources-extra.test.ts",
-    "smoke:onboarding": "vitest run tests/smoke/onboarding.test.ts",
-    "validate:agents": "tsx scripts/validate-agents.ts",
-    "validate:drift": "tsx scripts/validate-drift.ts",
-    "validate:rules": "tsx scripts/validate-rules.ts",
-    "validate:json": "npm run validate:agents -- --json && npm run validate:rules -- --json && npm run validate:drift -- --json",
-    "validate": "npm run validate:agents && npm run validate:rules && npm run validate:drift",
-    "review:pr": "bash scripts/pr-review.sh",
-    "prepare": "husky"
-  },
-  "lint-staged": {
-    "agents/**/*.md": [
-      "npm run validate:agents",
-      "npm run validate:drift"
-    ],
-    "agents/**/*.yml": [
-      "npm run validate:agents",
-      "npm run validate:drift"
-    ],
-    "rules/*.md": [
-      "npm run validate:rules"
-    ]
-  },
-  "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@types/js-yaml": "^4.0.9",
-    "@types/node": "^25.3.0",
-    "@vitest/coverage-v8": "^4.0.18",
-    "eslint": "^10.0.2",
-    "husky": "^9.1.7",
-    "js-yaml": "^4.1.1",
-    "lint-staged": "^16.2.7",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1",
-    "vitest": "^4.0.18",
-    "zod": "^4.3.6"
+    "verify": "bash scripts/verify.sh"
   }
 }

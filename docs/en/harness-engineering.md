@@ -1,5 +1,5 @@
 # Harness Engineering
 
-The canonical reference for adopting mantra's Minimum Viable Harness (MVH) into a repository. Covers the adoption path, repo-level hook pairing, verify commands, and the plan/execute split.
+How to add a minimal harness to another repository: a thin `AGENTS.md` that points to the real docs, one canonical verify command called from a pre-push hook and CI, hooks for rules that can be enforced mechanically, and native worktrees for isolation.
 
-> For the full document, see [docs/ja/harness-engineering.md](../ja/harness-engineering.md).
+The guide is written in Japanese: [docs/ja/harness-engineering.md](../ja/harness-engineering.md).
