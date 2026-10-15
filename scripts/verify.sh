@@ -12,9 +12,11 @@
 #   e. every tests/*.test.sh passes
 #   f. shellcheck on the shell scripts (required when CI=true)
 #
-# MANTRA_VERIFY_NESTED=1 skips e. It is set for the test scripts themselves
-# (deploy.test.sh runs deploy.sh, which runs verify.sh again on the exported
-# tree) so that the suite cannot recurse.
+# Check e is skipped (with a WARN) only when MANTRA_VERIFY_TOKEN matches the
+# contents of the file named by MANTRA_VERIFY_TOKEN_FILE. An outer verify.sh
+# creates that file in its own temp dir for the duration of its test run, so
+# deploy.test.sh -> deploy.sh -> verify.sh cannot recurse, while a stray
+# exported variable (no such file, or a stale one) skips nothing.
 set -euo pipefail
 unset CDPATH GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
 
@@ -116,7 +118,7 @@ check_rules_budget() {
     total_lines=$((total_lines + lines))
     total_bytes=$((total_bytes + bytes))
     echo "      always-on: $f ($lines lines, $bytes bytes)"
-  done < <(find -L rules \( -type f -o -type l \) -name '*.md' | sort)
+  done < <(find -H rules \( -type f -o -type l \) -name '*.md' | sort)
 
   if [ "$total_lines" -le "$RULES_MAX_LINES" ] && [ "$total_bytes" -le "$RULES_MAX_BYTES" ]; then
     [ "$dangling" -eq 1 ] || pass "a. always-on rules: $total_lines/$RULES_MAX_LINES lines, $total_bytes/$RULES_MAX_BYTES bytes"
@@ -189,7 +191,10 @@ check_agent() {
     return
   fi
   while IFS= read -r line; do
-    if [[ $line =~ ^([A-Za-z][A-Za-z0-9_-]*):[[:space:]]*(.*)$ ]]; then
+    if [[ -n $line && ! $line =~ ^[[:space:]] && ! $line =~ ^[A-Za-z][A-Za-z0-9_-]*(:\ .*|:)$ ]]; then
+      fail "d. $f: malformed frontmatter line (expected 'key: value'): $line"
+      ok=0
+    elif [[ $line =~ ^([A-Za-z][A-Za-z0-9_-]*):[[:space:]]*(.*)$ ]]; then
       key=${BASH_REMATCH[1]}
       val=$(trim_value "${BASH_REMATCH[2]}")
       last_key=$key
@@ -261,17 +266,35 @@ check_agents() {
 }
 
 # --- e. tests ----------------------------------------------------------------
+# True when MANTRA_VERIFY_TOKEN matches the file an outer verify.sh created.
+verify_token_ok() {
+  local tok=${MANTRA_VERIFY_TOKEN:-} file=${MANTRA_VERIFY_TOKEN_FILE:-}
+  [ -n "$tok" ] && [ -n "$file" ] && [ -f "$file" ] && [ "$(cat "$file" 2>/dev/null)" = "$tok" ]
+}
+
+TOKEN_DIR=''
+cleanup_token() {
+  if [ -n "$TOKEN_DIR" ] && [ -d "$TOKEN_DIR" ]; then
+    rm -rf -- "$TOKEN_DIR" || true
+  fi
+}
+
 check_tests() {
-  local t out rc found=0
-  if [ "${MANTRA_VERIFY_NESTED:-0}" = "1" ]; then
-    echo "SKIP  e. MANTRA_VERIFY_NESTED=1 (the outer run executes tests/)"
+  local t out rc found=0 token
+  if verify_token_ok; then
+    warn "e. tests/ NOT run: this is a nested verify.sh inside an outer run (token verified)"
     return
   fi
+  TOKEN_DIR=$(mktemp -d)
+  trap cleanup_token EXIT
+  token=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+  printf '%s' "$token" >"$TOKEN_DIR/token"
+  export MANTRA_VERIFY_TOKEN="$token" MANTRA_VERIFY_TOKEN_FILE="$TOKEN_DIR/token"
   for t in tests/*.test.sh; do
     [ -e "$t" ] || continue
     found=1
     rc=0
-    out=$(MANTRA_VERIFY_NESTED=1 bash "$t" 2>&1) || rc=$?
+    out=$(bash "$t" 2>&1) || rc=$?
     if [ "$rc" -eq 0 ]; then
       pass "e. $t ($(printf '%s\n' "$out" | tail -n 1))"
     else
@@ -279,6 +302,8 @@ check_tests() {
       printf '%s\n' "$out" | tail -n 25 | sed 's/^/        /'
     fi
   done
+  unset MANTRA_VERIFY_TOKEN MANTRA_VERIFY_TOKEN_FILE
+  cleanup_token
   [ "$found" -eq 1 ] || fail "e. no tests/*.test.sh found"
 }
 
