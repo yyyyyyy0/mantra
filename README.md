@@ -28,6 +28,7 @@ mantra used to be much bigger: fifteen agents, a TypeScript sync tool, and about
 | `githooks/pre-push` | Runs `scripts/verify.sh` before a push |
 | `tests/` | Shell tests for the guard, `install.sh` and `deploy.sh` |
 | `templates/` | Pointer-style `AGENTS.md` and a pre-push hook for other repos |
+| `skills/` | Claude Code skills (`skills/<name>/SKILL.md`); not linked automatically |
 | `docs/` | The redesign plan, the rules mapping, and the [harness guide for other repos](./docs/ja/harness-engineering.md) (Japanese) |
 
 ## Install
@@ -94,6 +95,14 @@ It has no dependencies. It needs bash and jq; shellcheck is optional locally and
 
 - When a new Claude model ships, run `/doctor prompt-audit` and go through each rule line with one question: would removing this cause a mistake? If not, delete it.
 - To bring back a retired behavior, find it in [docs/redesign/rules-mapping.md](./docs/redesign/rules-mapping.md) and restore one line from `git show pre-redesign:rules/<file>`.
+
+## Skills
+
+`skills/` holds Claude Code skills as `skills/<name>/SKILL.md`. `install.sh` does not link them; link the ones you want into `~/.claude/skills/` yourself.
+
+| Skill | Purpose |
+|---|---|
+| `deepen-request` | Rewrite a request the way a top expert in its field would approach it, show the rewrite, then execute it (`/deepen-request <request>`) |
 
 ## Other repos
 

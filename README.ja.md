@@ -28,6 +28,7 @@ Claude Code は、セッションのたびに `~/.claude/rules` と `~/.claude/a
 | `githooks/pre-push` | push の前に `scripts/verify.sh` を実行 |
 | `tests/` | ガード、`install.sh`、`deploy.sh` のシェルテスト |
 | `templates/` | ほかのリポジトリ向けの、ポインタ型 `AGENTS.md` と pre-push フック |
+| `skills/` | Claude Code のスキル（`skills/<name>/SKILL.md`）。自動ではリンクしない |
 | `docs/` | 再設計の計画、ルールの対応表、[他リポジトリ向けのハーネス導入ガイド](./docs/ja/harness-engineering.md) |
 
 ## インストール
@@ -94,6 +95,14 @@ npm run verify    # bash scripts/verify.sh と同じ
 
 - 新しい Claude モデルが出たら `/doctor prompt-audit` を実行し、ルールを 1 行ずつ「消すとミスが起きるか」で確かめます。起きないなら削ります。
 - 退役させた振る舞いを戻したいときは、[docs/redesign/rules-mapping.md](./docs/redesign/rules-mapping.md) で該当箇所を探し、`git show pre-redesign:rules/<file>` から 1 行だけ戻します。
+
+## スキル
+
+`skills/` には Claude Code のスキルを `skills/<name>/SKILL.md` の形式で置きます。`install.sh` はスキルをリンクしません。使いたいものだけ、`~/.claude/skills/` へ個別にリンクしてください。
+
+| スキル | 用途 |
+|---|---|
+| `deepen-request` | 依頼文を「その分野のトップ専門家ならどう取り組むか」の観点で書き直して見せ、そのまま実行する（`/deepen-request <依頼文>`） |
 
 ## ほかのリポジトリへ
 
