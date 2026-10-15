@@ -1,6 +1,6 @@
 ---
 name: deepen-request
-description: Rewrite a request the way a top expert in its field would approach it, show the rewrite, then execute it. Use when the user runs /deepen-request or asks how an expert would tackle a request ("専門家ならどうやる?", "もっと深くやって").
+description: Rewrite a request the way a top expert in its field would approach it, show the rewrite, then execute it. Use when the user runs /deepen-request, pastes the four-question template ("取りかかる前に次の4点を考え、依頼文を書き直して見せてから実行して"), or asks how an expert would tackle a request ("専門家ならどうやる?", "もっと深くやって"). Do not use for ordinary requests that do not ask for this.
 argument-hint: "<request>"
 ---
 
@@ -8,13 +8,13 @@ argument-hint: "<request>"
 
 Raise the depth of a request before doing it: ask how a top expert in the field would approach it, rewrite the request accordingly, show the rewrite, then execute it.
 
-Source: the "Depth" exercise in Felix Rieseberg, "How to be more ambitious: A tutorial for humans with models" (2026-10-13).
+Source: the "Depth" exercise in Felix Rieseberg, ["How to be more ambitious: A tutorial for humans with models"](https://felixrieseberg.com/how-to-be-more-ambitious-a-tutorial-for-humans-with-models/) (2026-10-13).
 
 ## Input
 
 Request: $ARGUMENTS
 
-If the request above is empty, use the user's most recent request in this conversation. If there is none, ask for it and stop.
+If the line above is empty or still shows a literal placeholder, the request is the user's message that invoked this skill (minus the template itself) or, if that holds no task, their most recent request in this conversation. If there is none, ask for it and stop.
 
 ## Use Cases
 - Research, analysis, debugging, or implementation where the literal ask is shallower than the outcome the user needs
@@ -22,7 +22,7 @@ If the request above is empty, use the user's most recent request in this conver
 
 ## Non-Goals
 - Trivial edits (typos, one-line fixes): just do them
-- Adding unrelated work (FM-CODE-CREEP): everything added must serve the user's stated outcome
+- Adding unrelated work: everything added must serve the user's stated outcome
 - Dropping the user's explicit constraints (scope, tools, files, deadlines)
 
 ## Process
@@ -33,9 +33,9 @@ State the field and the expert in one line (e.g. "an SRE running a postmortem", 
 ### 2. Answer four questions
 Answer each concretely for this request, in a few bullets:
 1. **Beyond the ask**: What would that expert do beyond what was literally asked?
-2. **Rawest source**: What is the most primary data or source they would go to? (raw logs, source code, the spec or RFC, the original dataset or paper; not secondary summaries)
+2. **Rawest source**: What is the most primary data or source they would go to? (raw logs, source code, the spec or RFC, the original dataset or paper; not secondary summaries) Name it as concretely as you can (path, URL, dataset). Nothing has been read yet, so mark any name you have not confirmed as a guess, and confirm or correct it during execution.
 3. **Methods and tools**: Which specific methods and tools would they use?
-4. **External evidence**: What evidence outside the model shows the result is correct? Model self-assessment does not count. Prefer checks the model can run itself (tests, scripts, queries, builds, re-deriving from the primary source). If no such check exists, name the check a human must run.
+4. **External evidence**: What evidence outside the model shows the result is correct? Model self-assessment does not count. Prefer checks the model can run itself (tests, scripts, queries, builds, re-deriving from the primary source). Fix the pass condition now, before seeing any result. If no such check exists, name the check a human must run.
 
 ### 3. Rewrite the request
 Write a self-contained request that folds in the four answers:
@@ -64,4 +64,4 @@ Carry out the rewritten request in the same turn.
 Stop and ask first only if the rewrite adds actions that are irreversible, outward-facing, or clearly larger in scope than the original; name the added part in one line.
 
 ### 6. Verify and report
-Run the verification from question 4 (FM-PLAUSIBLE, FM-SKIP-CHECK). In the final report, list the evidence obtained and anything left unverified.
+Run the verification from question 4. A plausible result is not a verified one, and an available check is never skipped. In the final report, list the evidence obtained and anything left unverified.
