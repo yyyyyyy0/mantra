@@ -59,11 +59,11 @@
 |---|---|---|
 | FM-READ / FM-PLAUSIBLE / FM-SKIP-CHECK / FM-TEST-PASS | M | FM-PLAUSIBLE にまとめた |
 | FM-SUMMARY | M | delegation.md「A subagent's report is a claim」 |
-| FM-RETRY | N | Claude Code のシステムプロンプトにある |
+| FM-RETRY | M | FM-GIT-NOVERIFY の末尾に入れた。サブエージェントには標準のシステムプロンプトのこの指示が入らないため |
 | FM-VAGUE | A | planner の出力ルール（具体的な質問だけをする） |
 | FM-VERSION | K | 文言を変えずに残した |
 | FM-TEST-FIX | K | — |
-| FM-SEC-INTERNAL | C | 現行の指針は「境界でだけ検証し、内部は信頼する」 |
+| FM-SEC-INTERNAL | A | security-reviewer の「信頼できない機械入力」の項目（hook の stdin、transcript、他のエージェントの出力など）。常時読み込みには入れない |
 | FM-SEC-SILENCE | A | security-reviewer |
 | FM-GIT-AMEND | M | FM-GIT-NOVERIFY の末尾に入れた。標準の git 安全手順とも重なる |
 | FM-GIT-NOVERIFY | K + H | `hooks/guard.sh` が `--no-verify` を遮断する |
@@ -78,7 +78,7 @@
 |---|---|---|
 | コミット形式と type 一覧 | K | — |
 | Attribution を無効にしていること | N | settings.json の `attribution` で設定済み |
-| PR の手順（全履歴を確認、diff を見る、push -u） | N / I | Claude Code 標準の PR 手順と重なる。テスト計画だけ K |
+| PR の手順（全履歴を確認、diff を見る、push -u） | N / I | Claude Code 標準の PR 手順と重なる。verify、レビュー、テスト計画は K |
 | 機能開発の流れ（計画 → TDD → レビュー → コミット） | K / U | 計画とレビューは K。tdd-guide は起動 0 回 |
 | TDD と 80% カバレッジ | M | 「Follow the repo's coverage gate」に弱めた。**全リポジトリ共通で 80% を義務にしたいなら戻す候補** |
 
@@ -100,7 +100,7 @@
 | flash / plan / review-mob、navigator、scribe、要約の書式 | R | 使用 0 回。必要になったら `git show pre-redesign:rules/mob-programming.md` で戻せる |
 | 高リスクのときは反論役を入れる | K | FM-AGENT-CRITIC、delegation.md |
 | 起動する前に、何を決めるのかを定める | K | delegation.md |
-| 人の判断ゲート | K | 「Merge only with the user's approval」と、計画の承認 |
+| 人の判断ゲート | K | delegation.md の「計画を見せて OK を待つ」と、git-workflow.md の「Merge only with the user's approval」 |
 
 ## patterns.md（削除）
 
@@ -145,5 +145,5 @@
 | マルチエージェント間の状態の引き継ぎ | K | delegation.md「Pass forward…」 |
 | ファイル削除は trash で | K + H | git-workflow.md と guard.sh |
 | メモリ「頼まなくても自動で使う」 | K | delegation.md「Do without being asked」 |
-| メモリ「Teams を TeamCreate で自動起動する」 | 変更 | TeamCreate は存在しない。並列実装はまず worktree のサブエージェントで行い、Teams は書き手同士が協調し続ける必要があるときに限る。**ユーザーの確認が必要** |
+| メモリ「Teams を TeamCreate で自動起動する」 | 変更 | 並列実装の自動起動は、delegation.md の「実装は sonnet のサブエージェントへ」の行と、worktree の行に置き換えた。TeamCreate は 2.1.287 のツール一覧にないことを確認済み。Teams を使うのは、書き手同士が協調し続ける必要があるときに限る。**ユーザーの確認が必要** |
 | メモリ「コード生成は Codex」 | R | sonnet のサブエージェント |

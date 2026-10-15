@@ -16,7 +16,7 @@ Don't refactor, rename, or add features beyond what was asked. Note "while I'm h
 
 ### FM-GIT-NOVERIFY: Don't bypass hooks or permission guards
 
-No `--no-verify`, `HUSKY=0`, or similar. When a hook fails, fix the cause; when it blocks a commit, the commit did not happen, so make a new commit rather than amending.
+No `--no-verify`, `HUSKY=0`, or similar. When a hook fails, fix the cause; when it blocks a commit, the commit did not happen, so make a new commit rather than amending. If a hook or guard denies a command, don't retry it or route around it; ask the user (a subagent reports back instead).
 
 ### FM-VERSION: 「最新」≠「指定バージョン」
 
