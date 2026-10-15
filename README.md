@@ -202,6 +202,7 @@ mantra/
 │   ├── validate-agents.ts    # Agent validation
 │   ├── validate-rules.ts     # Rule validation
 │   └── validate-drift.ts     # Family drift guard validation
+├── skills/          # Claude Code skills (<name>/SKILL.md)
 └── package.json
 ```
 
@@ -245,6 +246,16 @@ Rules under `rules/` are symlinked to `~/.claude/rules/` and applied automatical
 | `performance.md` | Model selection, context management, Ultrathink |
 | `security.md` | Security checklist and secret management |
 | `testing.md` | Test coverage requirements and TDD workflow |
+
+---
+
+## Skill list
+
+Skills under `skills/` use the Claude Code skill format (`skills/<name>/SKILL.md`). `npm run setup` does not link them; link each skill you want into `~/.claude/skills/`.
+
+| Skill | Purpose |
+|---|---|
+| `deepen-request` | Rewrite a request the way a top expert in its field would approach it, show the rewrite, then execute it (`/deepen-request <request>`) |
 
 ---
 

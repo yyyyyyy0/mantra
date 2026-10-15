@@ -200,6 +200,7 @@ mantra/
 │   ├── validate-agents.ts    # agents 検証
 │   ├── validate-rules.ts     # rules 検証
 │   └── validate-drift.ts     # family drift guard 検証
+├── skills/          # Claude Code スキル定義（<name>/SKILL.md）
 └── package.json
 ```
 
@@ -243,6 +244,16 @@ mantra は specialist agents を同梱しています。primary workflow は `au
 | `performance.md` | モデル選択・コンテキスト管理・Ultrathink |
 | `security.md` | セキュリティチェックリスト・シークレット管理 |
 | `testing.md` | テストカバレッジ要件・TDD ワークフロー |
+
+---
+
+## スキル一覧
+
+`skills/` 配下のスキルは Claude Code のスキル形式（`skills/<name>/SKILL.md`）で置く。`npm run setup` はリンクしないので、使うスキルを個別に `~/.claude/skills/` へリンクする。
+
+| スキル | 用途 |
+|---|---|
+| `deepen-request` | 依頼文を「その分野のトップ専門家ならどう取り組むか」で書き直して提示し、そのまま実行する（`/deepen-request <依頼文>`） |
 
 ---
 
