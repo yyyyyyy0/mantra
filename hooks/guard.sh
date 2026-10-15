@@ -3,8 +3,8 @@
 #
 # Reads the hook JSON on stdin and takes .tool_input.command. Backslash-newline
 # continuations are joined and the command is lowercased. Quoted strings that
-# are only data for jq, echo, printf, grep, egrep, fgrep or a `for` list are
-# blanked (see AWK_MASK and the first limit below). It is then split into
+# are only data for jq, echo, printf, grep, egrep or fgrep are blanked (see
+# AWK_MASK and the first limit below). It is then split into
 # segments twice, and the segments of both splits are checked: once on
 # & && | || ; and newlines everywhere, and once with a quote-aware awk scanner
 # that splits only outside quotes (so `git commit -m "a; b" --no-verify` is one
@@ -24,27 +24,29 @@
 #   - Quoted text that contains a separator (for example "a; rm -rf x") is also
 #     split by the plain pass, so it can cause a false positive. That is the
 #     intended direction of error. The exception is a closed string that is
-#     only an argument of jq, echo, printf, grep, egrep, fgrep or a `for` list
-#     (double quotes: no $ or backtick in it): it is blanked first, so
-#     `jq --arg c 'a && git config core.hooksPath x'` passes. Blanking is
-#     skipped for the whole command when a quote is still open at the end of
-#     a line, when a line is over 20000 bytes, when a string is piped into
-#     anything but a filter or `bash <plain file>` (`| bash`, `| sh -s`,
-#     `| bash /dev/stdin`, `| env bash`, `| xargs`, `| python3`), when `<(`
-#     or `>(` appears, when the command runs strings as code (`eval`,
-#     `source`, `sh -c`, `bash -e -c`), and when a blanked `for` list is
-#     followed by a command other than echo/printf/jq/grep/filters (`ssh`,
-#     `su -c`, `bash <<<`, `$cmd`). A `$(` or backtick stops the blanking
-#     for what follows it, so a string inside a capture such as
+#     only an argument of jq, echo, printf, grep, egrep or fgrep (double
+#     quotes: no $ or backtick in it): it is blanked first, so
+#     `jq --arg c 'a && git config core.hooksPath x'` passes. A `for` list is
+#     never blanked: its body consumes the items, and no check of the body
+#     was found that holds. Blanking is skipped for the whole command when a
+#     quote is still open at the end of a line, when a line is over 20000
+#     bytes, when a backslash-newline was joined, when a string is piped
+#     into anything but a filter or `bash <plain file>` (`| bash`, `| sh -s`,
+#     `| bash /dev/stdin`, `| env bash`, `| { ...; bash; }`, `| xargs`),
+#     when `<(` or `>(` appears, and when the command runs strings as code
+#     (`eval`, `source`, `sh -c`, `bash -e -c`). A `$(` or backtick stops
+#     the blanking for what follows it, so a string inside a capture such as
 #     `r=$(jq --arg c 'a; b' ...)` is still split and can cause a false
-#     positive. What a data command's string is used for later is not
+#     positive. If the blanking pass itself fails, the unblanked text is
+#     checked. What a data command's string is used for later is not
 #     followed: writing it to a file and running the file passes (`echo
 #     'a; rm -rf x' > f; sh f`), as the same text without a separator
 #     always did.
 #   - `git config core.hooksPath` is read-only and allowed, with `git config
 #     --get core.hooksPath` and the exact value `githooks` (a trailing `)` of a
 #     subshell is ignored for these). Any other value, flag or global option
-#     (`-C`, `-c`) is denied, including reads such as `--get-all`.
+#     (`-C`, `-c`) is denied, including reads such as `--get-all`. The
+#     value-less read is denied behind `xargs`, which appends the value.
 #   - A destructive command nested mid-segment is not detected:
 #     `echo $(rm -rf x)`, `find -exec rm -rf`, `xargs -a list rm -rf`.
 #   - Indirection is not followed: aliases, shell functions, variables
@@ -218,21 +220,19 @@ END {
 
 # awk program that blanks quoted data before splitting (must not contain a
 # single quote). A closed quoted string that is an argument of a command which
-# only reads it (jq, echo, printf, grep, egrep, fgrep, for) is emptied: 'a; b'
+# only reads it (jq, echo, printf, grep, egrep, fgrep) is emptied: 'a; b'
 # becomes ''. Double-quoted text is blanked only when it has no $ or backtick,
-# since those expand. Nothing else is touched: executors (bash -c, xargs, eval)
-# and command names that are not plain words keep their strings. After a $( or
-# a backtick (inside double quotes or not) nothing more is blanked: the quotes
-# nested in it cannot be paired by this scanner. It is all or nothing: if a
-# quote is still open at the end of a line (a comment or heredoc prose with an
-# apostrophe, a string that spans lines), a line is very long, a <( or >(
-# appears, a string is piped into anything but a filter (wc, sort, jq, ...) or
-# a shell that is given a plain script file, or a blanked for list is followed
-# by anything but printing or filtering commands (the loop could run the
-# items), the input is printed unchanged. So a quote the scanner misreads
+# since those expand. Nothing else is touched: executors (bash -c, xargs, eval),
+# loops (a for list is consumed by its body) and command names that are not
+# plain words keep their strings. After a $( or a backtick (inside double quotes
+# or not) nothing more is blanked: the quotes nested in it cannot be paired by
+# this scanner. It is all or nothing: if a quote is still open at the end of a
+# line (a comment or heredoc prose with an apostrophe, a string that spans
+# lines), a line is very long, a <( or >( appears, or a string is piped into
+# anything but a filter (wc, sort, jq, ...) or a shell that is given a plain
+# script file, the input is printed unchanged. So a quote the scanner misreads
 # cannot hide a command that bash would run, and a string that reaches a shell
-# stays visible. Lines with no quote, pipe, parenthesis or backtick are copied
-# (their segments are still classified for the for-list check).
+# stays visible. Lines with no quote, pipe, parenthesis or backtick are copied.
 # shellcheck disable=SC2016  # awk variables such as $0 must not expand in the shell
 AWK_MASK='
 function first_word(s) {
@@ -253,42 +253,38 @@ function seg_add(t) {
 function close_region(   inert) {
   inq = 0
   inert = 0
+  if (fw_done == 0) { fw = first_word(seg); fw_done = 1 }
   if (rq == dq && (index(rbuf, "$(") > 0 || index(rbuf, "`") > 0)) nomask = 1
-  if (nomask == 0) {
-    if (fw_done == 0) { fw = first_word(seg); fw_done = 1 }
-    if (fw ~ "^(jq|echo|printf|grep|egrep|fgrep|for)$") {
-      if (rq == sq) inert = 1
-      else if (index(rbuf, "$") == 0 && index(rbuf, "`") == 0) inert = 1
-      if (fw == "printf" && seg ~ "[ \t]-v") inert = 0
-    }
+  if (nomask == 0 && fw ~ "^(jq|echo|printf|grep|egrep|fgrep)$") {
+    if (rq == sq) inert = 1
+    else if (index(rbuf, "$") == 0 && index(rbuf, "`") == 0) inert = 1
+    if (fw == "printf" && seg ~ "[ \t]-v") inert = 0
   }
-  if (inert) {
-    out = out rq rq
-    if (fw == "for") used_for = 1
-  } else out = out rbuf
+  if (inert) out = out rq rq
+  else out = out rbuf
   rbuf = ""
 }
-# Called when a command segment ends. A segment that follows a single pipe
-# gets the string(s) before the pipe on its stdin: only a filter, or a shell
-# that is given a plain script file, is known not to run that text; anything
-# else switches the blanking off. Every segment is also checked against the
-# commands a for loop body may use: when a for list was blanked, the body must
-# only print, filter or pipe the items, never run them.
+# Called when a command segment ends. A segment that follows a single pipe gets
+# the string(s) before the pipe on its stdin: only a filter, or a shell that is
+# given a plain script file, is known not to run that text. Anything else, or a
+# command word that is not plain text (a quote, a substitution, a group), turns
+# the blanking off.
 function end_segment(   w, shfile) {
+  if (await_t == 0) return
   if (seg ~ "^[ \t]*$") {
-    if (fw_done != 0) { nonwl = 1; if (await_t) bad = 1 }
+    if (fw_done != 0) bad = 1
     return
   }
+  if (seg ~ "^[ \t]*[({!]" || (fw_done != 0 && seg !~ "[ \t]$")) bad = 1
   w = first_word(seg " ")
-  if (w == "" && seg ~ "^[ \t({!]*((if|then|else|elif|do|while|until)[ \t]*)*$") return
-  shfile = (seg ~ "^[ \t({!]*(sh|bash|zsh|dash|ksh)[ \t]+(~/|[.]/|/)?[a-z0-9_.][a-z0-9_./-]*([ \t]|$)" && seg !~ "^[ \t({!]*(sh|bash|zsh|dash|ksh)[ \t]+/(dev|proc)/")
-  if (await_t && w !~ FILTERS && !shfile) bad = 1
-  if (w !~ FILTERS && w !~ "^(jq|echo|printf|grep|egrep|fgrep|for|done|fi|true|false|:|test|\\[)$" && !(await_t && shfile)) nonwl = 1
+  shfile = (seg ~ SHFILE && seg !~ "(^|[ \t/])(dev|proc)/" && seg !~ "(^|[ \t/])[.][.]([ \t/]|$)" && seg !~ "/[.]/")
+  if (w !~ FILTERS && !shfile) bad = 1
   await_t = 0
 }
 BEGIN {
   dq = "\""
   FILTERS = "^(wc|sort|uniq|head|tail|tr|cut|grep|egrep|fgrep|rg|jq|cat|less|more|column|base64|shasum|sha1sum|sha256sum|md5sum|md5|xxd|od|hexdump|nl|rev|paste|pbcopy|diff|cmp)$"
+  SHFILE = "^[ \t]*(sh|bash|zsh|dash|ksh)[ \t]+(~/|[.]/|/)?[a-z0-9_.][a-z0-9_./-]*([ \t]|$)"
 }
 {
   raw[NR] = $0
@@ -297,11 +293,6 @@ BEGIN {
   if (length(line) > 20000) { bad = 1; next }
   if (await_t == 0 && !index(line, sq) && !index(line, dq) && !index(line, "|") && !index(line, "(") && !index(line, "`")) {
     res[++k] = line
-    np = split(line, parts, "[;&]")
-    for (p = 1; p <= np; p++) {
-      seg = parts[p]; fw_done = 0
-      end_segment()
-    }
     seg = ""; fw_done = 0
     next
   }
@@ -340,7 +331,7 @@ BEGIN {
       seg = ""; fw_done = 0
       if (substr(line, i + 1, 1) == "|") { out = out "|"; i++ }
       else await_t = 1
-    } else if (c == "&" && (substr(line, i - 1, 1) == ">" || substr(line, i - 1, 1) == "<" || substr(line, i + 1, 1) == ">")) {
+    } else if (c == "&" && (((substr(line, i - 1, 1) == ">" || substr(line, i - 1, 1) == "<") && substr(line, i - 2, 1) != "\\") || substr(line, i + 1, 1) == ">")) {
       out = out c
       seg_add(c)
     } else if (c == "&" || c == ";") {
@@ -359,7 +350,6 @@ BEGIN {
   seg = ""; fw_done = 0
 }
 END {
-  if (used_for && nonwl) bad = 1
   if (bad) for (j = 1; j <= NR; j++) print raw[j]
   else for (j = 1; j <= k; j++) print res[j]
 }
@@ -430,10 +420,12 @@ while IFS= read -r seg || [ -n "$seg" ]; do
     i=$((i + 1))
   done
 done < <(
+  # No apostrophes in comments inside this block: bash 3.2 reads them as quotes
+  # and fails to parse the whole script (tests/guard.test.sh checks this).
   lower=$(printf '%s\n' "$cmd" | tr '[:upper:]' '[:lower:]')
   # A string that is run as code is not data, and lines that were joined by a
-  # backslash may have moved a command into a data command's arguments: blank
-  # nothing in those cases. An empty result of the awk falls back to the
+  # backslash may have moved a command into the arguments of a data command:
+  # blank nothing in those cases. An empty result of the awk falls back to the
   # unblanked text.
   if [ "$joined" != 1 ] && ! [[ $lower =~ $RE_RUNS_STRING ]]; then
     masked=$(printf '%s\n' "$lower" | awk -v sq="'" "$AWK_MASK") || masked=''

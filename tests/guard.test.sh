@@ -198,8 +198,16 @@ assert_deny "for c in 'cd x; rm -rf y'; do env bash -e -c \"\$c\"; done"
 assert_deny "for c in 'cd x; rm -rf y'; do /bin/bash -x -c \"\$c\"; done"
 assert_deny "for c in 'cd x; rm -rf y'; do timeout 5 bash -e -c \"\$c\"; done"
 assert_deny "for c in 'cd x; rm -rf y'; do (bash -e -c \"\$c\"); done"
-# A for list may only be printed, filtered or piped into a script file; any
-# other command in the loop could run the items.
+# A for list is never blanked, whatever its body does: the body consumes the
+# items, and the commands that could run them (ssh, su -c, a quoted or
+# substituted command word, a capture, a group after a pipe) cannot all be
+# told apart from printing them. Run test inputs one by one, or from a file.
+assert_deny "for c in 'cd x; rm -rf y'; do echo \"\$c\"; done"
+assert_deny "for c in 'cd x; rm -rf y'; do jq -cn --arg c \"\$c\" '{tool_input:{command:\$c}}' | bash hooks/guard.sh; done"
+assert_deny "for c in 'cd x; rm -rf y'; do 'ssh' host \"\$c\"; done"
+assert_deny "for c in 'cd x; rm -rf y'; do \"\$SHELL\" -c \"\$c\"; done"
+assert_deny "for c in 'cd x; rm -rf y'; do echo \$(ssh host \"\$c\"); done"
+assert_deny "for c in 'cd x; rm -rf y'; do echo \"\$(echo \"\$c\" | bash)\"; done"
 assert_deny "for c in 'cd x; rm -rf y'; do ssh host \"\$c\"; done"
 assert_deny "for c in 'cd x; rm -rf y'; do su -c \"\$c\"; done"
 assert_deny "for c in 'cd x; rm -rf y'; do docker exec ctr bash -e -c \"\$c\"; done"
@@ -222,6 +230,26 @@ assert_deny "echo 'a; rm -rf x' | cat > >(sh)"
 assert_deny "bash <(true; echo 'a; rm -rf x')"
 assert_deny ". <(true; echo 'a; rm -rf x')"
 assert_deny "exec > >(sh); echo 'a; rm -rf x'"
+# Only the first command after a pipe used to be looked at; a group or a
+# negation can hold the shell, and a quoted command word is not plain text.
+assert_deny "echo 'cd x; rm -rf y' | { cat /dev/null; bash; }"
+assert_deny "echo 'cd x; rm -rf y' | ( cat /dev/null; bash )"
+assert_deny "echo 'cd x; rm -rf y' | ( \"\$SHELL\" )"
+assert_deny "echo 'cd x; rm -rf y' | ! \"\$SHELL\""
+assert_deny "echo 'cd x; rm -rf y' | \"\$SHELL\""
+# A path that reaches stdin through dots or a leading component.
+assert_deny "echo 'a; rm -rf x' | bash /./dev/stdin"
+assert_deny "echo 'a; rm -rf x' | bash /usr/../dev/stdin"
+assert_deny "echo 'a; rm -rf x' | bash ../../../../dev/stdin"
+assert_deny "echo 'a; rm -rf x' | bash ~/../../dev/stdin"
+assert_deny "echo 'a; rm -rf x' | bash /tmp/../proc/self/fd/0"
+# An escaped > before & is not a redirection.
+assert_deny "echo \\>& ssh host 'cd x; rm -rf y'"
+# printf -v keeps the string for later; so does anything the eval/-c check sees.
+assert_deny "printf -v c '%s' 'cd x; rm -rf y'; ssh host \"\$c\""
+assert_deny "echo 'cd x; rm -rf y' > f; bash -c \"\$(cat f)\""
+assert_deny "echo 'cd x; rm -rf y' > f; bash -e -c \"\$(cat f)\""
+assert_deny "echo 'cd x; rm -rf y' > f; eval \"\$(cat f)\""
 # `>&` and `&>` are redirections, not separators: bash is still the command.
 assert_deny "bash >&echo -c 'a; rm -rf x'"
 assert_deny "bash 2>&echo -c 'a; rm -rf x'"
@@ -335,9 +363,6 @@ assert_allow '(git config core.hooksPath)'
 assert_allow "jq -cn --arg c 'git config core.hooksPath githooks' '{tool_input:{command:\$c}}'"
 assert_allow "jq -cn --arg c 'cd x && git config core.hooksPath githooks' '{tool_input:{command:\$c}}'"
 assert_allow "jq -cn --arg c 'git commit -m x; git config core.hooksPath /dev/null' '{tool_input:{command:\$c}}' | bash hooks/guard.sh"
-assert_allow "for c in 'git config core.hooksPath githooks' 'cd x && git config core.hooksPath githooks' '( cd x && git config core.hooksPath githooks )'; do echo \"\$c\"; done"
-# A for list of test inputs, each run through jq and the guard itself.
-assert_allow "for c in 'git config core.hooksPath githooks' 'cd ~/src/mantra && git config core.hooksPath githooks' '( cd x && git config core.hooksPath githooks )' 'git config --get core.hooksPath' 'git config --get core.hooksPath )'; do printf '%-58s %s\\n' \"\$c\" \"\$(jq -cn --arg c \"\$c\" '{tool_input:{command:\$c}}' | bash ~/.mantra/live/hooks/guard.sh | jq -r '.hookSpecificOutput.permissionDecision // \"allow\"')\"; done"
 assert_allow "echo '{\"tool_input\":{\"command\":\"cd x && git reset --hard\"}}' | bash hooks/guard.sh"
 assert_allow "echo 'a; git reset --hard' | sha256sum"
 assert_allow "echo 'a; git reset --hard' | jq -R ."
@@ -345,8 +370,6 @@ assert_allow "echo 'a; git reset --hard' | wc -c | tr -d ' '"
 assert_allow "(echo 'a; git reset --hard' | wc -c)"
 assert_allow "echo 'a; rm -rf y' | bash ./run.sh"
 assert_allow "echo 'a; rm -rf y' | bash ~/.mantra/live/hooks/guard.sh"
-assert_allow $'for c in \'a; rm -rf y\' \'b && git reset --hard\'\ndo\n  echo "$c" | bash hooks/guard.sh\ndone'
-assert_allow "for c in 'a; rm -rf y' 'b'; do jq -cn --arg c \"\$c\" '{tool_input:{command:\$c}}' | bash hooks/guard.sh; done"
 assert_allow "echo 'a; rm -rf y' |& cat"
 assert_allow "echo 'a; rm -rf y' || echo none"
 assert_allow "echo 'a; git reset --hard' \"\$(date)\""
@@ -398,6 +421,18 @@ else
 fi
 rm -f -- "$shim/awk"
 rmdir -- "$shim"
+
+# bash 3.2 (the macOS /bin/bash) reads an apostrophe in a comment inside
+# `< <( ... )` as a quote and cannot parse the guard at all, which turns every
+# rule off. Keep such comments free of apostrophes.
+bad_comments=$(sed -n '/^done < <(/,/^)$/p' "$GUARD" | grep -n "^[[:space:]]*#.*'" || true)
+if [ -z "$bad_comments" ]; then
+  pass=$((pass + 1))
+  echo "ok   no apostrophe in a comment inside the process substitution"
+else
+  fail=$((fail + 1))
+  echo "FAIL apostrophe in a comment inside the process substitution: $bad_comments"
+fi
 
 # Fail-open on unparseable input, and on JSON without a command.
 for raw in 'this is not json' '{"tool_input":' '{"tool_name":"Bash","tool_input":{}}' ''; do
