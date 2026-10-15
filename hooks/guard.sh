@@ -2,17 +2,20 @@
 # PreToolUse guard for the Bash tool.
 #
 # Reads the hook JSON on stdin, takes .tool_input.command, splits it into
-# segments on && || ; | & ( ) ` and newlines, and checks every segment
-# (case-insensitive, after stripping leading env assignments and wrappers such
-# as `command`, `time`, `xargs`, `eval`, `bash -c`) against a deny list of
-# destructive commands. On a match it prints one permissionDecision=deny JSON
-# object and exits 0. Otherwise it prints nothing and exits 0.
+# segments on && || ; | & and newlines, and checks every segment
+# (case-insensitive, after stripping leading grouping characters, env
+# assignments and wrappers such as `command`, `time`, `xargs`, `eval`,
+# `bash -c`) against a deny list of destructive commands. On a match it prints
+# one permissionDecision=deny JSON object and exits 0. Otherwise it prints
+# nothing and exits 0.
 #
 # FAIL-OPEN: if jq is not installed, or stdin is not parseable JSON, or there
 # is no .tool_input.command, the hook exits 0 silently and the command runs.
-# This is a seatbelt against accidents, not a sandbox: quoted text that
+# This is a seatbelt against accidents, not a sandbox. Quoted text that
 # contains a separator (for example "a; rm -rf x") is split too and can cause
-# a false positive, which is the intended direction of error.
+# a false positive, which is the intended direction of error; a destructive
+# command nested mid-segment (`echo $(rm -rf x)`, `find -exec rm -rf`) is not
+# detected.
 #
 # Registration is manual (settings.json -> hooks.PreToolUse, matcher "Bash",
 # command: ~/.mantra/live/hooks/guard.sh). This script registers nothing.
@@ -49,7 +52,7 @@ add_rule 'fdisk' "^fdisk${END}"
 add_rule 'sudo' "^sudo${END}"
 add_rule 'passwd/userdel/iptables' "^(passwd|userdel|iptables)${END}"
 
-RE_LEAD='^[[:space:]{!"$'"'"']+'
+RE_LEAD='^[[:space:]({!"$`'"'"']+'
 RE_ENV='^[a-z_][a-z0-9_]*=[^[:space:]]*[[:space:]]+'
 RE_WRAP='^(command|builtin|exec|time|nohup|env|nice|xargs|eval|(ba|z|da)?sh[[:space:]]+-[a-z]*c)[[:space:]]+'
 
@@ -91,7 +94,7 @@ while IFS= read -r raw || [ -n "$raw" ]; do
     fi
     i=$((i + 1))
   done
-done < <(printf '%s\n' "$cmd" | tr '&|;()`' '\n\n\n\n\n\n')
+done < <(printf '%s\n' "$cmd" | tr '&|;' '\n\n\n')
 
 [ -n "$matched" ] || exit 0
 

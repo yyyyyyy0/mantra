@@ -57,7 +57,8 @@ assert_deny 'git push --no-verify origin x'
 assert_deny 'git clean -fd'
 assert_deny 'git -C /tmp/repo reset --hard'
 assert_deny 'ls | xargs rm -rf'
-assert_deny 'echo $(rm -rf x)'
+assert_deny '(rm -rf x)'
+assert_deny 'cd build && (rm -rf out)'
 assert_deny 'psql -c "DROP TABLE users;"'
 assert_deny 'fly deploy'
 assert_deny 'dd if=/dev/zero of=/dev/null'
@@ -71,6 +72,7 @@ assert_allow 'echo hello'
 assert_allow 'git commit -m "docs: mention git reset --hard in the guard list"'
 assert_allow 'git push --follow-tags origin main'
 assert_allow 'git clean -n'
+assert_allow 'git commit -m "feat: block rm -rf (via the guard)"'
 
 # Fail-open on unparseable input, and on JSON without a command.
 for raw in 'this is not json' '{"tool_input":' '{"tool_name":"Bash","tool_input":{}}' ''; do
