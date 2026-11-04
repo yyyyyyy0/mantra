@@ -126,6 +126,9 @@ fresh_vendor() {
 
 home_before=$(snapshot "$HOME")
 
+# README, the design doc and install.sh's warning all run it directly.
+check "scripts/pstack.sh is executable" test -x "$ROOT/scripts/pstack.sh"
+
 # --- --dry-run on an empty vendor changes nothing --------------------------------
 fresh_vendor
 write_pin "$SHA_A" 1.2.3
