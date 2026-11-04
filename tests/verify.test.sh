@@ -37,7 +37,9 @@ mk_fixture() { # prints the fixture dir
   d=$(mktemp -d "$TMP/fx.XXXXXX")
   mkdir -p "$d/scripts" "$d/tests"
   cp "$ROOT/scripts/verify.sh" "$d/scripts/"
-  cp -R "$ROOT/rules" "$ROOT/agents" "$d/"
+  cp -R "$ROOT/rules" "$ROOT/agents" "$ROOT/skills" "$d/"
+  mkdir -p "$d/pstack"
+  cp "$ROOT/pstack/PIN" "$d/pstack/PIN"
   printf '#!/usr/bin/env bash\necho "ok.test.sh: 1 passed, 0 failed"\n' >"$d/tests/ok.test.sh"
   printf '%s' "$d"
 }
@@ -48,7 +50,7 @@ run_verify() { # run_verify <dir> [VAR=value ...]
   local d=$1
   shift
   set +e
-  VOUT=$(cd "$d" && env -u CI -u MANTRA_VERIFY_NESTED -u MANTRA_VERIFY_TOKEN -u MANTRA_VERIFY_TOKEN_FILE "$@" bash scripts/verify.sh 2>&1)
+  VOUT=$(cd "$d" && env -u CI -u MANTRA_VERIFY_NESTED -u MANTRA_VERIFY_TOKEN -u MANTRA_VERIFY_TOKEN_FILE -u MANTRA_VENDOR HOME="$TMP/home" "$@" bash scripts/verify.sh 2>&1)
   VRC=$?
   set -e
 }
@@ -164,6 +166,292 @@ for badline in 'hooks : {}' '"hooks": {}' $'hooks\t: {}' 'hooks:{}' '# a comment
   run_verify "$d"
   expect_fail "frontmatter line '${badline}'" "malformed frontmatter line"
 done
+
+# --- g. skills ---------------------------------------------------------------------
+d=$(mk_fixture)
+run_verify "$d"
+check "pristine fixture reports the skills" contains "$VOUT" "g. skills/nil-mode/SKILL.md frontmatter"
+
+d=$(mk_fixture)
+sed -i.bak 's/^name: nil-mode$/name: other/' "$d/skills/nil-mode/SKILL.md"
+rm -f -- "$d/skills/nil-mode/SKILL.md.bak"
+run_verify "$d"
+expect_fail "skill name differs from its directory" "g. skills/nil-mode/SKILL.md: name must equal 'nil-mode'"
+
+d=$(mk_fixture)
+sed -i.bak '/^name: nil-mode$/d' "$d/skills/nil-mode/SKILL.md"
+rm -f -- "$d/skills/nil-mode/SKILL.md.bak"
+run_verify "$d"
+expect_fail "skill without a name" "name must equal 'nil-mode' (got '<missing>')"
+
+d=$(mk_fixture)
+sed -i.bak 's/^description: .*$/description:/' "$d/skills/nil-mode/SKILL.md"
+rm -f -- "$d/skills/nil-mode/SKILL.md.bak"
+run_verify "$d"
+expect_fail "skill with an empty description" "g. skills/nil-mode/SKILL.md: description is missing or empty"
+
+d=$(mk_fixture)
+sed -i.bak '/^description: /d' "$d/skills/nil-mode/SKILL.md"
+rm -f -- "$d/skills/nil-mode/SKILL.md.bak"
+run_verify "$d"
+expect_fail "skill without a description" "description is missing or empty"
+
+d=$(mk_fixture)
+sed -i.bak 's/^description: .*$/description: >\n  A folded description\n  on two lines./' "$d/skills/nil-mode/SKILL.md"
+rm -f -- "$d/skills/nil-mode/SKILL.md.bak"
+run_verify "$d"
+check "a folded (>) description with a body passes" test "$VRC" -eq 0
+
+d=$(mk_fixture)
+sed -i.bak 's/^description: .*$/description: >/' "$d/skills/nil-mode/SKILL.md"
+rm -f -- "$d/skills/nil-mode/SKILL.md.bak"
+run_verify "$d"
+expect_fail "a folded (>) description without a body" "description is missing or empty"
+
+d=$(mk_fixture)
+printf 'no frontmatter here\n' >"$d/skills/nil-mode/SKILL.md"
+run_verify "$d"
+expect_fail "skill without frontmatter" "g. skills/nil-mode/SKILL.md: missing or unterminated YAML frontmatter"
+
+d=$(mk_fixture)
+trash_target="$d/skills/nil-mode/SKILL.md"
+mv "$trash_target" "$trash_target.moved"
+run_verify "$d"
+expect_fail "skill directory without SKILL.md" "g. skills/nil-mode has no SKILL.md"
+
+d=$(mk_fixture)
+mv "$d/skills" "$d/skills.moved"
+run_verify "$d"
+expect_fail "no skills/ directory" "g. skills/ directory is missing"
+
+d=$(mk_fixture)
+mv "$d/skills" "$d/skills.moved"
+mkdir "$d/skills"
+run_verify "$d"
+expect_fail "an empty skills/ directory" "g. no skills/*/ directory found"
+
+# symlinks under skills/ and pstack/ are refused (positive control: none -> passes)
+d=$(mk_fixture)
+run_verify "$d"
+check "pristine fixture: no symlink complaint" test -z "$(printf '%s\n' "$VOUT" | grep 'symlink under' || true)"
+
+d=$(mk_fixture)
+ln -s /etc/hosts "$d/skills/nil-mode/leak.md"
+run_verify "$d"
+expect_fail "a file symlink inside a skill" "g. symlink under skills/: skills/nil-mode/leak.md"
+
+d=$(mk_fixture)
+mkdir -p "$d/outside"
+ln -s ../../outside "$d/skills/nil-mode/linked-dir"
+run_verify "$d"
+expect_fail "a directory symlink inside a skill" "g. symlink under skills/: skills/nil-mode/linked-dir"
+
+d=$(mk_fixture)
+ln -s nowhere "$d/skills/dangling"
+run_verify "$d"
+expect_fail "a dangling symlink directly under skills/" "g. symlink under skills/: skills/dangling"
+
+d=$(mk_fixture)
+mv "$d/skills/nil-mode" "$d/nil-mode.real"
+ln -s ../nil-mode.real "$d/skills/nil-mode"
+run_verify "$d"
+expect_fail "a whole skill directory that is a symlink" "g. symlink under skills/: skills/nil-mode"
+
+d=$(mk_fixture)
+mv "$d/skills" "$d/skills.real"
+ln -s skills.real "$d/skills"
+run_verify "$d"
+expect_fail "skills/ itself a symlink" "g. symlink under skills/: skills"
+
+d=$(mk_fixture)
+ln -s /etc/hosts "$d/pstack/PIN.link"
+run_verify "$d"
+expect_fail "a symlink inside pstack/" "h. symlink under pstack/: pstack/PIN.link"
+
+d=$(mk_fixture)
+mv "$d/pstack/PIN" "$d/PIN.real"
+ln -s ../PIN.real "$d/pstack/PIN"
+run_verify "$d"
+expect_fail "pstack/PIN itself a symlink" "h. symlink under pstack/: pstack/PIN"
+
+# --- h. pstack/PIN -----------------------------------------------------------------
+d=$(mk_fixture)
+run_verify "$d"
+check "pristine fixture reports the pin" contains "$VOUT" "h. pstack/PIN has repo, commit"
+
+d=$(mk_fixture)
+mv "$d/pstack/PIN" "$d/pstack/PIN.moved"
+run_verify "$d"
+expect_fail "no pstack/PIN" "h. pstack/PIN is missing"
+
+for k in repo commit path version; do
+  d=$(mk_fixture)
+  grep -v "^$k=" "$d/pstack/PIN" >"$d/pstack/PIN.tmp" || true
+  mv "$d/pstack/PIN.tmp" "$d/pstack/PIN"
+  run_verify "$d"
+  expect_fail "PIN without $k=" "h. pstack/PIN has no '$k=' line"
+done
+
+d=$(mk_fixture)
+sed -i.bak 's/^path=.*$/path=/' "$d/pstack/PIN"
+rm -f -- "$d/pstack/PIN.bak"
+run_verify "$d"
+expect_fail "PIN with an empty value" "h. pstack/PIN: 'path=' is empty"
+
+d=$(mk_fixture)
+echo "version=9.9.9" >>"$d/pstack/PIN"
+run_verify "$d"
+expect_fail "PIN with a repeated key" "h. pstack/PIN has 'version=' 2 times"
+
+for bad in "abc123" "FD268B808C786469E6DD8C8D9DB864D0DE4D669E" "fd268b808c786469e6dd8c8d9db864d0de4d669" "fd268b808c786469e6dd8c8d9db864d0de4d669e0" "fd268b808c786469e6dd8c8d9db864d0de4d669g" "main"; do
+  d=$(mk_fixture)
+  sed -i.bak "s/^commit=.*\$/commit=$bad/" "$d/pstack/PIN"
+  rm -f -- "$d/pstack/PIN.bak"
+  run_verify "$d"
+  expect_fail "PIN commit '$bad'" "h. pstack/PIN: commit is not a 40-digit hex SHA"
+done
+
+for bad in "1.2" "v1.2.3" "1.2.3.4" "1.2.x" "latest"; do
+  d=$(mk_fixture)
+  sed -i.bak "s/^version=.*\$/version=$bad/" "$d/pstack/PIN"
+  rm -f -- "$d/pstack/PIN.bak"
+  run_verify "$d"
+  expect_fail "PIN version '$bad'" "h. pstack/PIN: version is not x.y.z"
+done
+
+# --- i. rules/pstack-models.md -------------------------------------------------------
+M=rules/pstack-models.md
+d=$(mk_fixture)
+run_verify "$d"
+check "pristine fixture reports the model lines" contains "$VOUT" "i. rules/pstack-models.md:"
+check "no vendor dir: the vendor checks are skipped, not failed" contains "$VOUT" "SKIP  i. pstack vendor checks"
+
+d=$(mk_fixture)
+printf 'a role: inherit-parent\nb: auto\nc, d: opus max, haiku low\ne: fable xhigh, sonnet medium, auto\n  # an indented comment\n\n' >>"$d/$M"
+run_verify "$d"
+check "inherit-parent, auto, lists, commas in roles, blank and comment lines pass" test "$VRC" -eq 0
+
+for badline in \
+  'feature: gpt-5 high' \
+  'feature: sonnet' \
+  'feature: sonnet ultra' \
+  'feature: Sonnet high' \
+  'feature sonnet high' \
+  'feature: sonnet high,opus high' \
+  'feature: sonnet high ' \
+  'feature: sonnet  high' \
+  'feature: inherit' \
+  'feature: sonnet high, ' \
+  'feature:sonnet high' \
+  ': sonnet high' \
+  'feature: sonnet high: extra'; do
+  d=$(mk_fixture)
+  printf '%s\n' "$badline" >>"$d/$M"
+  run_verify "$d"
+  expect_fail "pstack-models line '$badline'" "i. rules/pstack-models.md:"
+done
+
+d=$(mk_fixture)
+mv "$d/$M" "$d/$M.moved"
+run_verify "$d"
+expect_fail "no rules/pstack-models.md" "i. rules/pstack-models.md is missing"
+
+d=$(mk_fixture)
+printf '# only a comment\n' >"$d/$M"
+run_verify "$d"
+expect_fail "pstack-models.md with no role lines" "has no role lines"
+
+# Optional checks against an installed pstack: a fake vendor dir.
+mk_vendor() { # prints a vendor dir whose pstack/current has what nil-mode names
+  local v cur p
+  v=$(mktemp -d "$TMP/vendor.XXXXXX")
+  cur="$v/pstack/current"
+  mkdir -p "$cur/skills/setup-pstack" "$cur/skills/poteto-mode" "$cur/docs/harness"
+  printf 'setup\n```\n' >"$cur/skills/setup-pstack/SKILL.md"
+  cat "$ROOT/rules/pstack-models.md" >>"$cur/skills/setup-pstack/SKILL.md"
+  printf '```\n' >>"$cur/skills/setup-pstack/SKILL.md"
+  : >"$cur/skills/poteto-mode/SKILL.md"
+  : >"$cur/docs/harness/claude-code.md"
+  # every <pstack>/... path nil-mode names (the same extraction verify.sh uses)
+  for p in $(grep -oE '<pstack>/[A-Za-z0-9_./-]+' "$ROOT/skills/nil-mode/SKILL.md" | sed -e 's/^<pstack>\///' -e 's/[.,]*$//' | sort -u); do
+    case "$p" in
+      *.md)
+        mkdir -p "$cur/$(dirname "$p")"
+        : >>"$cur/$p"
+        ;;
+      *) mkdir -p "$cur/$p" ;;
+    esac
+  done
+  for p in $(grep -oE 'principle-[a-z0-9]+(-[a-z0-9]+)*' "$ROOT/skills/nil-mode/SKILL.md" | sort -u); do
+    mkdir -p "$cur/skills/$p"
+    : >"$cur/skills/$p/SKILL.md"
+  done
+  printf '%s' "$v"
+}
+
+d=$(mk_fixture)
+v=$(mk_vendor)
+run_verify "$d" MANTRA_VENDOR="$v"
+check "vendor present and complete: exit 0" test "$VRC" -eq 0
+check "vendor present and complete: the checks ran" contains "$VOUT" "PASS  i. pstack at"
+check "vendor present: no SKIP line" test -z "$(printf '%s\n' "$VOUT" | grep 'SKIP  i.' || true)"
+
+v=$(mk_vendor)
+run_verify "$d" HOME="$TMP/vhome" MANTRA_VENDOR=''
+check "an empty MANTRA_VENDOR falls back to \$HOME/.mantra/vendor (absent: SKIP)" contains "$VOUT" "SKIP  i. pstack vendor checks"
+mkdir -p "$TMP/vhome/.mantra"
+mv "$v" "$TMP/vhome/.mantra/vendor"
+run_verify "$d" HOME="$TMP/vhome" MANTRA_VENDOR=''
+check "the default vendor dir under HOME is used when present" contains "$VOUT" "PASS  i. pstack at $TMP/vhome/.mantra/vendor/pstack/current"
+
+d=$(mk_fixture)
+printf 'a role pstack never heard of: auto\n' >>"$d/$M"
+v=$(mk_vendor)
+run_verify "$d" MANTRA_VENDOR="$v"
+expect_fail "a role that setup-pstack does not define" "role 'a role pstack never heard of' in rules/pstack-models.md is not a role in setup-pstack"
+
+d=$(mk_fixture)
+v=$(mk_vendor)
+trash_target="$v/pstack/current/docs/harness/claude-code.md"
+mv "$trash_target" "$trash_target.moved"
+run_verify "$d" MANTRA_VENDOR="$v"
+expect_fail "nil-mode names a pstack path that does not exist" "names <pstack>/docs/harness/claude-code.md"
+
+d=$(mk_fixture)
+v=$(mk_vendor)
+mv "$v/pstack/current/skills/principle-prove-it-works" "$v/pstack/current/skills/principle-renamed"
+run_verify "$d" MANTRA_VENDOR="$v"
+expect_fail "nil-mode names a principle that pstack lacks" "principle-prove-it-works, which is not a skill"
+
+d=$(mk_fixture)
+v=$(mk_vendor)
+mv "$v/pstack/current/skills/setup-pstack" "$v/pstack/current/skills/setup-moved"
+run_verify "$d" MANTRA_VENDOR="$v"
+expect_fail "vendor without setup-pstack" "setup-pstack/SKILL.md is missing"
+
+pin_commit=$(sed -n 's/^commit=//p' "$ROOT/pstack/PIN")
+pin_path=$(sed -n 's/^path=//p' "$ROOT/pstack/PIN")
+relocate_current() { # relocate_current <vendor> <sha>: make current a symlink to <sha>/<path>
+  local v=$1 sha=$2
+  mkdir -p "$v/pstack/$sha/$(dirname "$pin_path")"
+  mv "$v/pstack/current" "$v/pstack/$sha/$pin_path"
+  ln -s "$v/pstack/$sha/$pin_path" "$v/pstack/current"
+}
+
+d=$(mk_fixture)
+v=$(mk_vendor)
+relocate_current "$v" 0123456789abcdef0123456789abcdef01234567
+run_verify "$d" MANTRA_VENDOR="$v"
+check "a vendor dir that is not at the pinned commit only warns (exit 0)" test "$VRC" -eq 0
+check "a vendor dir that is not at the pinned commit is flagged WARN" contains "$VOUT" "WARN  i."
+
+d=$(mk_fixture)
+v=$(mk_vendor)
+relocate_current "$v" "$pin_commit"
+run_verify "$d" MANTRA_VENDOR="$v"
+check "a vendor dir at the pinned commit: exit 0" test "$VRC" -eq 0
+check "a vendor dir at the pinned commit: no WARN" test -z "$(printf '%s\n' "$VOUT" | grep 'WARN  i.' || true)"
+check "a vendor dir at the pinned commit: the checks ran" contains "$VOUT" "PASS  i. pstack at"
 
 # --- e. tests ---------------------------------------------------------------------
 d=$(mk_fixture)

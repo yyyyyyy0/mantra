@@ -3,6 +3,7 @@
 # temporary HOME and temporary repos only; nothing is pushed anywhere real.
 set -euo pipefail
 unset CDPATH GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
+unset MANTRA_VENDOR
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 
@@ -48,7 +49,7 @@ GIT_ID=(-c user.name=test -c user.email=test@example.invalid -c commit.gpgsign=f
 # Throwaway origin: current working-tree files committed on main.
 SRC="$TMP/src"
 mkdir -p "$SRC"
-cp -R "$ROOT/agents" "$ROOT/rules" "$ROOT/scripts" "$ROOT/hooks" "$SRC/"
+cp -R "$ROOT/agents" "$ROOT/rules" "$ROOT/scripts" "$ROOT/hooks" "$ROOT/skills" "$ROOT/pstack" "$SRC/"
 git init -q -b main "$SRC"
 git -C "$SRC" add -A
 git -C "$SRC" "${GIT_ID[@]}" commit -q -m "initial"
@@ -89,6 +90,7 @@ check "live is at origin/main" test "$(live_head)" = "$(origin_head)"
 check "live HEAD is detached" test -z "$(git -C "$LIVE" branch --show-current)"
 check "rules linked to live" is_symlink_to "$HOME_DIR/.claude/rules" "$LIVE/rules"
 check "agents linked to live" is_symlink_to "$HOME_DIR/.claude/agents/planner.md" "$LIVE/agents/planner.md"
+check "skills linked to live" is_symlink_to "$HOME_DIR/.claude/skills/nil-mode" "$LIVE/skills/nil-mode"
 c1=$(live_head)
 
 # --- pick up a new origin commit (and retire an agent) ------------------------

@@ -11,6 +11,14 @@
 #   d. agents/*.md frontmatter (name, description, model, allowed keys)
 #   e. every tests/*.test.sh passes
 #   f. shellcheck on the shell scripts (required when CI=true)
+#   g. skills/*/SKILL.md frontmatter (name == directory, description set);
+#      no symlink anywhere under skills/
+#   h. pstack/PIN has repo, commit (40 hex), path, version (x.y.z);
+#      no symlink anywhere under pstack/
+#   i. rules/pstack-models.md lines are `<role>: <model> <effort>[, ...]`;
+#      and, only when ${MANTRA_VENDOR:-~/.mantra/vendor}/pstack/current exists,
+#      the roles exist in setup-pstack and nil-mode's pstack paths and
+#      principle-* names exist there (otherwise SKIP)
 #
 # Check e is skipped (with a WARN) only when MANTRA_VERIFY_TOKEN matches the
 # contents of the file named by MANTRA_VERIFY_TOKEN_FILE. An outer verify.sh
@@ -29,7 +37,7 @@ SENTINELS=(
   'Do not leave model assignment implicit.'
   '## Do without being asked'
   'orchestration strategy: phases, and what runs in parallel vs. sequentially'
-  'which agent / model handles each phase, and why (see `rules/performance.md` Delegation Criteria)'
+  'which agent / model handles each phase, and why (see `rules/pstack-models.md` and the Models line above)'
   'the review / verification gate between phases'
 )
 DO_SECTION_HEADING='## Do without being asked'
@@ -265,6 +273,227 @@ check_agents() {
   [ "$found" -eq 1 ] || fail "d. no agents/*.md found"
 }
 
+# FAIL once per symlink found at or under directory $1 (check letter $2). The
+# files here are copied into the live clone and linked into ~/.claude, where a
+# link could lead out of the repo.
+check_no_symlinks() {
+  local dir=$1 letter=$2 l
+  { [ -e "$dir" ] || [ -L "$dir" ]; } || return 0
+  while IFS= read -r -d '' l; do
+    fail "$letter. symlink under $dir/: $l (not allowed; use a real file)"
+  done < <(find "$dir" -type l -print0)
+}
+
+# --- g. skills ---------------------------------------------------------------
+check_skill() {
+  local d=$1 f stem fm rc=0 line key val last_key='' name='' desc=''
+  local has_name=0 has_desc=0 desc_body=0 ok=1
+  stem=$(basename "$d")
+  f="$d/SKILL.md"
+  if [ ! -f "$f" ]; then
+    fail "g. $d has no SKILL.md"
+    return
+  fi
+  fm=$(frontmatter "$f") || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    fail "g. $f: missing or unterminated YAML frontmatter"
+    return
+  fi
+  while IFS= read -r line; do
+    if [[ $line =~ ^([A-Za-z][A-Za-z0-9_-]*):[[:space:]]*(.*)$ ]]; then
+      key=${BASH_REMATCH[1]}
+      val=$(trim_value "${BASH_REMATCH[2]}")
+      last_key=$key
+      case "$key" in
+        name)
+          name=$val
+          has_name=1
+          ;;
+        description)
+          desc=$val
+          has_desc=1
+          ;;
+      esac
+    elif [[ $line =~ ^[[:space:]]+[^[:space:]] ]] && [ "$last_key" = "description" ]; then
+      desc_body=1
+    fi
+  done <<<"$fm"
+
+  if [ "$has_name" -eq 0 ] || [ "$name" != "$stem" ]; then
+    fail "g. $f: name must equal '$stem' (got '${name:-<missing>}')"
+    ok=0
+  fi
+  case "$desc" in
+    '' | '>' | '|' | '>-' | '|-' | '>+' | '|+')
+      if [ "$has_desc" -eq 0 ] || [ "$desc_body" -eq 0 ]; then
+        fail "g. $f: description is missing or empty"
+        ok=0
+      fi
+      ;;
+  esac
+  [ "$ok" -eq 0 ] || pass "g. $f frontmatter"
+}
+
+check_skills() {
+  local d found=0
+  check_no_symlinks skills g
+  if [ ! -d skills ]; then
+    fail "g. skills/ directory is missing"
+    return
+  fi
+  for d in skills/*/; do
+    [ -d "$d" ] || continue
+    found=1
+    check_skill "${d%/}"
+  done
+  [ "$found" -eq 1 ] || fail "g. no skills/*/ directory found"
+}
+
+# --- h. pstack/PIN -----------------------------------------------------------
+# Value of KEY in pstack/PIN (last assignment wins); empty when absent.
+pin_value() {
+  local key=$1 line val=''
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=${line%$'\r'}
+    case "$line" in
+      "$key="*) val=${line#"$key="} ;;
+    esac
+  done <pstack/PIN
+  printf '%s' "$val"
+}
+
+check_pin() {
+  local k n v ok=1
+  check_no_symlinks pstack h
+  if [ ! -f pstack/PIN ]; then
+    fail "h. pstack/PIN is missing"
+    return
+  fi
+  for k in repo commit path version; do
+    n=$(grep -c "^$k=" pstack/PIN || true)
+    v=$(pin_value "$k")
+    if [ "$n" -eq 0 ]; then
+      fail "h. pstack/PIN has no '$k=' line"
+      ok=0
+    elif [ "$n" -gt 1 ]; then
+      fail "h. pstack/PIN has '$k=' $n times"
+      ok=0
+    elif [ -z "$v" ]; then
+      fail "h. pstack/PIN: '$k=' is empty"
+      ok=0
+    fi
+  done
+  [ "$ok" -eq 1 ] || return 0
+  if ! [[ $(pin_value commit) =~ ^[0-9a-f]{40}$ ]]; then
+    fail "h. pstack/PIN: commit is not a 40-digit hex SHA: $(pin_value commit)"
+    ok=0
+  fi
+  if ! [[ $(pin_value version) =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    fail "h. pstack/PIN: version is not x.y.z: $(pin_value version)"
+    ok=0
+  fi
+  if [ "$ok" -eq 1 ]; then
+    v=$(pin_value commit)
+    pass "h. pstack/PIN has repo, commit (${v:0:12}), path, version $(pin_value version)"
+  fi
+}
+
+# --- i. rules/pstack-models.md -------------------------------------------------
+# Lines are `<role>: <value>[, <value>...]`; a value is `<model> <effort>`,
+# `inherit-parent` or `auto`. Roles may contain commas and spaces (not colons).
+PSTACK_MODELS=rules/pstack-models.md
+PSTACK_VALUE='((opus|sonnet|haiku|fable) (low|medium|high|xhigh|max)|inherit-parent|auto)'
+PSTACK_LINE="^[^:#[:space:]][^:]*: ${PSTACK_VALUE}(, ${PSTACK_VALUE})*\$"
+
+check_pstack_models() {
+  local line n=0 bad=0 lineno=0
+  if [ ! -f "$PSTACK_MODELS" ]; then
+    fail "i. $PSTACK_MODELS is missing"
+    return
+  fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    lineno=$((lineno + 1))
+    line=${line%$'\r'}
+    case "$line" in
+      '' | '#'* | [[:space:]]*'#'*) continue ;;
+    esac
+    n=$((n + 1))
+    if ! [[ $line =~ $PSTACK_LINE ]]; then
+      fail "i. $PSTACK_MODELS:$lineno: not '<role>: <model> <effort>[, ...]' (or inherit-parent / auto): $line"
+      bad=1
+    fi
+  done <"$PSTACK_MODELS"
+  if [ "$n" -eq 0 ]; then
+    fail "i. $PSTACK_MODELS has no role lines"
+  elif [ "$bad" -eq 0 ]; then
+    pass "i. $PSTACK_MODELS: $n role lines are well formed"
+  fi
+}
+
+# Optional (FM-VERSION): when a pstack checkout is installed, the roles in
+# rules/pstack-models.md must be roles setup-pstack defines, and everything
+# skills/nil-mode names in pstack must exist. Without it these are skipped.
+check_pstack_vendor() {
+  local vendor cur target pin_commit pin_path line role p missing=0 checked=0 setup nil
+  vendor=${MANTRA_VENDOR:-$HOME/.mantra/vendor}
+  cur="$vendor/pstack/current"
+  if [ ! -d "$cur" ]; then
+    echo "SKIP  i. pstack vendor checks: $cur not found (scripts/pstack.sh installs it)"
+    return
+  fi
+  if [ -f pstack/PIN ] && [ -L "$cur" ]; then
+    pin_commit=$(pin_value commit)
+    pin_path=$(pin_value path)
+    target=$(readlink "$cur")
+    if [ "${target%"/$pin_path"}" = "$target" ] || [ "$(basename "${target%"/$pin_path"}")" != "$pin_commit" ]; then
+      warn "i. $cur -> $target is not the commit in pstack/PIN; the checks below ran against it anyway"
+    fi
+  fi
+
+  setup="$cur/skills/setup-pstack/SKILL.md"
+  if [ -f "$PSTACK_MODELS" ]; then
+    if [ ! -f "$setup" ]; then
+      fail "i. $setup is missing, so the roles in $PSTACK_MODELS cannot be checked"
+      missing=1
+    else
+      while IFS= read -r line || [ -n "$line" ]; do
+        line=${line%$'\r'}
+        case "$line" in
+          '' | '#'* | [[:space:]]*'#'*) continue ;;
+        esac
+        [[ $line =~ ^([^:]+):\  ]] || continue
+        role=${BASH_REMATCH[1]}
+        checked=$((checked + 1))
+        if ! sed -n 's/^\([^:#][^:]*\): .*$/\1/p' "$setup" | grep -Fxq -- "$role"; then
+          fail "i. role '$role' in $PSTACK_MODELS is not a role in setup-pstack"
+          missing=1
+        fi
+      done <"$PSTACK_MODELS"
+    fi
+  fi
+
+  nil=skills/nil-mode/SKILL.md
+  if [ -f "$nil" ]; then
+    while IFS= read -r p; do
+      [ -n "$p" ] || continue
+      checked=$((checked + 1))
+      if [ ! -e "$cur/$p" ]; then
+        fail "i. $nil names <pstack>/$p, which does not exist in $cur"
+        missing=1
+      fi
+    done < <(grep -oE '<pstack>/[A-Za-z0-9_./-]+' "$nil" | sed -e 's/^<pstack>\///' -e 's/[.,]*$//' | sort -u)
+    while IFS= read -r p; do
+      [ -n "$p" ] || continue
+      checked=$((checked + 1))
+      if [ ! -f "$cur/skills/$p/SKILL.md" ]; then
+        fail "i. $nil names $p, which is not a skill in $cur"
+        missing=1
+      fi
+    done < <(grep -oE 'principle-[a-z0-9]+(-[a-z0-9]+)*' "$nil" | sort -u)
+  fi
+  [ "$missing" -eq 1 ] || pass "i. pstack at $cur: $checked role/path/principle names exist"
+}
+
 # --- e. tests ----------------------------------------------------------------
 # True when MANTRA_VERIFY_TOKEN matches the file an outer verify.sh created.
 verify_token_ok() {
@@ -337,6 +566,10 @@ check_rules_budget
 check_sentinels
 check_relative_links
 check_agents
+check_skills
+check_pin
+check_pstack_models
+check_pstack_vendor
 check_tests
 check_shellcheck
 
