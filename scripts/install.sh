@@ -7,6 +7,17 @@
 # - ~/.claude/agents -> real directory; each <live>/agents/*.md is symlinked
 #   into it per file. A legacy symlinked agents dir is replaced by a real dir
 #   that keeps every non-mantra entry (e.g. web-search-agent.md).
+# - ~/.claude/skills -> real directory; each <live>/skills/<name>/ is symlinked
+#   into it per skill. A real directory of the same name is moved to
+#   ~/.claude/skills.bak/ first. A symlink of the same name that points
+#   anywhere but the live clone is never touched: before ANYTHING is changed
+#   (rules, agents or skills) every mantra skill is checked for such a link,
+#   and one is enough to exit 1 with nothing changed (--dry-run too).
+#   Skills that are not mantra's are never touched.
+# - Warns (never fetches) when the pinned pstack is not installed under
+#   ${MANTRA_VENDOR:-~/.mantra/vendor}/pstack/current, or is installed but does
+#   not match the pin (symlinked checkout, modified tracked files); run
+#   scripts/pstack.sh.
 # - settings.json is never modified.
 #
 # Must be run from the live clone itself (MANTRA_LIVE, default
@@ -27,8 +38,9 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/install.sh [--dry-run]
 
-Links ~/.claude/rules and ~/.claude/agents/*.md to the live clone
-(MANTRA_LIVE, default ~/.mantra/live). Run it from that clone only.
+Links ~/.claude/rules, ~/.claude/agents/*.md and ~/.claude/skills/<name> to
+the live clone (MANTRA_LIVE, default ~/.mantra/live). Run it from that clone
+only.
 USAGE
 }
 
@@ -70,7 +82,7 @@ case "$LIVE_RAW" in
   *) LIVE_LINK="$LIVE" ;;
 esac
 
-for d in rules agents; do
+for d in rules agents skills; do
   if [ ! -d "$LIVE/$d" ]; then
     echo "install.sh: $LIVE/$d is missing; the live clone looks broken" >&2
     exit 2
@@ -81,8 +93,11 @@ CLAUDE_DIR="$HOME/.claude"
 RULES_DST="$CLAUDE_DIR/rules"
 AGENTS_DST="$CLAUDE_DIR/agents"
 STAGING="$CLAUDE_DIR/agents.migrating"
+SKILLS_DST="$CLAUDE_DIR/skills"
+SKILLS_BAK="$CLAUDE_DIR/skills.bak"
 TS=$(date +%Y%m%d-%H%M%S)
 CHANGES=0
+CONFLICTS=0
 PRESERVED=''
 STAGING_ACTIVE=0
 
@@ -91,6 +106,43 @@ if [ -e "$AGENTS_DST" ] && [ ! -L "$AGENTS_DST" ] && [ ! -d "$AGENTS_DST" ]; the
   echo "install.sh: $AGENTS_DST exists and is not a directory; nothing was changed" >&2
   exit 2
 fi
+
+if [ -e "$SKILLS_DST" ] || [ -L "$SKILLS_DST" ]; then
+  if [ -L "$SKILLS_DST" ] || [ ! -d "$SKILLS_DST" ]; then
+    echo "install.sh: $SKILLS_DST exists and is not a real directory; nothing was changed" >&2
+    exit 2
+  fi
+fi
+
+# A mantra skill whose name is taken by a symlink that does not lead into the
+# live clone cannot be installed, and replacing it is the user's call (it may
+# belong to another tool). Find all of them BEFORE anything is changed: a
+# conflict found halfway would leave the links made so far dangling when
+# deploy.sh rolls the live clone back after the failed install.
+preflight_skill_conflicts() {
+  local src name dst cur n=0
+  for src in "$LIVE"/skills/*/; do
+    [ -d "$src" ] || continue
+    name=$(basename "$src")
+    dst="$SKILLS_DST/$name"
+    [ -L "$dst" ] || continue
+    cur=$(readlink "$dst")
+    case "$cur" in
+      "$LIVE_LINK"/skills/* | "$LIVE"/skills/*) ;;
+      *)
+        echo "conflict: $dst is a symlink to $cur, not to the live clone" >&2
+        n=$((n + 1))
+        ;;
+    esac
+  done
+  if [ "$n" -gt 0 ]; then
+    echo "install.sh: $n skill link(s) conflict with mantra's skills; nothing was changed" >&2
+    echo "  Check what each link points to first. If mantra's skill should replace it," >&2
+    echo "  remove the link yourself (unlink <path>) and run this again." >&2
+    exit 1
+  fi
+}
+preflight_skill_conflicts
 
 # Remove a half-built staging dir if the copy fails. Once the copy is
 # complete STAGING_ACTIVE is cleared, so a finished staging dir survives and
@@ -286,6 +338,112 @@ if [ "$VIRTUAL" -eq 0 ]; then
   done
 fi
 
+# --- skills ------------------------------------------------------------------
+# One symlink per mantra skill; every other entry in ~/.claude/skills is left
+# alone. Real copies are moved OUTSIDE ~/.claude/skills (a backup inside it
+# would be loaded as a second copy of the skill).
+if [ ! -d "$SKILLS_DST" ]; then
+  act "mkdir: $SKILLS_DST" mkdir "$SKILLS_DST"
+fi
+
+for src in "$LIVE"/skills/*/; do
+  [ -d "$src" ] || continue
+  name=$(basename "$src")
+  dst="$SKILLS_DST/$name"
+  want="$LIVE_LINK/skills/$name"
+  if [ -L "$dst" ]; then
+    cur=$(readlink "$dst")
+    if [ "$cur" = "$want" ]; then
+      echo "ok: $dst -> $want"
+    else
+      case "$cur" in
+        "$LIVE_LINK"/skills/* | "$LIVE"/skills/*)
+          act "relink: $dst (was $cur) -> $want" ln -sfn "$want" "$dst"
+          ;;
+        *)
+          # preflight_skill_conflicts catches this before any change; this is
+          # only reached if the link appeared since.
+          echo "conflict: $dst is a symlink to $cur, not to the live clone; left alone" >&2
+          CONFLICTS=$((CONFLICTS + 1))
+          ;;
+      esac
+    fi
+  elif [ -e "$dst" ]; then
+    [ -d "$SKILLS_BAK" ] || act "mkdir: $SKILLS_BAK" mkdir -p "$SKILLS_BAK"
+    bak=$(backup_name "$SKILLS_BAK/$name")
+    act "backup: $dst -> $bak" mv "$dst" "$bak"
+    act "link: $dst -> $want" ln -s "$want" "$dst"
+  else
+    act "link: $dst -> $want" ln -s "$want" "$dst"
+  fi
+done
+
+# Retired skills: links into the live clone whose target no longer exists.
+if [ -d "$SKILLS_DST" ]; then
+  while IFS= read -r link; do
+    [ -n "$link" ] || continue
+    target=$(readlink "$link")
+    case "$target" in
+      "$LIVE_LINK"/skills/* | "$LIVE"/skills/*)
+        if [ ! -e "$link" ]; then
+          act "remove retired skill link: $link -> $target" unlink "$link"
+        fi
+        ;;
+    esac
+  done < <(find "$SKILLS_DST" -maxdepth 1 -type l)
+fi
+
+# --- pstack (warn only; scripts/pstack.sh fetches it, by hand) ----------------
+# True when checkout dir $1 is a real directory with a real .git, at commit $2,
+# with no modified tracked files (untracked files are ignored). Read-only: no
+# hooks, no fsmonitor, no index refresh written.
+GIT_LOOK=(-c core.hooksPath=/dev/null -c core.fsmonitor=false)
+pstack_untampered() {
+  local d=$1 want=$2 head dirty
+  [ ! -L "$d" ] && [ -d "$d" ] || return 1
+  { [ -d "$d/.git" ] && [ ! -L "$d/.git" ]; } || return 1
+  head=$(GIT_OPTIONAL_LOCKS=0 git "${GIT_LOOK[@]}" -C "$d" rev-parse HEAD 2>/dev/null) || return 1
+  [ "$head" = "$want" ] || return 1
+  dirty=$(GIT_OPTIONAL_LOCKS=0 git "${GIT_LOOK[@]}" -C "$d" status --porcelain --untracked-files=no 2>/dev/null) || return 1
+  [ -z "$dirty" ]
+}
+
+# echo, not act: a warning is not a change, so "no changes needed" still holds.
+check_pstack() {
+  local pin="$LIVE/pstack/PIN" commit='' path='' line vendor cur target rest sha
+  vendor="${MANTRA_VENDOR:-$HOME/.mantra/vendor}"
+  if [ -f "$pin" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in
+        commit=*) commit=${line#commit=} ;;
+        path=*) path=${line#path=} ;;
+      esac
+    done <"$pin"
+  fi
+  if [ -z "$commit" ] || [ -z "$path" ]; then
+    echo "warning: $pin is missing or has no commit=/path= line; pstack was not checked"
+    return 0
+  fi
+  cur="$vendor/pstack/current"
+  if [ ! -L "$cur" ]; then
+    echo "warning: pstack is not installed ($cur is missing); run $LIVE/scripts/pstack.sh"
+    return 0
+  fi
+  target=$(readlink "$cur")
+  rest=${target%"/$path"}
+  sha=${rest##*/}
+  if [ "$rest" = "$target" ] || [ "$sha" != "$commit" ]; then
+    echo "warning: pstack current -> $target is not the pinned ${commit:0:12}; run $LIVE/scripts/pstack.sh"
+  elif [ ! -d "$cur" ]; then
+    echo "warning: pstack current -> $target does not exist; run $LIVE/scripts/pstack.sh"
+  elif ! pstack_untampered "$rest" "$commit"; then
+    echo "warning: pstack checkout $rest does not match the pin (a symlink, not a git checkout at ${commit:0:12}, or tracked files modified); run $LIVE/scripts/pstack.sh"
+  else
+    echo "ok: pstack ${commit:0:12} at $cur"
+  fi
+}
+check_pstack
+
 echo "note: settings.json is never modified; register hooks/guard.sh there by hand."
 if [ "$CHANGES" -eq 0 ]; then
   echo "Summary: no changes needed."
@@ -293,4 +451,8 @@ elif [ "$DRY_RUN" -eq 1 ]; then
   echo "Summary: $CHANGES change(s) would be made (dry-run, nothing changed)."
 else
   echo "Summary: $CHANGES change(s) made."
+fi
+if [ "$CONFLICTS" -gt 0 ]; then
+  echo "install.sh: $CONFLICTS skill link(s) conflict with symlinks from elsewhere; see the messages above" >&2
+  exit 1
 fi
