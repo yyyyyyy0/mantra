@@ -165,7 +165,7 @@ check "dry-run after a fetch: reports no changes" contains "$OUT" "no changes ne
 # --- default vendor location (MANTRA_VENDOR unset) lives under $HOME/.mantra/vendor --
 (
   unset MANTRA_VENDOR
-  OUT=$(bash "$MANTRA/scripts/pstack.sh" 2>&1) && [ -d "$HOME/.mantra/vendor/pstack/$SHA_A" ] \
+  bash "$MANTRA/scripts/pstack.sh" >/dev/null 2>&1 && [ -d "$HOME/.mantra/vendor/pstack/$SHA_A" ] \
     && [ -L "$HOME/.mantra/vendor/pstack/current" ]
 ) && rc=0 || rc=$?
 check "default vendor: used when MANTRA_VENDOR is unset" test "$rc" -eq 0
@@ -281,7 +281,7 @@ check "tampered checkout: fetched again" test "$(git -C "$BASE/$SHA_A" rev-parse
 check "tampered checkout: version is the pinned one again" contains "$(cat "$BASE/$SHA_A/$PLUGIN_PATH/.claude-plugin/plugin.json")" '"1.2.3"'
 check "tampered checkout: current still resolves" test -f "$BASE/current/skills/poteto-mode/SKILL.md"
 
-rm -rf -- "$BASE/$SHA_A"
+rm -rf -- "${BASE:?}/${SHA_A:?}"
 mkdir -p "$BASE/$SHA_A"
 echo junk >"$BASE/$SHA_A/junk"
 run_pstack
@@ -391,6 +391,7 @@ for badenv in "--upload-pack=touch $TMP/pwned" "-c" "-"; do
   check "MANTRA_PSTACK_REPO '$badenv': ran nothing" absent "$TMP/pwned"
 done
 
+# shellcheck disable=SC2016  # 'a$b' and 'a`b`' are literal path strings, never expanded
 for badpath in ".git" ".git/hooks" "a/.git" "a/.git/b" "*" "a/*" "a/b*" ".hidden/x" "a//b" "a/b/" "a/./b" "a/b?" "a;b" 'a$b' 'a`b`' "a:b" "[a]" "{a,b}"; do
   fresh_vendor
   write_pin "$SHA_A" 1.2.3 "$badpath"

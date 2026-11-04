@@ -373,7 +373,7 @@ mk_vendor() { # prints a vendor dir whose pstack/current has what nil-mode names
   : >"$cur/skills/poteto-mode/SKILL.md"
   : >"$cur/docs/harness/claude-code.md"
   # every <pstack>/... path nil-mode names (the same extraction verify.sh uses)
-  for p in $(grep -oE '<pstack>/[A-Za-z0-9_./-]+' "$ROOT/skills/nil-mode/SKILL.md" | sed -e 's/^<pstack>\///' -e 's/[.,]*$//' | sort -u); do
+  while IFS= read -r p; do
     case "$p" in
       *.md)
         mkdir -p "$cur/$(dirname "$p")"
@@ -381,11 +381,11 @@ mk_vendor() { # prints a vendor dir whose pstack/current has what nil-mode names
         ;;
       *) mkdir -p "$cur/$p" ;;
     esac
-  done
-  for p in $(grep -oE 'principle-[a-z0-9]+(-[a-z0-9]+)*' "$ROOT/skills/nil-mode/SKILL.md" | sort -u); do
+  done < <(grep -oE '<pstack>/[A-Za-z0-9_./-]+' "$ROOT/skills/nil-mode/SKILL.md" | sed -e 's/^<pstack>\///' -e 's/[.,]*$//' | sort -u)
+  while IFS= read -r p; do
     mkdir -p "$cur/skills/$p"
     : >"$cur/skills/$p/SKILL.md"
-  done
+  done < <(grep -oE 'principle-[a-z0-9]+(-[a-z0-9]+)*' "$ROOT/skills/nil-mode/SKILL.md" | sort -u)
   printf '%s' "$v"
 }
 
