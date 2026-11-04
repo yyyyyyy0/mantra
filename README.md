@@ -21,14 +21,15 @@ mantra used to be much bigger: fifteen agents, a TypeScript sync tool, and about
 
 | Path | Contents |
 |---|---|
-| `rules/` | `delegation.md`, `performance.md`, `failure-modes.md`, `git-workflow.md` (always loaded, 200 lines / 8 KB in total) |
+| `rules/` | `delegation.md`, `failure-modes.md`, `git-workflow.md`, `pstack-models.md` (always loaded, 200 lines / 8 KB in total) |
 | `agents/` | `planner`, `code-reviewer`, `security-reviewer`, `mob-critic` |
 | `hooks/guard.sh` | PreToolUse guard for destructive commands and hook bypasses |
-| `scripts/` | `install.sh`, `deploy.sh`, `verify.sh` |
+| `scripts/` | `install.sh`, `deploy.sh`, `verify.sh`, `pstack.sh` |
+| `pstack/PIN` | Source and pinned commit of the pstack base |
 | `githooks/pre-push` | Runs `scripts/verify.sh` before a push |
-| `tests/` | Shell tests for the guard, `install.sh` and `deploy.sh` |
+| `tests/` | Shell tests for the guard, `install.sh`, `deploy.sh`, `pstack.sh` and `verify.sh` |
 | `templates/` | Pointer-style `AGENTS.md` and a pre-push hook for other repos |
-| `skills/` | Claude Code skills (`skills/<name>/SKILL.md`); not linked automatically |
+| `skills/` | Claude Code skills (`skills/<name>/SKILL.md`); `install.sh` links each into `~/.claude/skills/` |
 | `docs/` | The redesign plan, the rules mapping, and the [harness guide for other repos](./docs/ja/harness-engineering.md) (Japanese) |
 
 ## Install
@@ -98,10 +99,11 @@ It has no dependencies. It needs bash and jq; shellcheck is optional locally and
 
 ## Skills
 
-`skills/` holds Claude Code skills as `skills/<name>/SKILL.md`. `install.sh` does not link them; link the ones you want into `~/.claude/skills/` yourself.
+`skills/` holds Claude Code skills as `skills/<name>/SKILL.md`. `install.sh` links each one as `~/.claude/skills/<name>` into the live clone. A real directory of the same name is moved to `~/.claude/skills.bak/`; a same-named symlink that points elsewhere stops the install before anything changes. Skills that are not mantra's are never touched.
 
 | Skill | Purpose |
 |---|---|
+| `nil-mode` | This user's working style. It builds on [pstack](https://github.com/cursor/plugins/tree/main/pstack)'s `poteto-mode` and overrides only what differs (Japanese, when to stop, grant scope, models, verification, adversarial review). `scripts/pstack.sh` fetches pstack at the commit pinned in `pstack/PIN` into `~/.mantra/vendor/pstack/`. Design: [docs/redesign/pstack-layer.md](./docs/redesign/pstack-layer.md) |
 | `deepen-request` | Rewrite a request the way a top expert in its field would approach it, show the rewrite, then execute it (`/deepen-request <request>`) |
 
 ## Other repos

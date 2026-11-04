@@ -21,14 +21,15 @@ Claude Code は、セッションのたびに `~/.claude/rules` と `~/.claude/a
 
 | パス | 内容 |
 |---|---|
-| `rules/` | `delegation.md`、`performance.md`、`failure-modes.md`、`git-workflow.md`（常時読み込み。合計 200 行・8KB まで） |
+| `rules/` | `delegation.md`、`failure-modes.md`、`git-workflow.md`、`pstack-models.md`（常時読み込み。合計 200 行・8KB まで） |
 | `agents/` | `planner`、`code-reviewer`、`security-reviewer`、`mob-critic` |
 | `hooks/guard.sh` | 破壊的コマンドとフック回避を止める PreToolUse ガード |
-| `scripts/` | `install.sh`、`deploy.sh`、`verify.sh` |
+| `scripts/` | `install.sh`、`deploy.sh`、`verify.sh`、`pstack.sh` |
+| `pstack/PIN` | 土台にする pstack の取得元と固定コミット |
 | `githooks/pre-push` | push の前に `scripts/verify.sh` を実行 |
-| `tests/` | ガード、`install.sh`、`deploy.sh` のシェルテスト |
+| `tests/` | ガード、`install.sh`、`deploy.sh`、`pstack.sh`、`verify.sh` のシェルテスト |
 | `templates/` | ほかのリポジトリ向けの、ポインタ型 `AGENTS.md` と pre-push フック |
-| `skills/` | Claude Code のスキル（`skills/<name>/SKILL.md`）。自動ではリンクしない |
+| `skills/` | Claude Code のスキル（`skills/<name>/SKILL.md`）。`install.sh` が `~/.claude/skills/` に 1 つずつリンクする |
 | `docs/` | 再設計の計画、ルールの対応表、[他リポジトリ向けのハーネス導入ガイド](./docs/ja/harness-engineering.md) |
 
 ## インストール
@@ -98,10 +99,11 @@ npm run verify    # bash scripts/verify.sh と同じ
 
 ## スキル
 
-`skills/` には Claude Code のスキルを `skills/<name>/SKILL.md` の形式で置きます。`install.sh` はスキルをリンクしません。使いたいものだけ、`~/.claude/skills/` へ個別にリンクしてください。
+`skills/` には Claude Code のスキルを `skills/<name>/SKILL.md` の形式で置きます。`install.sh` が `~/.claude/skills/<name>` を live clone へのリンクにします。同名の実ディレクトリは `~/.claude/skills.bak/` に退避します。同名で別の場所を指すリンクがあると、何も変えずに止まります。mantra 以外のスキルには触れません。
 
 | スキル | 用途 |
 |---|---|
+| `nil-mode` | このユーザーの作業スタイル。[pstack](https://github.com/cursor/plugins/tree/main/pstack) の `poteto-mode` を土台にして、違う部分（日本語、止まる条件、許可の範囲、モデル、検証、対抗レビュー）だけを上書きする。pstack は `scripts/pstack.sh` が `pstack/PIN` の固定コミットで `~/.mantra/vendor/pstack/` に取得する。設計は [docs/redesign/pstack-layer.md](./docs/redesign/pstack-layer.md) |
 | `deepen-request` | 依頼文を「その分野のトップ専門家ならどう取り組むか」の観点で書き直して見せ、そのまま実行する（`/deepen-request <依頼文>`） |
 
 ## ほかのリポジトリへ
