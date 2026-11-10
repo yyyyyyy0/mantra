@@ -2,7 +2,7 @@
 
 English: [README.md](./README.md)
 
-自分用の Claude Code ハーネスです。短いルール 4 ファイル、エージェント 4 体、ガードフック 1 つを、専用の clone から `~/.claude` にリンクして使います。必要なのは bash と jq だけです。
+自分用の Claude Code ハーネスです。短いルール 4 ファイル、エージェント 5 体、ガードフック 1 つを、専用の clone から `~/.claude` にリンクして使います。必要なのは bash と jq だけです。
 
 ## これは何か
 
@@ -22,7 +22,7 @@ Claude Code は、セッションのたびに `~/.claude/rules` と `~/.claude/a
 | パス | 内容 |
 |---|---|
 | `rules/` | `delegation.md`、`failure-modes.md`、`git-workflow.md`、`pstack-models.md`（常時読み込み。合計 200 行・8KB まで） |
-| `agents/` | `planner`、`code-reviewer`、`security-reviewer`、`mob-critic` |
+| `agents/` | `planner`、`code-reviewer`、`security-reviewer`、`mob-critic`、`Explore`（haiku。組み込みの Explore を置き換える） |
 | `hooks/guard.sh` | 破壊的コマンドとフック回避を止める PreToolUse ガード |
 | `scripts/` | `install.sh`、`deploy.sh`、`verify.sh`、`pstack.sh` |
 | `pstack/PIN` | 土台にする pstack の取得元と固定コミット |
