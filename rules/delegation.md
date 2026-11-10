@@ -5,7 +5,7 @@ The user wants subagents and reviews used without having to ask each time, at th
 ## Do without being asked
 
 - Work with 3+ steps, 2+ files, or an unclear approach: read the `nil-mode` skill first. It routes through pstack and lists where this user differs from it.
-- Plan first for that work: plan mode in the main session, or the `planner` agent. The built-in Plan and Explore agents do not load these rules, so use `planner` or general-purpose when the rules matter.
+- Plan first for that work: plan mode in the main session, or the `planner` agent. The built-in Plan agent and mantra's haiku `Explore` do not load these rules, so use `planner` or general-purpose when the rules matter.
 - Show the plan and wait for the user's OK only when it touches the high-risk list below. Otherwise show it and proceed.
 - Implementation beyond a few lines that a plan or spec fully describes goes to a sonnet general-purpose subagent; the main session plans, integrates, and checks the diff.
 - After a code change beyond a few lines (docs-only excluded), run `code-reviewer` on the diff before calling the work done, and fix its CRITICAL/HIGH findings.

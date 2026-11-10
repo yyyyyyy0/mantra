@@ -2,7 +2,7 @@
 
 日本語版: [README.ja.md](./README.ja.md)
 
-My personal Claude Code harness: four short rule files, four agents and one guard hook, linked into `~/.claude` from a dedicated clone. It needs only bash and jq.
+My personal Claude Code harness: four short rule files, five agents and one guard hook, linked into `~/.claude` from a dedicated clone. It needs only bash and jq.
 
 ## What it is
 
@@ -22,7 +22,7 @@ mantra used to be much bigger: fifteen agents, a TypeScript sync tool, and about
 | Path | Contents |
 |---|---|
 | `rules/` | `delegation.md`, `failure-modes.md`, `git-workflow.md`, `pstack-models.md` (always loaded, 200 lines / 8 KB in total) |
-| `agents/` | `planner`, `code-reviewer`, `security-reviewer`, `mob-critic` |
+| `agents/` | `planner`, `code-reviewer`, `security-reviewer`, `mob-critic`, `Explore` (haiku, replaces the built-in one) |
 | `hooks/guard.sh` | PreToolUse guard for destructive commands and hook bypasses |
 | `scripts/` | `install.sh`, `deploy.sh`, `verify.sh`, `pstack.sh` |
 | `pstack/PIN` | Source and pinned commit of the pstack base |
