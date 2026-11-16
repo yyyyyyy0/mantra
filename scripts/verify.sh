@@ -36,6 +36,7 @@ SENTINELS=(
   '### FM-AGENT-CRITIC'
   'Do not leave model assignment implicit.'
   '## Do without being asked'
+  'grill before planning or implementing'
   'orchestration strategy: phases, and what runs in parallel vs. sequentially'
   'which agent / model handles each phase, and why (see `rules/pstack-models.md` and the Models line above)'
   'the review / verification gate between phases'
