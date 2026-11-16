@@ -58,10 +58,10 @@ Register the guard once by hand in `~/.claude/settings.json`, merging into any e
 
 The guard is fail-open: if `jq` is missing it does nothing. It is a seatbelt against accidents, not a sandbox.
 
-The Stop hook `excuse-check.sh` is registered the same way. It looks at the added lines of `git diff HEAD` and untracked files, and blocks the stop once per distinct finding list:
+The Stop hook `excuse-check.sh` is registered the same way. It looks at the added lines of `git diff HEAD` and untracked files, and reports each finding once per session (your own uncommitted changes are included, at the first stop of a session). It does nothing in a repository whose local git config defines `filter.*`:
 
 ```json
-"Stop": [{"hooks": [{"type": "command", "command": "bash ~/.mantra/live/hooks/excuse-check.sh"}]}]
+"Stop": [{"hooks": [{"type": "command", "command": "bash ~/.mantra/live/hooks/excuse-check.sh", "timeout": 10}]}]
 ```
 
 In the dev checkout, turn on the pre-push gate once:

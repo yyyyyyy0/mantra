@@ -58,10 +58,10 @@ scripts/deploy.sh --init
 
 ガードは fail-open です。jq がないと何もしません。事故を防ぐシートベルトであり、サンドボックスではありません。
 
-Stop フックの `excuse-check.sh` も同じ形で登録します。`git diff HEAD` の追加行と未追跡ファイルを見て、同じ指摘一覧につき 1 回だけ止めます。
+Stop フックの `excuse-check.sh` も同じ形で登録します。`git diff HEAD` の追加行と未追跡ファイルを見て、同じ指摘は 1 セッションに 1 回だけ報告します（自分の未コミット変更も、セッション最初の停止では対象です）。リポジトリのローカル git 設定に `filter.*` があるリポジトリでは何もしません。
 
 ```json
-"Stop": [{"hooks": [{"type": "command", "command": "bash ~/.mantra/live/hooks/excuse-check.sh"}]}]
+"Stop": [{"hooks": [{"type": "command", "command": "bash ~/.mantra/live/hooks/excuse-check.sh", "timeout": 10}]}]
 ```
 
 開発用 checkout では、pre-push のゲートを一度だけ有効にします。
