@@ -112,6 +112,10 @@ It has no dependencies. It needs bash and jq; shellcheck is optional locally and
 |---|---|
 | `nil-mode` | This user's working style. It builds on [pstack](https://github.com/cursor/plugins/tree/main/pstack)'s `poteto-mode` and overrides only what differs (Japanese, when to stop, grant scope, models, verification, adversarial review). `scripts/pstack.sh` fetches pstack at the commit pinned in `pstack/PIN` into `~/.mantra/vendor/pstack/`. Design: [docs/redesign/pstack-layer.md](./docs/redesign/pstack-layer.md) |
 | `deepen-request` | Rewrite a request the way a top expert in its field would approach it, show the rewrite, then execute it (`/deepen-request <request>`) |
+| `grilling` | Round-by-round interview that settles open decisions before work starts; `nil-mode` follows it for its pre-work grill. Copied unmodified from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT) |
+| `grill-me` | `/grill-me` entry point that calls `grilling`. Copied unmodified from the same repo |
+
+A skill copied from another repo keeps three files: `SKILL.md` (unmodified), the upstream `LICENSE`, and `UPSTREAM` (`repo=`, `commit=`, `path=`, and `blob=`, the git blob SHA of `SKILL.md` at that commit). `verify.sh` check j fails when `SKILL.md` no longer hashes to `blob=`, so local edits are caught; put overrides for this user in `nil-mode` instead. To take a new upstream version, replace `SKILL.md` with the file at the new commit and update `commit=` and `blob=` (`git hash-object --no-filters skills/<name>/SKILL.md`).
 
 ## Other repos
 

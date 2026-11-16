@@ -4,7 +4,7 @@
 #   bash scripts/verify.sh
 #
 # Checks:
-#   0. jq is installed (hooks/guard.sh depends on it)
+#   0. jq is installed (hooks/guard.sh depends on it); check j also needs git
 #   a. always-on rules budget (rules without a `paths:` frontmatter key)
 #   b. sentinel strings that must survive in rules/
 #   c. no relative "](../" links in rules/ or agents/
@@ -19,6 +19,9 @@
 #      and, only when ${MANTRA_VENDOR:-~/.mantra/vendor}/pstack/current exists,
 #      the roles exist in setup-pstack and nil-mode's pstack paths and
 #      principle-* names exist there (otherwise SKIP)
+#   j. every skills/<name>/UPSTREAM (a skill copied unmodified from another
+#      repo) has repo, commit (40 hex), path, blob (40 hex); SKILL.md hashes
+#      to that blob (git hash-object) and a LICENSE sits next to it
 #
 # Check e is skipped (with a WARN) only when MANTRA_VERIFY_TOKEN matches the
 # contents of the file named by MANTRA_VERIFY_TOKEN_FILE. An outer verify.sh
@@ -399,6 +402,77 @@ check_pin() {
   fi
 }
 
+# --- j. skills copied from upstream ------------------------------------------
+# skills/<name>/UPSTREAM marks a skill copied unmodified from another repo:
+# repo=, commit=, path= say where it came from and blob= is the git blob SHA of
+# its SKILL.md there. A local edit changes the hash and fails here; overrides
+# for this user belong in nil-mode, not in the copy.
+upstream_value() { # upstream_value <file> <key>; last assignment wins
+  local file=$1 key=$2 line val=''
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=${line%$'\r'}
+    case "$line" in
+      "$key="*) val=${line#"$key="} ;;
+    esac
+  done <"$file"
+  printf '%s' "$val"
+}
+
+check_upstream_skill() {
+  local d=$1 u k n v got ok=1
+  u="$d/UPSTREAM"
+  for k in repo commit path blob; do
+    n=$(grep -c "^$k=" "$u" || true)
+    v=$(upstream_value "$u" "$k")
+    if [ "$n" -eq 0 ]; then
+      fail "j. $u has no '$k=' line"
+      ok=0
+    elif [ "$n" -gt 1 ]; then
+      fail "j. $u has '$k=' $n times"
+      ok=0
+    elif [ -z "$v" ]; then
+      fail "j. $u: '$k=' is empty"
+      ok=0
+    fi
+  done
+  [ "$ok" -eq 1 ] || return 0
+  for k in commit blob; do
+    v=$(upstream_value "$u" "$k")
+    if ! [[ $v =~ ^[0-9a-f]{40}$ ]]; then
+      fail "j. $u: $k is not a 40-digit hex SHA: $v"
+      ok=0
+    fi
+  done
+  if [ ! -s "$d/LICENSE" ]; then
+    fail "j. $d/LICENSE is missing or empty (the upstream license must ship with the copy)"
+    ok=0
+  fi
+  [ "$ok" -eq 1 ] || return 0
+  if [ ! -f "$d/SKILL.md" ]; then
+    fail "j. $d has no SKILL.md to compare with $u"
+    return 0
+  fi
+  if ! got=$(git hash-object --no-filters -- "$d/SKILL.md" 2>/dev/null); then
+    fail "j. git hash-object failed for $d/SKILL.md"
+    return 0
+  fi
+  v=$(upstream_value "$u" blob)
+  if [ "$got" != "$v" ]; then
+    fail "j. $d/SKILL.md differs from upstream (blob $got, $u says $v); restore the upstream file, or update UPSTREAM when taking a new upstream version"
+    return 0
+  fi
+  v=$(upstream_value "$u" commit)
+  pass "j. $d/SKILL.md matches upstream ${v:0:12}"
+}
+
+check_upstream_skills() {
+  local u
+  for u in skills/*/UPSTREAM; do
+    [ -f "$u" ] || continue
+    check_upstream_skill "${u%/UPSTREAM}"
+  done
+}
+
 # --- i. rules/pstack-models.md -------------------------------------------------
 # Lines are `<role>: <value>[, <value>...]`; a value is `<model> <effort>`,
 # `inherit-parent` or `auto`. Roles may contain commas and spaces (not colons).
@@ -571,6 +645,7 @@ check_skills
 check_pin
 check_pstack_models
 check_pstack_vendor
+check_upstream_skills
 check_tests
 check_shellcheck
 

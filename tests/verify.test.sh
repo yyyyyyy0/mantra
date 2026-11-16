@@ -274,6 +274,41 @@ ln -s ../PIN.real "$d/pstack/PIN"
 run_verify "$d"
 expect_fail "pstack/PIN itself a symlink" "h. symlink under pstack/: pstack/PIN"
 
+# --- j. skills copied from upstream -------------------------------------------------
+d=$(mk_fixture)
+run_verify "$d"
+check "pristine fixture reports the upstream copies" contains "$VOUT" "j. skills/grilling/SKILL.md matches upstream"
+
+d=$(mk_fixture)
+printf '\nAn extra local line.\n' >>"$d/skills/grilling/SKILL.md"
+run_verify "$d"
+expect_fail "an edited upstream copy" "j. skills/grilling/SKILL.md differs from upstream"
+
+d=$(mk_fixture)
+mv "$d/skills/grilling/LICENSE" "$d/LICENSE.moved"
+run_verify "$d"
+expect_fail "an upstream copy without its LICENSE" "j. skills/grilling/LICENSE is missing or empty"
+
+for k in repo commit path blob; do
+  d=$(mk_fixture)
+  grep -v "^$k=" "$d/skills/grilling/UPSTREAM" >"$d/skills/grilling/UPSTREAM.tmp" || true
+  mv "$d/skills/grilling/UPSTREAM.tmp" "$d/skills/grilling/UPSTREAM"
+  run_verify "$d"
+  expect_fail "UPSTREAM without $k=" "j. skills/grilling/UPSTREAM has no '$k=' line"
+done
+
+d=$(mk_fixture)
+sed -i.bak 's/^commit=.*$/commit=main/' "$d/skills/grilling/UPSTREAM"
+rm -f -- "$d/skills/grilling/UPSTREAM.bak"
+run_verify "$d"
+expect_fail "UPSTREAM with a branch name as commit" "j. skills/grilling/UPSTREAM: commit is not a 40-digit hex SHA"
+
+d=$(mk_fixture)
+mv "$d/skills/grilling/UPSTREAM" "$d/UPSTREAM.moved"
+printf '\nAn extra local line.\n' >>"$d/skills/grilling/SKILL.md"
+run_verify "$d"
+check "a skill without UPSTREAM is not compared" test "$VRC" -eq 0
+
 # --- h. pstack/PIN -----------------------------------------------------------------
 d=$(mk_fixture)
 run_verify "$d"
@@ -478,7 +513,7 @@ check "the skip is a loud WARN" contains "$VOUT" "WARN  e. tests/ NOT run"
 tools_dir() { # tools_dir <name> <with-jq 0|1>
   local b="$TMP/bin-$1" t p
   mkdir -p "$b"
-  for t in bash awk grep sed find sort wc tail head tr basename dirname cat mktemp rm mv cp date od; do
+  for t in bash awk grep sed find sort wc tail head tr basename dirname cat mktemp rm mv cp date od git; do
     if p=$(command -v "$t" 2>/dev/null) && [ -x "$p" ]; then ln -sf "$p" "$b/$t"; fi
   done
   if [ "$2" = "1" ]; then ln -sf "$(command -v jq)" "$b/jq"; fi
