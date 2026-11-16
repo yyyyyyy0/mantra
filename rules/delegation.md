@@ -5,8 +5,9 @@ The user wants subagents and reviews used without having to ask each time, at th
 ## Do without being asked
 
 - Work with 3+ steps, 2+ files, or an unclear approach: read the `nil-mode` skill first. It routes through pstack and lists where this user differs from it.
+- `grill-first`: for that work, if the done condition won't fit one sentence, the request lacks a target or success criterion, or 2+ options differ in ways the user would care about, grill before planning or implementing (see `nil-mode`). On a correction, choose a guardrail before adding rule text (same).
 - Plan first for that work: plan mode in the main session, or the `planner` agent. The built-in Plan agent and mantra's haiku `Explore` do not load these rules, so use `planner` or general-purpose when the rules matter.
-- Show the plan and wait for the user's OK only when it touches the high-risk list below. Otherwise show it and proceed.
+- Show the plan and wait for the user's OK only when it touches the high-risk list below (also after a grill). Otherwise show it and proceed.
 - Implementation beyond a few lines that a plan or spec fully describes goes to a sonnet general-purpose subagent; the main session plans, integrates, and checks the diff.
 - After a code change beyond a few lines (docs-only excluded), run `code-reviewer` on the diff before calling the work done, and fix its CRITICAL/HIGH findings.
 - Auth, secrets, billing, migrations, data integrity, CI config, or the user's live Claude config: run `mob-critic` on the plan (or the proposed change) before implementing and `security-reviewer` on the diff after (FM-AGENT-CRITIC).
