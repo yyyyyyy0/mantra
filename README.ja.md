@@ -2,7 +2,7 @@
 
 English: [README.md](./README.md)
 
-自分用の Claude Code ハーネスです。短いルール 4 ファイル、エージェント 5 体、ガードフック 1 つを、専用の clone から `~/.claude` にリンクして使います。必要なのは bash と jq だけです。
+自分用の Claude Code ハーネスです。短いルール 4 ファイル、エージェント 5 体、フック 2 つ（コマンドガードと Stop チェック）を、専用の clone から `~/.claude` にリンクして使います。必要なのは bash と jq だけです。
 
 ## これは何か
 
@@ -24,6 +24,7 @@ Claude Code は、セッションのたびに `~/.claude/rules` と `~/.claude/a
 | `rules/` | `delegation.md`、`failure-modes.md`、`git-workflow.md`、`pstack-models.md`（常時読み込み。合計 200 行・8KB まで） |
 | `agents/` | `planner`、`code-reviewer`、`security-reviewer`、`mob-critic`、`Explore`（haiku。組み込みの Explore を置き換える） |
 | `hooks/guard.sh` | 破壊的コマンドとフック回避を止める PreToolUse ガード |
+| `hooks/excuse-check.sh` | 回避・言い訳のコメントや報告用 `.md` を見つけたら、エージェントを 1 回だけ差し戻す Stop フック |
 | `scripts/` | `install.sh`、`deploy.sh`、`verify.sh`、`pstack.sh` |
 | `pstack/PIN` | 土台にする pstack の取得元と固定コミット |
 | `githooks/pre-push` | push の前に `scripts/verify.sh` を実行 |
@@ -57,6 +58,12 @@ scripts/deploy.sh --init
 
 ガードは fail-open です。jq がないと何もしません。事故を防ぐシートベルトであり、サンドボックスではありません。
 
+Stop フックの `excuse-check.sh` も同じ形で登録します。git は一切呼ばず、リポジトリも読みません。セッション記録（フック入力の `transcript_path`）から、エージェント自身の Edit / Write だけを調べ、書いた行がいまもファイルに残っているものだけを指摘します。Edit では、`old_string` にも含まれていた行（もとからあった文脈）は対象外です。同じ指摘は 1 セッションに 1 回だけで、表示は 10 件までとし、残りは件数だけ伝えます。1 回の停止で見るのは Write/Edit 40 件・指摘 50 件までで、ユーザー自身の未コミット変更は対象外です。既存の `SUMMARY.md` などへの上書き Write は新規作成と区別できず、同じ行が複数あるときは最初の出現の行番号を示します。Bash で書いたファイルは見えず、サブエージェントの編集は `SubagentStop` にも登録すると対象になります。
+
+```json
+"Stop": [{"hooks": [{"type": "command", "command": "bash ~/.mantra/live/hooks/excuse-check.sh", "timeout": 10}]}]
+```
+
 開発用 checkout では、pre-push のゲートを一度だけ有効にします。
 
 ```sh
@@ -74,7 +81,7 @@ git config core.hooksPath githooks
 
 - ライブ用 clone で origin を fetch します。fast-forward できない場合は、`--force` を付けない限り止まります。
 - 変更される内容を `git log --stat` で表示します。
-- 切り替える前に、一時ディレクトリへ export した origin/main を検証します（`bash -n hooks/guard.sh` と `scripts/verify.sh`）。
+- 切り替える前に、一時ディレクトリへ export した origin/main を検証します（両フックの `bash -n` と `scripts/verify.sh`）。
 - origin/main を detached で checkout し、`install.sh` を実行します。失敗したら、元のコミットに戻します。
 
 ## 検証

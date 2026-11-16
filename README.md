@@ -2,7 +2,7 @@
 
 日本語版: [README.ja.md](./README.ja.md)
 
-My personal Claude Code harness: four short rule files, five agents and one guard hook, linked into `~/.claude` from a dedicated clone. It needs only bash and jq.
+My personal Claude Code harness: four short rule files, five agents and two hooks (a command guard and a Stop check), linked into `~/.claude` from a dedicated clone. It needs only bash and jq.
 
 ## What it is
 
@@ -24,6 +24,7 @@ mantra used to be much bigger: fifteen agents, a TypeScript sync tool, and about
 | `rules/` | `delegation.md`, `failure-modes.md`, `git-workflow.md`, `pstack-models.md` (always loaded, 200 lines / 8 KB in total) |
 | `agents/` | `planner`, `code-reviewer`, `security-reviewer`, `mob-critic`, `Explore` (haiku, replaces the built-in one) |
 | `hooks/guard.sh` | PreToolUse guard for destructive commands and hook bypasses |
+| `hooks/excuse-check.sh` | Stop hook that sends the agent back once for workaround comments and unrequested report `.md` files it wrote (read from the session transcript, no git) |
 | `scripts/` | `install.sh`, `deploy.sh`, `verify.sh`, `pstack.sh` |
 | `pstack/PIN` | Source and pinned commit of the pstack base |
 | `githooks/pre-push` | Runs `scripts/verify.sh` before a push |
@@ -57,6 +58,12 @@ Register the guard once by hand in `~/.claude/settings.json`, merging into any e
 
 The guard is fail-open: if `jq` is missing it does nothing. It is a seatbelt against accidents, not a sandbox.
 
+The Stop hook `excuse-check.sh` is registered the same way. It never runs git and never reads the repository: it reads the session transcript (`transcript_path` from the hook input) and checks only the Edit and Write calls the agent itself made, and only if the written line is still in the file. For an Edit, lines that were already in `old_string` are not reported. Each finding is reported once per session (at most 10 are listed, the rest are only counted), a stop looks at no more than 40 Write/Edit calls and 50 findings, and your own uncommitted changes are never reported. A Write over an existing file such as `SUMMARY.md` cannot be told from a new one, and if the same line occurs several times the first occurrence's line number is shown. Files written through Bash and edits made by subagents are not seen (register the script for `SubagentStop` as well to cover subagents):
+
+```json
+"Stop": [{"hooks": [{"type": "command", "command": "bash ~/.mantra/live/hooks/excuse-check.sh", "timeout": 10}]}]
+```
+
 In the dev checkout, turn on the pre-push gate once:
 
 ```sh
@@ -74,7 +81,7 @@ git config core.hooksPath githooks
 
 - fetches origin in the live clone, and refuses a non-fast-forward unless you pass `--force`;
 - shows `git log --stat` of what will change;
-- verifies origin/main in a temporary export (`bash -n hooks/guard.sh`, then `scripts/verify.sh`) before switching;
+- verifies origin/main in a temporary export (`bash -n` on both hooks, then `scripts/verify.sh`) before switching;
 - checks out origin/main detached and runs `install.sh`; if that fails, it returns to the previous commit.
 
 ## Verify
