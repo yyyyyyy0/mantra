@@ -41,7 +41,7 @@
 # removed), two files per session (and agent): <key>.pos is the byte offset of
 # the transcript that was already processed, <key>.seen holds the key of every
 # finding already reported (file name + comment text, no line number; at most
-# 1000 lines). Each run reads only the complete lines after the offset (up to
+# 1000 lines, after which the hook stays silent for that session). Each run reads only the complete lines after the offset (up to
 # 20 MB; a bigger unread part is skipped), and writes the new offset right
 # after choosing that range, before any heavy work. So if the run is killed
 # (timeout) or fails, the next run does not read the same range again. A
@@ -74,12 +74,14 @@
 #     followed by an excuse word is a false positive; a comment style not listed
 #     above is a miss. A long block comment is only seen on lines that start
 #     with "*" or "/*". A written line is matched whole, so a comment that
-#     starts in the middle of an Edit's new_string line is a miss.
+#     starts in the middle of an Edit's new_string line is a miss. Written
+#     lines over 2000 bytes are not examined.
 #   - A Write over an existing file (SUMMARY.md, a code file) cannot be told
 #     from a new file, so it is treated like a new one.
 #   - Per stop at most 40 candidate Edit / Write calls are examined (each text
 #     up to 400 KB) and at most 50 findings are collected; findings beyond the
-#     10 shown are only counted. Files over 400 KB, binary files and symlinks
+#     10 shown are only counted. Only the first 400 KB of a file is compared;
+#     binary files and symlinks
 #     are skipped.
 #
 # Registration is manual (settings.json -> hooks.Stop, command:
@@ -130,6 +132,8 @@ mkdir -p "$state_dir" 2>/dev/null || exit 0
 chmod 700 "$state_dir" 2>/dev/null || exit 0
 [ -d "$state_dir" ] && [ -O "$state_dir" ] || exit 0
 find "$state_dir" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null || true
+# Work dirs left behind by a killed run (see the trap below).
+find "$state_dir" -maxdepth 1 -type d -name 'tmp.*' -mtime +1 -exec rm -rf -- {} + 2>/dev/null || true
 skey=$sid
 [ -z "$aid" ] || skey="$sid.$aid"
 pos_file="$state_dir/$skey.pos"
@@ -188,7 +192,7 @@ JQ_PROG='
 def bad: test(invis) or contains("\\");
 def ext: (split("/") | last | split(".")) as $p | if ($p | length) > 1 then ($p | last | ascii_downcase) else "" end;
 def code: ext | test("^(ts|tsx|js|jsx|mjs|cjs|go|rs|java|kt|swift|c|h|cc|cpp|hpp|cs|py|rb|sh|bash|zsh|php|lua)$");
-def hint: ascii_downcase | test("workaround|hack|for now|temporary fix|quick fix|todo|fixme|xxx|一旦|いったん|念のため|とりあえず|暫定");
+def hint: ascii_downcase | test("(^|[^a-z0-9_])(workarounds?|hacky|hack|for now|temporary fix|quick fix|todo|fixme|xxx)($|[^a-z0-9_])|一旦|いったん|念のため|とりあえず|暫定");
 def norm: sub("^[ \t\r]+"; "") | sub("[ \t\r]+$"; "");
 def rec($n; $path; $new; $old):
   if ($path | type) == "string" and ($path | startswith("/")) and ($path | bad | not) then
@@ -196,7 +200,7 @@ def rec($n; $path; $new; $old):
     elif ($path | code) and ($new | type) == "string" and ($new | utf8bytelength) <= $maxtext
       and ($old | type) == "string" and ($old | utf8bytelength) <= $maxtext and ($new | hint) then
       (reduce ($old | split("\n") | .[] | norm) as $l ({}; .[$l] = 1)) as $ctx
-      | [$new | split("\n") | .[] | norm | select(length > 0 and hint and ($ctx[.] | not))] | unique
+      | [$new | split("\n") | .[] | norm | select(length > 0 and utf8bytelength <= 2000 and hint and ($ctx[.] | not))] | unique
       | map(["L", $path, .] | @tsv)
     else empty end
   else empty end;

@@ -555,13 +555,13 @@ new_case
 for hex in '\xcd\x8f:U+034F' '\xd8\x9c:U+061C' '\xe1\x85\x9f:U+115F' '\xe1\x85\xa0:U+1160' '\xe1\xa0\x8e:U+180E' \
   '\xe2\xa0\x80:U+2800' '\xe3\x85\xa4:U+3164' '\xef\xb8\x80:U+FE00' '\xef\xb8\x8f:U+FE0F' \
   '\xf3\xa0\x80\x81:U+E0001' '\xf3\xa0\xbf\xbf:U+E0FFF'; do
-  ch=$(printf "${hex%%:*}")
+  ch=$(printf '%b' "${hex%%:*}")
   printf '// hack a%sb 日本語\n' "$ch" >"$D/inv.go"
   add_write "$D/inv.go" "$(cat "$D/inv.go")"
   out=$(run_hook "inv-${hex##*:}")
   assert_block "${hex##*:} in a comment" "$out" "inv.go:1: // hack ab 日本語"
   : >"$TR"
-  if printf '// hack\n' >"$D/n$ch.go" 2>/dev/null; then
+  if { printf '// hack\n' >"$D/n$ch.go"; } 2>/dev/null; then
     add_write "$D/n$ch.go" "// hack"
     out=$(run_hook "invn-${hex##*:}")
     assert_silent "${hex##*:} in a file name is skipped" "$out"
@@ -599,6 +599,25 @@ printf '// hack\n' >"$D/a.go"
 add_write "$D/a.go" "// hack"
 out=$(run_hook sp6)
 if [ "$(printf '%s' "$out" | jq -r .reason | grep -c '^> ')" = "1" ]; then ok "every listed line starts with '> '"; else bad "every listed line starts with '> '"; fi
+
+new_case
+printf 'x = 1\n' >"$D/d.py"
+i=0
+while [ "$i" -lt 45 ]; do
+  add_edit "$D/d.py" "# hackathon todoList $i"
+  i=$((i + 1))
+done
+printf '# workaround real\n' >"$D/real.py"
+add_edit "$D/real.py" "# workaround real"
+out=$(run_hook decoy)
+assert_block "45 decoy edits do not push out a real finding" "$out" "real.py:1: # workaround real"
+
+new_case
+long=$(printf '%2100s' '' | tr ' ' 'x')
+printf '// hack %s\n' "$long" >"$D/long.js"
+add_write "$D/long.js" "$(cat "$D/long.js")"
+out=$(run_hook longline)
+assert_silent "a written line over 2000 bytes is not examined" "$out"
 
 echo
 echo "excuse-check.test.sh: $pass passed, $fail failed"
