@@ -30,16 +30,20 @@ new_case() { # sets D (cwd, work dir) and TR (empty transcript)
   : >"$TR"
 }
 
+# Large texts go through files, not argv: Linux limits one argument to 128 KB.
 tool_line() { # name, input JSON
-  jq -cn --arg n "$1" --argjson i "$2" \
+  printf '%s' "$2" >"$WORK/tool_input.json"
+  jq -cn --arg n "$1" --slurpfile i "$WORK/tool_input.json" \
     '{type: "assistant", cwd: "/x", sessionId: "s", isSidechain: false,
-      message: {role: "assistant", content: [{type: "text", text: "ok"}, {type: "tool_use", id: "t1", name: $n, input: $i}]}}'
+      message: {role: "assistant", content: [{type: "text", text: "ok"}, {type: "tool_use", id: "t1", name: $n, input: $i[0]}]}}'
 }
 add_edit() { # path, new_string
-  tool_line Edit "$(jq -cn --arg p "$1" --arg s "$2" '{file_path: $p, old_string: "a", new_string: $s, replace_all: false}')" >>"$TR"
+  printf '%s' "$2" >"$WORK/tool_text"
+  tool_line Edit "$(jq -cn --arg p "$1" --rawfile s "$WORK/tool_text" '{file_path: $p, old_string: "a", new_string: $s, replace_all: false}')" >>"$TR"
 }
 add_write() { # path, content
-  tool_line Write "$(jq -cn --arg p "$1" --arg s "$2" '{file_path: $p, content: $s}')" >>"$TR"
+  printf '%s' "$2" >"$WORK/tool_text"
+  tool_line Write "$(jq -cn --arg p "$1" --rawfile s "$WORK/tool_text" '{file_path: $p, content: $s}')" >>"$TR"
 }
 
 run_hook() { # session id, [stop_hook_active]
@@ -104,6 +108,7 @@ assert_block "/* */ on a code line" "$out" "> c.c:1:"
 assert_block "' * ' block comment line" "$out" "> c.c:3: * FIXME later"
 
 new_case
+# shellcheck disable=SC2016  # literal PHP source, $a is not a shell variable
 printf '<?php\n$a = 1; // hack\n# FIXME later\n' >"$D/p.php"
 printf 'local a = 1\n-- hack\n' >"$D/l.lua"
 add_write "$D/p.php" "$(cat "$D/p.php")"
@@ -478,7 +483,7 @@ printf '// hack\n' >"$D/a.go"
 add_write "$D/a.go" "// hack"
 rc=0
 out=$(jq -cn --arg t "$TR" '{session_id: "nocwd", transcript_path: $t}' | bash "$HOOK") || rc=$?
-[ "$rc" -eq 0 ] && ok "no cwd exits 0" || bad "no cwd exits 0"
+if [ "$rc" -eq 0 ]; then ok "no cwd exits 0"; else bad "no cwd exits 0"; fi
 assert_block "no cwd still reports A (full path, cut at 80)" "$out" ":1: // hack"
 
 # --- state dir safety ----------------------------------------------------------------------
