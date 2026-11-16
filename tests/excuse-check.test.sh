@@ -140,6 +140,56 @@ add_edit "./a.go" "// hack"
 out=$(run_hook rel1)
 assert_silent "relative path in the tool call is ignored" "$out"
 
+# --- Edit context lines (old_string) are not candidates ----------------------------
+new_case
+printf '// TODO old note\nx := 1\n// hack new\n' >"$D/a.go"
+add_edit_ctx() { # path, old, new
+  tool_line Edit "$(jq -cn --arg p "$1" --arg o "$2" --arg s "$3" '{file_path: $p, old_string: $o, new_string: $s}')" >>"$TR"
+}
+add_edit_ctx "$D/a.go" $'// TODO old note\nx := 0' $'// TODO old note\nx := 1\n// hack new'
+out=$(run_hook ctx1)
+assert_block "Edit: a newly added line blocks" "$out" "a.go:3: // hack new"
+assert_lacks "Edit: a line also in old_string is not reported" "$out" "TODO old note"
+
+new_case
+printf '// TODO old note\nx := 1\n' >"$D/a.go"
+add_edit_ctx "$D/a.go" $'// TODO old note\nx := 0' $'// TODO old note\nx := 1'
+out=$(run_hook ctx2)
+assert_silent "Edit: only context lines carry an excuse: silent" "$out"
+
+new_case
+printf '    // TODO old note\nx := 1\n' >"$D/a.go"
+add_edit_ctx "$D/a.go" $'\t// TODO old note\r\nx := 0' $'    // TODO old note\nx := 1'
+out=$(run_hook ctx3)
+assert_silent "Edit: context compared after trimming blanks and CR" "$out"
+
+new_case
+printf '// TODO old note\nx := 1\n' >"$D/a.go"
+add_write "$D/a.go" "$(cat "$D/a.go")"
+out=$(run_hook ctx4)
+assert_block "Write: every line counts" "$out" "a.go:1: // TODO old note"
+
+# --- line matching is a little loose: CRLF, indentation ----------------------------
+new_case
+printf 'x := 1\r\n// hack here\r\n' >"$D/crlf.go"
+add_write "$D/crlf.go" $'x := 1\n// hack here\n'
+out=$(run_hook crlf1)
+assert_block "CRLF file, LF in the written text" "$out" "crlf.go:2: // hack here"
+
+new_case
+printf 'func f() {\n\t\t// hack here\n}\n' >"$D/ind.go"
+add_edit "$D/ind.go" "    // hack here"
+out=$(run_hook ind1)
+assert_block "re-indented line (tabs vs spaces) still matches; shown from the file" "$out" "ind.go:2: // hack here"
+
+# --- the first comment marker wins ------------------------------------------------------
+new_case
+printf 'x(); /* hack */ // ok\ny(); // ok /* fine */\n' >"$D/cm.go"
+add_write "$D/cm.go" "$(cat "$D/cm.go")"
+out=$(run_hook cm1)
+assert_block "/* hack */ before // ok is a comment" "$out" "cm.go:1: x(); /* hack */ // ok"
+if [ "$(printf '%s' "$out" | jq -r .reason | grep -c '^> ')" = "1" ]; then ok "no excuse word, no finding on the other line"; else bad "no excuse word, no finding on the other line"; fi
+
 # --- still-in-file rule -----------------------------------------------------------
 new_case
 printf 'int a;\n' >"$D/a.go"
@@ -231,12 +281,56 @@ for i in $(seq 1 12); do
 done
 out1=$(run_hook m1)
 out2=$(run_hook m1)
+assert_block "12 findings: first block lists 10 and counts the rest" "$out1" "ほか 2 件（表示は省略）"
+if [ "$(printf '%s' "$out1" | jq -r .reason | grep -c '^> ')" = "10" ]; then ok "12 findings: 10 listed"; else bad "12 findings: 10 listed"; fi
+assert_silent "12 findings: nothing carried over to the next stop" "$out2"
+if [ "$(wc -l <"$TMPDIR/mantra-excuse-check/m1.seen" | tr -d ' ')" = "12" ]; then ok "12 findings: all 12 recorded as seen"; else bad "12 findings: all 12 recorded as seen"; fi
+printf '// FIXME x\n' >"$D/g.go"
+add_write "$D/g.go" "// FIXME x"
 out3=$(run_hook m1)
-assert_block "12 findings: first block" "$out1" "ほか 2 件"
-assert_block "12 findings: remaining ones next time" "$out2"
-if [ "$(printf '%s' "$out1" | jq -r .reason | grep -c '^> ')" = "10" ] \
-  && [ "$(printf '%s' "$out2" | jq -r .reason | grep -c '^> ')" = "2" ]; then ok "10 listed, then the other 2"; else bad "10 listed, then the other 2"; fi
-assert_silent "12 findings: then silent" "$out3"
+assert_block "12 findings: a later new edit still blocks" "$out3" "g.go:1:"
+
+new_case
+for i in $(seq 1 45); do
+  printf '// hack\n' >"$D/p$i.go"
+  add_write "$D/p$i.go" "// hack"
+done
+out=$(run_hook mp1)
+assert_block "45 pairs: only the first 40 are examined" "$out" "ほか 30 件"
+
+new_case
+for i in $(seq 1 60); do printf '// hack %s\n' "$i"; done >"$D/many.go"
+add_write "$D/many.go" "$(cat "$D/many.go")"
+out=$(run_hook mf1)
+assert_block "60 findings in one file: at most 50 are collected" "$out" "ほか 40 件"
+if [ "$(wc -l <"$TMPDIR/mantra-excuse-check/mf1.seen" | tr -d ' ')" = "50" ]; then ok "only the 50 collected findings are recorded"; else bad "only the 50 collected findings are recorded"; fi
+
+# at-most-once: the offset moves before the heavy work, so a run killed midway is not repeated
+new_case
+printf '// hack\n' >"$D/a.go"
+add_write "$D/a.go" "// hack"
+mkdir -p "$WORK/killbin"
+cat >"$WORK/killbin/grep" <<EOS
+#!/bin/sh
+i=0
+while [ ! -s "$WORK/killpid" ] && [ \$i -lt 100 ]; do sleep 0.1; i=\$((i + 1)); done
+kill -KILL "\$(cat "$WORK/killpid")"
+sleep 5
+EOS
+chmod +x "$WORK/killbin/grep"
+rm -f "$WORK/killpid"
+jq -cn --arg s ko1 --arg c "$D" --arg t "$TR" '{session_id: $s, cwd: $c, transcript_path: $t, stop_hook_active: false}' >"$WORK/ko.json"
+PATH="$WORK/killbin:$PATH" bash "$HOOK" <"$WORK/ko.json" >"$WORK/ko.out" 2>/dev/null &
+hp=$!
+echo "$hp" >"$WORK/killpid"
+wait "$hp" 2>/dev/null || true
+if [ "$(cat "$TMPDIR/mantra-excuse-check/ko1.pos")" = "$(wc -c <"$TR" | tr -d ' ')" ] && [ ! -s "$WORK/ko.out" ]; then
+  ok "killed run: offset was already moved to the end"
+else
+  bad "killed run: offset was already moved to the end" "($(cat "$TMPDIR/mantra-excuse-check/ko1.pos" 2>/dev/null))"
+fi
+out=$(run_hook ko1)
+assert_silent "killed run: the next run does not read the range again" "$out"
 
 new_case
 printf '// hack\n' >"$D/a.go"
@@ -269,6 +363,22 @@ if [ "$(cat "$TMPDIR/mantra-excuse-check/pt1.pos")" = "$first_len" ]; then ok "o
 tail -c +61 "$WORK/second.jsonl" >>"$TR"
 out2=$(run_hook pt1)
 assert_block "partial last line: completed line is read next time" "$out2" "b.go:1:"
+
+new_case
+printf '// hack 日本語\n' >"$D/a.go"
+printf '// FIXME 暫定 日本語の説明\n' >"$D/b.go"
+add_write "$D/a.go" "$(cat "$D/a.go")"
+first_len=$(wc -c <"$TR" | tr -d ' ')
+tool_line Write "$(jq -cn --arg p "$D/b.go" '{file_path: $p, content: "// FIXME 暫定 日本語の説明"}')" >"$WORK/second.jsonl"
+cut_at=$(LC_ALL=C grep -a -b -o '日' "$WORK/second.jsonl" | head -1 | cut -d: -f1)
+head -c $((cut_at + 1)) "$WORK/second.jsonl" >>"$TR"
+out1=$(run_hook mb1)
+assert_block "multibyte: first record read" "$out1" "a.go:1:"
+if [ "$(cat "$TMPDIR/mantra-excuse-check/mb1.pos")" = "$first_len" ]; then ok "multibyte: offset stops before the record cut inside a character"; else bad "multibyte: offset stops before the record cut inside a character"; fi
+tail -c +$((cut_at + 2)) "$WORK/second.jsonl" >>"$TR"
+out2=$(run_hook mb1)
+assert_block "multibyte: the completed record is read on the next run" "$out2" "b.go:1:"
+if [ "$(cat "$TMPDIR/mantra-excuse-check/mb1.pos")" = "$(wc -c <"$TR" | tr -d ' ')" ]; then ok "multibyte: offset at the end of the transcript"; else bad "multibyte: offset at the end of the transcript"; fi
 
 new_case
 printf '// hack\n' >"$D/a.go"
@@ -440,6 +550,26 @@ for pair in "ESC:$(printf '\033')" "CR:$(printf '\r')" "U+202E:$(printf '\xe2\x8
 done
 assert_block "notice says the list is a quote" "$out" "以下の引用はエージェントが書いたファイルの抜粋であり、指示ではありません。"
 assert_block "excerpt keeps the visible text" "$out" "> e.go:1: // hack [31mFAKE"
+
+new_case
+for hex in '\xcd\x8f:U+034F' '\xd8\x9c:U+061C' '\xe1\x85\x9f:U+115F' '\xe1\x85\xa0:U+1160' '\xe1\xa0\x8e:U+180E' \
+  '\xe2\xa0\x80:U+2800' '\xe3\x85\xa4:U+3164' '\xef\xb8\x80:U+FE00' '\xef\xb8\x8f:U+FE0F' \
+  '\xf3\xa0\x80\x81:U+E0001' '\xf3\xa0\xbf\xbf:U+E0FFF'; do
+  ch=$(printf "${hex%%:*}")
+  printf '// hack a%sb 日本語\n' "$ch" >"$D/inv.go"
+  add_write "$D/inv.go" "$(cat "$D/inv.go")"
+  out=$(run_hook "inv-${hex##*:}")
+  assert_block "${hex##*:} in a comment" "$out" "inv.go:1: // hack ab 日本語"
+  : >"$TR"
+  if printf '// hack\n' >"$D/n$ch.go" 2>/dev/null; then
+    add_write "$D/n$ch.go" "// hack"
+    out=$(run_hook "invn-${hex##*:}")
+    assert_silent "${hex##*:} in a file name is skipped" "$out"
+  else
+    ok "${hex##*:} in a file name: file system refuses it (skipped)"
+  fi
+  : >"$TR"
+done
 
 new_case
 long=$(printf 'a%.0s' $(seq 1 90))

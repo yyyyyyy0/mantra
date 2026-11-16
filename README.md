@@ -58,7 +58,7 @@ Register the guard once by hand in `~/.claude/settings.json`, merging into any e
 
 The guard is fail-open: if `jq` is missing it does nothing. It is a seatbelt against accidents, not a sandbox.
 
-The Stop hook `excuse-check.sh` is registered the same way. It never runs git and never reads the repository: it reads the session transcript (`transcript_path` from the hook input) and checks only the Edit and Write calls the agent itself made, and only if the written line is still in the file. Each finding is reported once per session, and your own uncommitted changes are never reported. Files written through Bash and edits made by subagents are not seen (register the script for `SubagentStop` as well to cover subagents):
+The Stop hook `excuse-check.sh` is registered the same way. It never runs git and never reads the repository: it reads the session transcript (`transcript_path` from the hook input) and checks only the Edit and Write calls the agent itself made, and only if the written line is still in the file. For an Edit, lines that were already in `old_string` are not reported. Each finding is reported once per session (at most 10 are listed, the rest are only counted), a stop looks at no more than 40 Write/Edit calls and 50 findings, and your own uncommitted changes are never reported. A Write over an existing file such as `SUMMARY.md` cannot be told from a new one, and if the same line occurs several times the first occurrence's line number is shown. Files written through Bash and edits made by subagents are not seen (register the script for `SubagentStop` as well to cover subagents):
 
 ```json
 "Stop": [{"hooks": [{"type": "command", "command": "bash ~/.mantra/live/hooks/excuse-check.sh", "timeout": 10}]}]
