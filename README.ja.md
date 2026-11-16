@@ -58,7 +58,7 @@ scripts/deploy.sh --init
 
 ガードは fail-open です。jq がないと何もしません。事故を防ぐシートベルトであり、サンドボックスではありません。
 
-Stop フックの `excuse-check.sh` も同じ形で登録します。`git diff HEAD` の追加行と未追跡ファイルを見て、同じ指摘は 1 セッションに 1 回だけ報告します（自分の未コミット変更も、セッション最初の停止では対象です）。リポジトリのローカル git 設定に `filter.*` があるリポジトリでは何もしません。
+Stop フックの `excuse-check.sh` も同じ形で登録します。git は一切呼ばず、リポジトリも読みません。セッション記録（フック入力の `transcript_path`）から、エージェント自身の Edit / Write だけを調べ、書いた行がいまもファイルに残っているものだけを指摘します。同じ指摘は 1 セッションに 1 回だけで、ユーザー自身の未コミット変更は対象外です。Bash で書いたファイルは見えず、サブエージェントの編集は `SubagentStop` にも登録すると対象になります。
 
 ```json
 "Stop": [{"hooks": [{"type": "command", "command": "bash ~/.mantra/live/hooks/excuse-check.sh", "timeout": 10}]}]

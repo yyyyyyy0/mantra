@@ -24,7 +24,7 @@ mantra used to be much bigger: fifteen agents, a TypeScript sync tool, and about
 | `rules/` | `delegation.md`, `failure-modes.md`, `git-workflow.md`, `pstack-models.md` (always loaded, 200 lines / 8 KB in total) |
 | `agents/` | `planner`, `code-reviewer`, `security-reviewer`, `mob-critic`, `Explore` (haiku, replaces the built-in one) |
 | `hooks/guard.sh` | PreToolUse guard for destructive commands and hook bypasses |
-| `hooks/excuse-check.sh` | Stop hook that sends the agent back once for workaround comments and unrequested report `.md` files |
+| `hooks/excuse-check.sh` | Stop hook that sends the agent back once for workaround comments and unrequested report `.md` files it wrote (read from the session transcript, no git) |
 | `scripts/` | `install.sh`, `deploy.sh`, `verify.sh`, `pstack.sh` |
 | `pstack/PIN` | Source and pinned commit of the pstack base |
 | `githooks/pre-push` | Runs `scripts/verify.sh` before a push |
@@ -58,7 +58,7 @@ Register the guard once by hand in `~/.claude/settings.json`, merging into any e
 
 The guard is fail-open: if `jq` is missing it does nothing. It is a seatbelt against accidents, not a sandbox.
 
-The Stop hook `excuse-check.sh` is registered the same way. It looks at the added lines of `git diff HEAD` and untracked files, and reports each finding once per session (your own uncommitted changes are included, at the first stop of a session). It does nothing in a repository whose local git config defines `filter.*`:
+The Stop hook `excuse-check.sh` is registered the same way. It never runs git and never reads the repository: it reads the session transcript (`transcript_path` from the hook input) and checks only the Edit and Write calls the agent itself made, and only if the written line is still in the file. Each finding is reported once per session, and your own uncommitted changes are never reported. Files written through Bash and edits made by subagents are not seen (register the script for `SubagentStop` as well to cover subagents):
 
 ```json
 "Stop": [{"hooks": [{"type": "command", "command": "bash ~/.mantra/live/hooks/excuse-check.sh", "timeout": 10}]}]
