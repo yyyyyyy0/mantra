@@ -2,7 +2,7 @@
 
 日本語版: [README.ja.md](./README.ja.md)
 
-My personal Claude Code harness: four short rule files, five agents and one guard hook, linked into `~/.claude` from a dedicated clone. It needs only bash and jq.
+My personal Claude Code harness: four short rule files, five agents and two hooks (a command guard and a Stop check), linked into `~/.claude` from a dedicated clone. It needs only bash and jq.
 
 ## What it is
 
@@ -24,6 +24,7 @@ mantra used to be much bigger: fifteen agents, a TypeScript sync tool, and about
 | `rules/` | `delegation.md`, `failure-modes.md`, `git-workflow.md`, `pstack-models.md` (always loaded, 200 lines / 8 KB in total) |
 | `agents/` | `planner`, `code-reviewer`, `security-reviewer`, `mob-critic`, `Explore` (haiku, replaces the built-in one) |
 | `hooks/guard.sh` | PreToolUse guard for destructive commands and hook bypasses |
+| `hooks/excuse-check.sh` | Stop hook that sends the agent back once for workaround comments and unrequested report `.md` files |
 | `scripts/` | `install.sh`, `deploy.sh`, `verify.sh`, `pstack.sh` |
 | `pstack/PIN` | Source and pinned commit of the pstack base |
 | `githooks/pre-push` | Runs `scripts/verify.sh` before a push |
@@ -57,6 +58,12 @@ Register the guard once by hand in `~/.claude/settings.json`, merging into any e
 
 The guard is fail-open: if `jq` is missing it does nothing. It is a seatbelt against accidents, not a sandbox.
 
+The Stop hook `excuse-check.sh` is registered the same way. It looks at the added lines of `git diff HEAD` and untracked files, and blocks the stop once per distinct finding list:
+
+```json
+"Stop": [{"hooks": [{"type": "command", "command": "bash ~/.mantra/live/hooks/excuse-check.sh"}]}]
+```
+
 In the dev checkout, turn on the pre-push gate once:
 
 ```sh
@@ -74,7 +81,7 @@ git config core.hooksPath githooks
 
 - fetches origin in the live clone, and refuses a non-fast-forward unless you pass `--force`;
 - shows `git log --stat` of what will change;
-- verifies origin/main in a temporary export (`bash -n hooks/guard.sh`, then `scripts/verify.sh`) before switching;
+- verifies origin/main in a temporary export (`bash -n` on both hooks, then `scripts/verify.sh`) before switching;
 - checks out origin/main detached and runs `install.sh`; if that fails, it returns to the previous commit.
 
 ## Verify

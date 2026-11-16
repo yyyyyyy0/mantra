@@ -19,7 +19,7 @@
 #   3. origin/main is a fast-forward of the live HEAD (unless --force)
 #   4. origin/main, exported to a temp dir with checkout-index (so .gitattributes
 #      export-ignore cannot hide files) and run with a fresh HOME, passes
-#      bash -n hooks/guard.sh and scripts/verify.sh
+#      bash -n hooks/guard.sh, bash -n hooks/excuse-check.sh and scripts/verify.sh
 # Only then is origin/main checked out detached and install.sh run. If
 # install.sh fails, the previous HEAD is checked out again and deploy.sh
 # exits non-zero.
@@ -161,6 +161,7 @@ echo "verifying ${NEW_HEAD:0:12} in $EXPORT_DIR"
 # change) the real ~/.claude or the live clone.
 if ! (cd "$EXPORT_DIR" &&
   env -u MANTRA_LIVE -u MANTRA_TEST_REAL_HOME HOME="$GATE_HOME" bash -n hooks/guard.sh &&
+  env -u MANTRA_LIVE -u MANTRA_TEST_REAL_HOME HOME="$GATE_HOME" bash -n hooks/excuse-check.sh &&
   env -u MANTRA_LIVE -u MANTRA_TEST_REAL_HOME HOME="$GATE_HOME" bash scripts/verify.sh); then
   echo "deploy.sh: origin/main failed verification; the live clone was not changed" >&2
   exit 1
